@@ -26,8 +26,9 @@ authoring_mode: ai_generated
 - 为什么:见 `forwarded-clock.md`。一句话:数据和前向时钟出自同一个 PLL,收端看到的是差;把前向时钟当一个"同 RMS 的独立时钟"
   会把 186 fs 的 PLL 抖动全部算进预算,结论就错了一个数量级。
 - 怎么守:`tests/test_forwarded_clock.py` —— 相关 = 1 残余恰为 0(闭式与合成都为 0);跟踪带宽 ∞ → 0;无跟踪 → 两路独立功率和;
-  闭式与合成 5% 内;`tests/test_invariants.py::test_law2_*` 静态保证配置里没有 `rx.*profile` 字段、`clock/forwarded.py` 之外没有
-  第二处合成相噪。
+  闭式与合成 5% 内。`tests/test_local_pll.py`(里程碑 2)—— 本地 PLL 环路带宽 ∞ → 残余 0(本地噪声全压掉),→ 0 → 发端 + 本地
+  两路功率和;没有环路带宽的本地 PLL 被 schema 拒绝。`tests/test_invariants.py::test_law2_*` 静态保证配置里除 `clocking.local_pll_*`
+  外没有任何收端时钟字段、`clock/forwarded.py` 之外没有第二处合成相噪。
 
 ## 3 统计引擎是主引擎
 
@@ -40,7 +41,8 @@ authoring_mode: ai_generated
 
 - 怎么守:`tests/test_lanes.py` —— `lane_map` 三种修复模式;`lanes.count = 1` 的结果与 x4 模块的 lane 0 逐位相同;残余 skew 把
   lane 推离眼中心;两个 bundled 配置(x16 降宽、x64 备用 lane)跑通。
-- 边界:lane 间串扰不在本轮(ROADMAP)。
+- 里程碑 2:lane 间 FEXT 串扰(`channel.xtalk`)按**物理**邻接取邻 lane,死 lane 与闲置备用 lane 静默,修复后的重映射改变邻接
+  (`tests/test_xtalk.py`);单 lane 的结果不受串扰设置影响。
 
 ## 5 规范数字只用原文
 

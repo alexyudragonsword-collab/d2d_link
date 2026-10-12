@@ -14,6 +14,7 @@ per UI); both engines read their cursors off that one pulse.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -95,15 +96,48 @@ def ctle_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
     return (1.0 + s / fz) / ((1.0 + s / fp1) * (1.0 + s / fp2))
 
 
+def xtalk_response(cfg: LinkConfig, f: np.ndarray, neighbour: int) -> np.ndarray:
+    """Far-end crosstalk from a lane ``neighbour`` places away, relative to the
+    through response: coupled lines couple the *derivative* of the aggressor
+    at low frequency and saturate near the band edge, so X/H = k (jf/fn) /
+    (1 + jf/fn) with k set by the configured level at the Nyquist frequency
+    fn. Zero when crosstalk is off or the neighbour is further than two lanes."""
+    f = np.asarray(f, dtype=np.float64)
+    if cfg.channel.xtalk == "none" or neighbour not in (1, 2):
+        return np.zeros_like(f, dtype=complex)
+    adj, sec = cfg.xtalk_db()
+    level = 10.0 ** ((adj if neighbour == 1 else sec) / 20.0)
+    u = 1j * f / cfg.f_nyquist
+    return level * math.sqrt(2.0) * u / (1.0 + u)
+
+
+def read_cursors(pulse: np.ndarray, position: float, osr: int, n_max: int = 64,
+                 keep_centre: bool = True) -> tuple[np.ndarray, int]:
+    """Baud-spaced samples of ``pulse`` around sample ``position`` (linear
+    interpolation): ``(c, i_centre)``. Cursors below 1e-9 of the pulse's peak
+    at both ends are dropped; the centre is kept when ``keep_centre``."""
+    ks = np.arange(-n_max, n_max + 1)
+    c = np.interp(position + ks * osr, np.arange(pulse.size), pulse, left=0.0, right=0.0)
+    keep = np.abs(c) > 1e-9 * max(float(np.max(np.abs(pulse))), 1e-300)
+    if keep_centre:
+        keep[n_max] = True
+    if not keep.any():
+        return np.zeros(0), 0
+    lo, hi = int(np.argmax(keep)), int(keep.size - np.argmax(keep[::-1]))
+    return c[lo:hi], n_max - lo
+
+
 @dataclass(frozen=True)
 class LinkResponse:
-    """Pulse response at the sampler for a +1 symbol of amplitude swing/2."""
+    """Pulse response at the sampler for a +1 symbol of amplitude swing/2, and
+    the crosstalk pulses a neighbour lane's +1 symbol leaves on it."""
 
     pulse: Waveform          # [V], per sample of ``dt``
     impulse: Waveform        # per-sample weights (sum = H(0))
     channel: ChannelModel
     H_total: np.ndarray      # channel x Tx x CTLE on channel.f
     osr: int
+    xtalk_pulses: dict = None   # {neighbour distance: Waveform [V]}; empty when crosstalk is off
 
     @property
     def main_index(self) -> int:
@@ -123,15 +157,21 @@ class LinkResponse:
         (linear interpolation between waveform samples): ``(c, i_main)`` with
         ``c[i_main]`` the main cursor. Cursors below 1e-9 of the peak at both
         ends are dropped; at most ``n_max`` on each side."""
-        p = self.pulse.y
-        pos = self.main_index + phase_ui * self.osr
-        ks = np.arange(-n_max, n_max + 1)
-        idx = pos + ks * self.osr
-        c = np.interp(idx, np.arange(p.size), p, left=0.0, right=0.0)
-        keep = np.abs(c) > 1e-9 * np.max(np.abs(p))
-        keep[n_max] = True
-        lo, hi = int(np.argmax(keep)), int(keep.size - np.argmax(keep[::-1]))
-        return c[lo:hi], n_max - lo
+        return read_cursors(self.pulse.y, self.main_index + phase_ui * self.osr, self.osr, n_max)
+
+    def xtalk_cursors(self, neighbour: int, phase_ui: float, rel_skew_ui: float = 0.0,
+                      n_max: int = 64) -> np.ndarray:
+        """Baud-spaced crosstalk cursors a neighbour ``neighbour`` lanes away
+        leaves at this lane's sampling instant (``phase_ui`` from its own
+        peak). The aggressor's symbols arrive ``rel_skew_ui`` later than the
+        victim's, so its pulse is read that much earlier. Empty when there is
+        no coupling at that distance."""
+        pulses = self.xtalk_pulses or {}
+        if neighbour not in pulses:
+            return np.zeros(0)
+        pos = self.main_index + (phase_ui - rel_skew_ui) * self.osr
+        c, _ = read_cursors(pulses[neighbour].y, pos, self.osr, n_max, keep_centre=False)
+        return c
 
 
 def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkResponse:
@@ -142,8 +182,15 @@ def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkR
     if not np.isclose(h.dt, cfg.dt, rtol=1e-6):
         raise ValueError(f"impulse dt {h.dt:.3e} does not match the waveform grid {cfg.dt:.3e}")
     osr = cfg.sim.osr
-    pulse = np.convolve(h.y, np.ones(osr))[: h.y.size] * (0.5 * cfg.tx.swing_vpp)
-    return LinkResponse(Waveform(pulse, h.dt), h, ch, H, osr)
+    amp = 0.5 * cfg.tx.swing_vpp
+    pulse = np.convolve(h.y, np.ones(osr))[: h.y.size] * amp
+    xt = {}
+    if cfg.channel.xtalk != "none":
+        for k in (1, 2):
+            hx = freq2impulse(H * xtalk_response(cfg, f, k), f)
+            xt[k] = Waveform(np.convolve(hx.y, np.ones(osr))[: hx.y.size] * amp, hx.dt)
+    return LinkResponse(Waveform(pulse, h.dt), h, ch, H, osr, xt)
 
 
-__all__ = ["ChannelModel", "LinkResponse", "link_response", "tx_response", "ctle_response"]
+__all__ = ["ChannelModel", "LinkResponse", "link_response", "tx_response", "ctle_response",
+           "xtalk_response", "read_cursors"]

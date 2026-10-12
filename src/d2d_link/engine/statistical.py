@@ -74,8 +74,13 @@ class IsiModel:
     n_cursors: int
 
 
-def isi_model(cursors: np.ndarray, i_main: int, n_enum: int) -> IsiModel:
+def isi_model(cursors: np.ndarray, i_main: int, n_enum: int, extra: np.ndarray | None = None) -> IsiModel:
+    """``extra`` are further interferers with independent +-1 symbols (the
+    neighbour lanes' crosstalk cursors): they join the ISI cursors in the
+    enumeration or the variance on the same footing."""
     c = np.delete(cursors, i_main)
+    if extra is not None and extra.size:
+        c = np.concatenate([c, extra])
     order = np.argsort(-np.abs(c))
     top = c[order[:n_enum]]
     rest = c[order[n_enum:]]
@@ -95,8 +100,11 @@ def tail_probability(m: IsiModel, sigma_noise: float, v: float) -> float:
     return float(np.mean(qfunc((m.main + m.isi_values - v) / sigma)))
 
 
-def jitter_quadrature(sigma_ui: float, phase_points: int, n_sigmas: float) -> tuple[np.ndarray, np.ndarray]:
-    """Offsets [UI] and weights for E[f(phase + delta)], delta ~ N(0, sigma).
+def jitter_quadrature(sigma_ui: float, phase_points: int, n_sigmas: float,
+                      uniform_width_ui: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
+    """Offsets [UI] and weights for E[f(phase + delta)], delta ~ N(0, sigma)
+    convolved with a uniform of width ``uniform_width_ui`` (the phase
+    interpolator's quantisation step; 0 = none).
 
     A trapezoid on a uniform grid rather than Gauss-Hermite: the integrand is
     the bathtub, a near step at the eye's edge, and a few Hermite nodes
@@ -105,14 +113,19 @@ def jitter_quadrature(sigma_ui: float, phase_points: int, n_sigmas: float) -> tu
     on one fine grid and the ISI models are shared; the range is
     ``n_sigmas`` on each side, which must reach the target BER's tail
     (1e-27 is 10.8 sigma)."""
-    if sigma_ui <= 0.0:
+    if sigma_ui <= 0.0 and uniform_width_ui <= 0.0:
         return np.zeros(1), np.ones(1)
     base = 1.0 / phase_points
-    q = max(1, int(math.ceil(base / (sigma_ui / 4.0))))
+    finest = min([v for v in (sigma_ui / 4.0, uniform_width_ui / 8.0) if v > 0.0])
+    q = max(1, int(math.ceil(base / finest)))
     h = base / q
-    j = int(math.ceil(n_sigmas * sigma_ui / h))
+    j = int(math.ceil((n_sigmas * sigma_ui + 0.5 * uniform_width_ui) / h))
     x = np.arange(-j, j + 1) * h
-    w = np.exp(-0.5 * (x / sigma_ui) ** 2)
+    w = np.exp(-0.5 * (x / sigma_ui) ** 2) if sigma_ui > 0.0 else (x == 0.0).astype(float)
+    if uniform_width_ui > 0.0:
+        m = int(round(0.5 * uniform_width_ui / h))
+        box = np.ones(2 * m + 1)
+        w = np.convolve(w, box, mode="same")
     return x, w / w.sum()
 
 
@@ -162,14 +175,18 @@ class StatisticalEngine:
     """The engine bound to one config and one pulse response."""
 
     def __init__(self, cfg: LinkConfig, resp: LinkResponse | None = None,
-                 clock: ForwardedClock | None = None):
+                 clock: ForwardedClock | None = None, aggressors: tuple = ()):
+        """``aggressors`` are ``(neighbour distance, relative skew [UI])`` pairs
+        for the active lanes whose crosstalk lands on this one."""
         self.cfg = cfg
         self.resp = resp if resp is not None else link_response(cfg)
         self.clock = clock if clock is not None else ForwardedClock(cfg)
+        self.aggressors = tuple(aggressors)
         self.budget = self.clock.budget()
         self.sigma_j_ui = self.budget.total_s / cfg.ui
+        self.quant_ui = cfg.clocking.pi_step_ui if self.clock.alpha > 0.0 else 0.0
         self.nodes, self.weights = jitter_quadrature(self.sigma_j_ui, cfg.sim.stat_phase_points,
-                                                     cfg.sim.stat_jitter_sigmas)
+                                                     cfg.sim.stat_jitter_sigmas, self.quant_ui)
         self.n_enum = cfg.sim.stat_enumerate_cursors
         self.sigma_n = cfg.rx.noise_rms_v
         self.vref = cfg.rx.vref_offset_v
@@ -181,7 +198,9 @@ class StatisticalEngine:
         m = self._models.get(key)
         if m is None:
             c, i_main = self.resp.cursors(phase_ui)
-            m = self._models[key] = isi_model(c, i_main, self.n_enum)
+            extra = [self.resp.xtalk_cursors(d, phase_ui, skew) for d, skew in self.aggressors]
+            extra = np.concatenate(extra) if extra else None
+            m = self._models[key] = isi_model(c, i_main, self.n_enum, extra)
         return m
 
     def sampling_phases(self, phase_ui: float) -> list[tuple[float, float]]:
@@ -283,14 +302,18 @@ class StatisticalEngine:
             main_cursor_v=m.main, cursors_v=c, i_main=i_main, skew_residual_ui=skew_residual_ui,
             targets=targets,
             extras={"sigma_isi_rest_v": m.sigma_rest, "n_enumerated": m.n_enumerated,
-                    "n_cursors": m.n_cursors, "ber_min": float(ber[i_min]),
+                    "n_cursors": m.n_cursors, "n_aggressors": len(self.aggressors),
+                    "xtalk_rms_v": float(math.sqrt(sum(float(np.sum(self.resp.xtalk_cursors(d, phase, sk) ** 2))
+                                                      for d, sk in self.aggressors))),
+                    "quantisation_ui": self.quant_ui, "ber_min": float(ber[i_min]),
                     "phase_min_ui": float(phases[i_min]),
                     "insertion_loss_nyquist_db": self.resp.channel.insertion_loss_db(cfg.f_nyquist)})
 
 
 def run_statistical(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
-                    skew_residual_ui: float = 0.0, clock: ForwardedClock | None = None) -> StatResult:
-    return StatisticalEngine(cfg, resp, clock).run(lane, skew_residual_ui)
+                    skew_residual_ui: float = 0.0, clock: ForwardedClock | None = None,
+                    aggressors: tuple = ()) -> StatResult:
+    return StatisticalEngine(cfg, resp, clock, aggressors).run(lane, skew_residual_ui)
 
 
 def with_phase(cfg: LinkConfig, phase_ui: float) -> LinkConfig:

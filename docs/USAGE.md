@@ -6,6 +6,9 @@ python examples/00_single_lane_eye.py        # 单 lane:预算、眼、两引擎
 python examples/01_tracking_bandwidth_sweep.py
 python examples/02_reach_sweep.py
 python examples/03_stat_vs_time.py           # 1e-6 处的一致性比,约 3–5 分钟
+python examples/04_local_pll_bandwidth.py    # 收端本地 PLL 的环路带宽
+python examples/05_module_xtalk_repair.py    # x16 / x64 模块:skew、串扰、修复
+python examples/06_m2_consistency.py         # 新机制上的统计 / 时域一致性
 pytest -q
 ```
 
@@ -27,9 +30,9 @@ print(res.summary())      # 每 lane:BER、眼高/眼宽对目标(带 source)、
 | 段 | 关键字段 |
 |---|---|
 | `package.kind` | `standard` / `advanced`:选 RLGC 预设与规范表的 reach / pitch / 模块宽度行 |
-| `channel` | `kind: analytic`(`length_mm`,RLGC 可逐项覆盖)或 `touchstone`(`file`,经 vendored Halo 读法) |
+| `channel` | `kind: analytic`(`length_mm`,RLGC 可逐项覆盖)或 `touchstone`(`file`,经 vendored Halo 读法);`xtalk: fext` 打开邻 lane 远端串扰(`xtalk_adjacent_db` 留空取封装预设) |
 | `lanes` | `count`、`skew_ps` / `skew_sigma_ps`、`deskew_step_ps`、`spare_count`、`failed`、`repair` |
-| `clocking` | `pll_profile`、`correlation`、`data_path_rj_s`、`clock_path_rj_s`、`tree_delay_ps`、`tree_bw_hz`、`tree_rj_s`、`track_bw_hz`、`dcd_ui` |
+| `clocking` | 发端:`pll_profile`、`correlation`、`data_path_rj_s`、`clock_path_rj_s`、`*_wander_s` + `wander_corner_hz`;收端:`local_pll_profile` + `local_pll_bw_hz`(锁到前向时钟,必须给带宽)、`tree_delay_ps`、`tree_bw_hz`、`tree_rj_s`、`track_bw_hz`、`track_delay_ui`、`pi_step_ui`、`dcd_ui` |
 | `tx` / `rx` | `swing_vpp`、`bw_hz`;`noise_rms_v`、`ctle.*`、`sampling_phase_ui`、`vref_offset_v` |
 | `sim` | `osr`、`n_symbols`、`seed`、`pattern`、`engine`、统计引擎的枚举 / 网格参数 |
 | `target` | 留空 = 规范表(带 `source: survey`);写了 = 配置自己的主张 |
@@ -41,6 +44,9 @@ print(res.summary())      # 每 lane:BER、眼高/眼宽对目标(带 source)、
 
 - `run_statistical(cfg)`:主引擎,BER 到 1e-27,眼高 / 眼宽在目标 BER 处,浴盆,残余抖动预算。
 - `run_time(cfg, phase_ui=...)`:时域校核,`sim.n_symbols` 个符号;`sim.engine: both` 时 `run_link` 两个都跑并给出比。
+- `run_link(cfg)`:整个模块 —— lane 映射与修复、逐 lane skew 残余、邻 lane 串扰(按物理邻接,死 lane 与闲置备用 lane 静默)、
+  最差 lane 判定;`LinkResult.summary()`。
+- `ForwardedClock(cfg).budget()`:残余抖动的闭式分解(发端泄漏、本地 PLL、路径白噪、漫游、树);`residual_vs_local_pll_bw`、`residual_vs_track_bw` 扫曲线。
 
 ## 规范数字(铁律 5)
 

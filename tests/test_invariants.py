@@ -54,12 +54,21 @@ def test_law1_examples_read_the_config_files():
 
 
 def test_law2_no_independent_receive_clock_anywhere():
-    """The config has no Rx clock profile, and nothing but clock/forwarded.py
-    synthesises phase noise: a second PLL object for the receiver is the
+    """The config has no free-running Rx clock: the receiver's only clock
+    fields are the ``clocking.local_pll_*`` of a PLL locked to the forwarded
+    clock (a loop bandwidth is mandatory), and nothing but clock/forwarded.py
+    synthesises phase noise -- a second PLL object for the receiver is the
     shortcut the invariant forbids."""
+    import pytest
+
+    from d2d_link.config import ClockingConfig
     from d2d_link.config.form import schema_paths
 
-    assert not [p for p in schema_paths() if re.search(r"rx.*(pll|profile|clock)", p)]
+    assert not [p for p in schema_paths() if re.search(r"^rx\..*(pll|profile|clock)", p)]
+    rx_clock = [p for p in schema_paths() if re.search(r"(pll|clock)", p) and not p.startswith("clocking.")]
+    assert not rx_clock, rx_clock
+    with pytest.raises(ValueError, match="locked to the forwarded clock"):
+        ClockingConfig(local_pll_rj_s=100e-15)          # a local PLL without a loop: refused
     users = [p.relative_to(REPO) for p, s in _sources(("engine", "channel", "core"))
              if "synth_from_psd" in s or "ClockProfile(" in s]
     assert not users, users

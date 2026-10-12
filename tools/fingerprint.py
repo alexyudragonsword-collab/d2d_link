@@ -59,6 +59,7 @@ def stat_values(r) -> dict:
 
 def time_values(t) -> dict:
     return {"ber": repr(t.ber), "n_errors": repr(t.n_errors), "n_symbols": repr(t.n_symbols),
+            "bursts": repr(getattr(t, "error_bursts", None)),
             "eye_sampled": repr(float(t.eye_height_sampled_v)), "jitter_rms_s": repr(float(t.jitter_rms_s)),
             "samples": digest(t.samples), "traces": digest(t.eye_traces)}
 

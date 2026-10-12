@@ -35,6 +35,18 @@ Markulic 2016 SSPLL 剖面(带内 186 fs),数据 / 时钟路径各 200 fs 白抖
 | `02_reach_sweep.py` | 走线能到多长 | 30 mm 是最后通过的长度(35 mm 眼宽 0.747 < 0.75 UI,眼高还有 163 mV);综述 reach 25 mm,比 1.20× |
 | `03_stat_vs_time.py` | 统计 / 时域在 1e-6 处的一致性 | 噪声主导 1e-6:时域 / 统计 1.23(24 误码 / 2e7);抖动主导 1e-6:1.22(16 误码 / 2e7);混合 1e-5:0.87(17 / 2e6)。三点都在 0.5–2× 内 |
 
+## 里程碑 2:多 lane 模块与收端本地时钟
+
+`configs/standard_32g_x16_module.yaml`:x16、20 mm、3 ps 随机 skew(1/16 UI 步长 deskew)、邻 lane FEXT(封装预设 −30 dB @ Nyquist,
+模型估计)、200 fs 路径漫游、收端本地 PLL(Wu 2019 SPLL 剖面,1 MHz 环路,锁到前向时钟)、2 MHz 跟踪器带 4 UI 延迟与 1/64 UI 相位插值器、
+物理 lane 5 死 → 降宽到上半 x8。
+
+| 示例 | 问题 | 答案(2026-10-12) |
+|---|---|---|
+| `04_local_pll_bandwidth.py` | 本地 PLL 的环路带宽 | 1 kHz:205.9 fs = √(186.2² + 88.0²)(两个独立时钟);10 THz:0。发端泄漏与本地噪声随带宽**同向**下降;折中只来自环路前的时钟路径噪声(300 fs 白噪:最优 2.5e7 Hz,100.9 fs)。PI 步长 1/64 UI 加 32 fs,1/16 UI 加到 636 fs |
+| `05_module_xtalk_repair.py` | 整个模块能不能过 | x16 降宽后 8 lane 全过,最差眼宽 0.752 对 0.75 UI;串扰费 21 mV / 0.018 UI,−20 dB 时关门。x64 两死 lane 备用修复 64/64 过,邻数 0..4 |
+| `06_m2_consistency.py` | 新机制上统计 / 时域 | 本地 PLL 0.92、量化 + 延迟跟踪器 0.74、x3 串扰中间 lane 0.86、先进封装 + CTLE + DCD 0.80、漫游 + 噪声 0.82;五点都在 0.5–2× 内 |
+
 见 [`docs/USAGE.md`](docs/USAGE.md)、[`docs/clock_profile.md`](docs/clock_profile.md);结论与被推翻的判断在 `cairn/LOG.md`。
 
 ## 规范数字
@@ -51,8 +63,8 @@ grep "source: survey" data/spec/ucie_survey.yaml
 | 目录 | 内容 |
 |---|---|
 | `src/d2d_link/config/` | frozen `LinkConfig`、YAML 加载、表单字段声明(`form.py`) |
-| `src/d2d_link/clock/` | 剖面读取、**前向时钟模型**(闭式预算 + 逐符号合成) |
-| `src/d2d_link/channel/` | 解析 RLGC 走线 / Touchstone → 脉冲响应 |
+| `src/d2d_link/clock/` | 剖面读取、**前向时钟模型**(发端 PLL、本地 PLL、树、跟踪器;闭式预算 + 逐符号合成) |
+| `src/d2d_link/channel/` | 解析 RLGC 走线 / Touchstone → 脉冲响应;邻 lane FEXT 串扰脉冲 |
 | `src/d2d_link/engine/` | 统计引擎(主)、时域引擎(校核)、lane 映射与修复、链路判定 |
 | `src/d2d_link/spec/` | 规范数字表的读取 |
 | `src/d2d_link/vendor/` | Halo_Serdes 的 S 参数读法 / RLGC / 响应转换,pll_simulator 的相噪合成与积分;完整 SHA 钉住,`tools/vendor_check.py` 守 |

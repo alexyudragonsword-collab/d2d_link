@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "d2d-link"
-version = "0.1.0"
+version = "0.2.0"
 description = "Behavioural simulation of die-to-die / UCIe short-reach parallel links: forwarded-clock jitter tracking, multi-lane, statistical BER to 1e-27"
 readme = "README.md"
 requires-python = ">=3.10"

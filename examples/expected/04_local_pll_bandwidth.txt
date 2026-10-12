@@ -1,0 +1,38 @@
+Tx PLL bench_markulic16_sspll_40m_10p24g.yaml: 186.2 fs in band; local PLL bench_wu19_spll_frac_52m_6p253g.yaml: 88.0 fs; configured loop 1 MHz, damping 1
+loop -> 0 (1 kHz), ideal tree, no path noise: residual 205.9 fs = sqrt(186.2^2 + 88.0^2) = 205.9 fs (two independent clocks)
+loop -> inf (10 THz): residual 0.000 fs
+
+loop bandwidth sweep, the module's clock path (tree, path noise, wander, 2 MHz tracker with 4 UI latency and 0.0156 UI steps):
+loop bw [Hz]  Tx leak [fs]  local [fs]  wander [fs]  total [fs]  eye width [UI]  eye height [mV]
+       1e+04         132.7        52.7        117.9       290.4           0.773            234.1
+       3e+04         132.7        52.7        118.0       290.4           0.773            234.1
+       1e+05         132.4        52.5        118.9       290.6           0.773            234.1
+       3e+05         130.5        51.6        123.9       291.6           0.772            234.1
+       1e+06         120.5        48.1        142.4       295.2           0.770            234.1
+       3e+06         103.4        43.5        162.1       298.1           0.768            234.1
+       1e+07          92.8        40.7        168.9       298.1           0.768            234.1
+       3e+07          90.5        39.8        168.3       297.3           0.769            234.1
+       1e+08          90.7        38.6        167.4       297.8           0.768            234.1
+       3e+08          93.2        35.6        167.0       301.2           0.766            234.1
+       1e+09          98.3        26.5        166.9       311.6           0.759            234.1
+
+the trade-off: 300 fs of white jitter on the clock path before the local PLL, ideal tree, no wander:
+loop bw [Hz]  Tx leak [fs]  local [fs]  clock path [fs]  total [fs]
+       1e+04         186.1        87.9              0.2       205.8
+       1e+05         182.1        81.7              1.3       199.6
+       1e+06         138.5        54.3              4.7       148.9
+       1e+07          92.5        40.8             14.8       102.2
+       1e+08          86.9        38.7             46.8       106.0
+       1e+09          69.4        26.7            143.8       161.9
+       1e+10           8.8         1.6            323.1       323.3
+optimum near 2.5e+07 Hz: 100.9 fs (vs 205.8 fs at 1e+04 Hz, where the Tx PLL leaks, and 323.3 fs at 1e+10 Hz, where the clock path passes)
+
+per-lane tracker: latency and phase-interpolator step at 2 MHz (module clocking, 200 fs wander per path):
+latency [UI] PI step [UI]  linear [fs]  +quantisation [fs]  eye width [UI]
+           0       0.0000        294.9               294.9           0.780
+           4       0.0000        295.2               295.2           0.780
+          32       0.0000        296.2               296.2           0.779
+           0       0.0156        294.9               326.9           0.768
+           4       0.0156        295.2               327.1           0.768
+           4       0.0625        295.2               636.4           0.724
+wrote examples/output/04_local_pll_bandwidth.png

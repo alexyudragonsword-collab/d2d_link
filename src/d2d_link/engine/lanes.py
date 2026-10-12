@@ -136,23 +136,42 @@ class LinkResult:
         return "\n".join(lines)
 
 
+def aggressors_of(cfg: LinkConfig, lm: LaneMap, phys: int, skews_ps: np.ndarray) -> tuple:
+    """``(neighbour distance, relative skew [UI], aggressor physical lane)`` for
+    every *active* physical lane within two places of ``phys``. Failed lanes
+    and unused spares are silent. The relative skew is the aggressor's static
+    skew minus the victim's: its symbols arrive that much later."""
+    if cfg.channel.xtalk == "none":
+        return ()
+    active = {p for p in lm.logical_to_physical if p not in lm.unrepaired}
+    out = []
+    for q in sorted(active):
+        d = abs(q - phys)
+        if 1 <= d <= 2:
+            out.append((d, float((skews_ps[q] - skews_ps[phys]) * 1e-12 / cfg.ui), q))
+    return tuple(out)
+
+
 def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     resp = resp if resp is not None else link_response(cfg)
     clock = ForwardedClock(cfg)
     lm = lane_map(cfg)
     skews = physical_skews_ps(cfg)
-    engine = StatisticalEngine(cfg, resp, clock)
-    stat = [engine.run(lane, residual_skew_ui(cfg, skews[phys]))
-            for lane, phys in enumerate(lm.logical_to_physical) if phys not in lm.unrepaired]
+    active = [(lane, phys) for lane, phys in enumerate(lm.logical_to_physical) if phys not in lm.unrepaired]
+    aggr = {phys: aggressors_of(cfg, lm, phys, skews) for _, phys in active}
+    stat = []
+    for lane, phys in active:
+        engine = StatisticalEngine(cfg, resp, clock, tuple((d, sk) for d, sk, _ in aggr[phys]))
+        stat.append(engine.run(lane, residual_skew_ui(cfg, skews[phys])))
     time: list[TimeResult] = []
     if cfg.sim.engine in ("time", "both"):
         n_active = len(stat)
         jit = clock.synthesize(cfg.sim.n_symbols, np.random.default_rng([cfg.sim.seed, 0xC10C]), n_active)
-        for i, r in enumerate(stat):
+        for i, (r, (_, phys)) in enumerate(zip(stat, active)):
             time.append(run_time(cfg, resp, r.lane, r.phase_ui - r.skew_residual_ui, r.skew_residual_ui,
-                                 jit[i], clock))
+                                 jit[i], clock, aggr[phys]))
     rows = {k: survey(k, cfg.package.kind) for k in ("reach_mm", "module_width_lanes", "bump_pitch_um")}
     return LinkResult(cfg, lm, stat, time, skews, resolved_targets(cfg), rows)
 
 
-__all__ = ["LaneMap", "lane_map", "physical_skews_ps", "residual_skew_ui", "LinkResult", "run_link"]
+__all__ = ["LaneMap", "lane_map", "physical_skews_ps", "residual_skew_ui", "aggressors_of", "LinkResult", "run_link"]

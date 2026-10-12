@@ -1,0 +1,42 @@
+# Milestone 2: a standard-package x16 module as a whole -- lane skew with a
+# 1/16-UI deskew step, far-end crosstalk from the neighbour lanes, a receiver
+# local PLL locked to the forwarded clock, and width-degradation repair of one
+# dead lane (physical lane 5 -> the intact upper x8).
+data_rate_gtps: 32.0
+package:
+  kind: standard
+channel:
+  kind: analytic
+  length_mm: 20.0
+  xtalk: fext               # nearest-neighbour level from the package preset (-30 dB at Nyquist)
+lanes:
+  count: 16
+  skew_sigma_ps: 3.0
+  skew_seed: 7
+  deskew_step_ps: 1.95
+  failed: [5]
+  repair: width_degrade
+clocking:
+  scheme: forwarded_ddr
+  pll_profile: data/clock_profiles/bench_markulic16_sspll_40m_10p24g.yaml
+  data_path_rj_s: 200.0e-15
+  clock_path_rj_s: 200.0e-15
+  data_path_wander_s: 200.0e-15
+  clock_path_wander_s: 200.0e-15
+  wander_corner_hz: 1.0e6
+  local_pll_profile: data/clock_profiles/bench_wu19_spll_frac_52m_6p253g.yaml
+  local_pll_bw_hz: 1.0e6        # narrow: it filters the clock path's wander (example 04)
+  tree_delay_ps: 30.0
+  tree_bw_hz: 20.0e9
+  tree_rj_s: 100.0e-15
+  track_bw_hz: 2.0e6
+  track_delay_ui: 4
+  pi_step_ui: 0.0156        # 1/64 UI phase interpolator
+tx:
+  swing_vpp: 0.4
+  bw_hz: 60.0e9
+rx:
+  noise_rms_v: 3.0e-3
+sim:
+  n_symbols: 100000
+  engine: statistical

@@ -61,6 +61,14 @@ PACKAGE_RLGC: dict[str, dict[str, float]] = {
 }
 
 
+#: Per-package far-end crosstalk of the nearest neighbour lane, |X/H| at the
+#: Nyquist frequency in dB, used where ``ChannelConfig.xtalk_adjacent_db`` is
+#: None. Model estimates for coupled microstrip at the packages' bump pitches
+#: (data/spec/ucie_survey.yaml holds the pitches, not these), to be replaced
+#: by a measured coupled-line model when one is available.
+PACKAGE_XTALK_DB: dict[str, float] = {"standard": -30.0, "advanced": -24.0}
+
+
 @dataclass(frozen=True)
 class PackageConfig:
     """Which package the link is built on. Selects the RLGC preset and the
@@ -93,9 +101,18 @@ class ChannelConfig:
     c_f_m: Optional[float] = None
     loss_tangent: Optional[float] = None
     g_s_m: Optional[float] = None
+    # lane-to-lane crosstalk (needs lanes.count > 1 to do anything)
+    xtalk: Literal["none", "fext"] = "none"     # far-end coupling from the neighbour lanes
+    xtalk_adjacent_db: Optional[float] = None   # |X/H| at Nyquist, nearest neighbour; None -> package preset
+    xtalk_second_db: Optional[float] = None     # second neighbour; None -> adjacent - 12 dB
 
     def __post_init__(self):
         _require_in(self.kind, {"analytic", "touchstone"}, "channel.kind")
+        _require_in(self.xtalk, {"none", "fext"}, "channel.xtalk")
+        for name in ("xtalk_adjacent_db", "xtalk_second_db"):
+            v = getattr(self, name)
+            if v is not None:
+                _require(math.isfinite(v) and v < 0.0, f"channel.{name} must be a negative dB figure, got {v!r}")
         _finite_nonneg(self.length_mm, "channel.length_mm")
         _require(self.n_freq >= 16, f"channel.n_freq must be >= 16, got {self.n_freq}")
         _finite_pos(self.zs_ohm, "channel.zs_ohm")
@@ -174,8 +191,11 @@ class ClockingConfig:
     (``correlation`` = 1). The receiver samples data with the forwarded clock
     after its distribution tree (``tree_delay_ps``, ``tree_bw_hz``) and a
     per-lane phase tracker of bandwidth ``track_bw_hz`` that follows the slow
-    part of the data-to-clock difference. There is no field for an
-    independent receive clock on purpose.
+    part of the data-to-clock difference. An optional local PLL
+    (``local_pll_*``) sits between the pads and the tree and is *locked to
+    the forwarded clock*: its loop passes the forwarded phase below its
+    bandwidth and its own noise above. There is no field for a free-running
+    receive clock on purpose.
 
     ``pll_profile`` is a pll_simulator clock phase-noise profile (YAML; see
     docs/clock_profile.md). Timing is phase / (2 pi f0) with the file's
@@ -197,10 +217,45 @@ class ClockingConfig:
     tree_bw_hz: Optional[float] = None    # Rx clock tree bandwidth (first order on phase); None = flat
     tree_rj_s: float = 0.0                # jitter the Rx tree adds [s RMS]
     track_bw_hz: Optional[float] = None   # per-lane phase tracker bandwidth; None = no tracker
+    track_delay_ui: int = 0               # tracker loop latency [UI]; 0 = the zero-latency abstraction
+    pi_step_ui: float = 0.0               # phase-interpolator step the tracker's output is quantised to [UI]
     dcd_ui: float = 0.0                   # DDR duty-cycle error: odd/even sampling offset [UI]
+    # receiver local PLL, locked to the forwarded clock (never free-running):
+    # output phase = H_loop * forwarded + (1 - H_loop) * own noise
+    local_pll_profile: Optional[str] = None   # its phase-noise profile; None and local_pll_rj_s = 0 -> no local PLL
+    local_pll_f0_hz: Optional[float] = None
+    local_pll_shift_db: float = 0.0
+    local_pll_rj_s: float = 0.0               # white part of the local PLL's own jitter [s RMS]
+    local_pll_bw_hz: Optional[float] = None   # loop natural frequency; required with a local PLL
+    local_pll_damping: float = 1.0            # type-II second-order loop damping zeta
+    # low-frequency wander the two paths pick up separately (supply, thermal):
+    # first-order shaped noise of the given RMS with corner wander_corner_hz
+    data_path_wander_s: float = 0.0
+    clock_path_wander_s: float = 0.0
+    wander_corner_hz: float = 1.0e6
+
+    @property
+    def has_local_pll(self) -> bool:
+        return self.local_pll_profile is not None or self.local_pll_rj_s > 0.0
 
     def __post_init__(self):
         _require_in(self.scheme, {"forwarded_ddr"}, "clocking.scheme")
+        _require(self.track_delay_ui >= 0, f"clocking.track_delay_ui must be >= 0, got {self.track_delay_ui}")
+        _finite_nonneg(self.pi_step_ui, "clocking.pi_step_ui")
+        _require(self.pi_step_ui < 0.5, f"clocking.pi_step_ui must be < 0.5 UI, got {self.pi_step_ui}")
+        for name in ("local_pll_rj_s", "data_path_wander_s", "clock_path_wander_s"):
+            _finite_nonneg(getattr(self, name), f"clocking.{name}")
+        _finite_pos(self.wander_corner_hz, "clocking.wander_corner_hz")
+        _require(math.isfinite(self.local_pll_shift_db), "clocking.local_pll_shift_db must be finite")
+        _finite_pos(self.local_pll_damping, "clocking.local_pll_damping")
+        if self.local_pll_f0_hz is not None:
+            _finite_pos(self.local_pll_f0_hz, "clocking.local_pll_f0_hz")
+        if self.local_pll_bw_hz is not None:
+            _finite_pos(self.local_pll_bw_hz, "clocking.local_pll_bw_hz")
+        if self.has_local_pll:
+            _require(self.local_pll_bw_hz is not None,
+                     "clocking.local_pll_bw_hz is required with a local PLL: it is locked to the "
+                     "forwarded clock, never free-running (invariant #2)")
         _require(0.0 <= self.correlation <= 1.0,
                  f"clocking.correlation must be in [0, 1], got {self.correlation!r}")
         for name in ("pll_rj_s", "data_path_rj_s", "clock_path_rj_s", "tree_rj_s",
@@ -364,6 +419,13 @@ class LinkConfig:
     def forwarded_clock_hz(self) -> float:
         """The forwarded clock's frequency: DDR, so half the data rate."""
         return 0.5 * self.symbol_rate
+
+    def xtalk_db(self) -> tuple[float, float]:
+        """(nearest, second neighbour) far-end crosstalk at Nyquist [dB]."""
+        adj = self.channel.xtalk_adjacent_db
+        adj = PACKAGE_XTALK_DB[self.package.kind] if adj is None else adj
+        sec = self.channel.xtalk_second_db
+        return adj, (adj - 12.0 if sec is None else sec)
 
     def rlgc(self) -> dict[str, float]:
         """The analytic line's RLGC: explicit channel fields over the package preset."""
