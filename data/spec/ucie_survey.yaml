@@ -1,0 +1,116 @@
+# UCIe 规范数字表 —— 本库用到的每一个"规范数字"都在这里,一条一个,带来源标签。
+#
+#   source: survey  未拿到规范原文;数字来自公开综述 / 论文 / 会议报告,按 cite 所示,
+#                   并一律视为"未核实"。grep "source: survey" 一次列全。
+#   source: spec    来自规范原文;必须附 quote(原文摘录)与 section。
+#
+# 原文贴进 cairn/Reference/ 之后,把对应条目改成 source: spec 并补 quote。
+# 任何代码都不得直接写这些数字(tests/test_spec_sources.py 守着):只能通过
+# d2d_link.spec.survey() 按 key 取,并把 source 一起带到结果里。
+
+entries:
+
+  data_rates_gtps:
+    value: [4, 8, 12, 16, 24, 32]
+    unit: GT/s
+    source: survey
+    cite: "D. Das Sharma et al., 'Universal Chiplet Interconnect Express (UCIe): An Open Industry Standard for Innovations with Chiplets at Package Level', IEEE Trans. CPMT 2022; UCIe Consortium white paper (2022)"
+    note: "未核实:速率档按综述所列,规范原文的速率表未读到。"
+
+  forwarded_clock:
+    value: "differential forwarded clock, DDR: clock rate = data rate / 2"
+    unit: text
+    source: survey
+    cite: "Das Sharma 2022 (IEEE Micro / Hot Chips 34 UCIe 1.0 overview)"
+    note: "未核实:本库 ClockingConfig.scheme = forwarded_ddr 依此;是否四分之一速率等变体未查。"
+
+  raw_ber_target:
+    value: 1.0e-27
+    unit: BER
+    source: survey
+    cite: "UCIe Consortium white paper (2022) 'BER < 1e-27'; Das Sharma 2022"
+    note: "未核实:综述把 1e-27 作为无 FEC 的原始 BER 目标;另有说法 24/32 GT/s 配 CRC+retry 放宽到 1e-15。两种说法都未见原文,此处取严格值。"
+
+  raw_ber_with_retry:
+    value: 1.0e-15
+    unit: BER
+    source: survey
+    cite: "UCIe 1.0 overview talks (Hot Chips 34, 2022)"
+    note: "未核实:据称 24 / 32 GT/s 允许的原始 BER(有 CRC + retry);本库不建协议层,只留此参数位。"
+
+  rx_eye_height_mv:
+    value: 40.0
+    unit: mV
+    source: survey
+    cite: "public UCIe 1.0 electrical summaries (eye mask 'EH ≥ 40 mV')"
+    note: "未核实:收端眼高下限;原文的 eye-mask 表与所属速率档 / 封装未读到,数值待确认。"
+
+  rx_eye_width_ui:
+    value: 0.75
+    unit: UI
+    source: survey
+    cite: "public UCIe 1.0 electrical summaries (eye mask 'EW ≥ 0.75 UI')"
+    note: "未核实:收端眼宽下限;同上,数值待确认。"
+
+  tx_swing_vpp:
+    value: 0.4
+    unit: V
+    source: survey
+    cite: "Das Sharma 2022: ~0.4 V single-ended swing, terminated at the higher rates"
+    note: "未核实:发端摆幅标称值;本库 TxConfig.swing_vpp 默认值取自此。"
+
+  standard.bump_pitch_um:
+    value: [100, 130]
+    unit: um
+    source: survey
+    cite: "UCIe Consortium white paper (2022): standard package bump pitch 100-130 um"
+    note: "未核实。"
+
+  standard.reach_mm:
+    value: 25.0
+    unit: mm
+    source: survey
+    cite: "UCIe Consortium white paper (2022): standard package reach up to 25 mm"
+    note: "未核实:示例 02 的 reach 上限与此比;差 2× 以上在 cairn/LOG.md 写原因。"
+
+  standard.module_width_lanes:
+    value: 16
+    unit: lanes
+    source: survey
+    cite: "Das Sharma 2022: standard package module x16"
+    note: "未核实。"
+
+  standard.lane_repair:
+    value: "width degradation (x16 -> x8), no spare lanes"
+    unit: text
+    source: survey
+    cite: "Das Sharma 2022 / UCIe 1.0 overview"
+    note: "未核实:标准封装靠降宽度修复,先进封装靠备用 lane;本库两种都做成配置项。"
+
+  advanced.bump_pitch_um:
+    value: [25, 55]
+    unit: um
+    source: survey
+    cite: "UCIe Consortium white paper (2022): advanced package bump pitch 25-55 um"
+    note: "未核实。"
+
+  advanced.reach_mm:
+    value: 2.0
+    unit: mm
+    source: survey
+    cite: "UCIe Consortium white paper (2022): advanced package reach up to 2 mm"
+    note: "未核实。"
+
+  advanced.module_width_lanes:
+    value: 64
+    unit: lanes
+    source: survey
+    cite: "Das Sharma 2022: advanced package module x64"
+    note: "未核实。"
+
+  advanced.lane_repair:
+    value: "spare lanes (lane repair by remapping)"
+    unit: text
+    source: survey
+    cite: "Das Sharma 2022 / UCIe 1.0 overview"
+    note: "未核实:备用 lane 的数量未见原文,本库由 lanes.spare_count 配置。"

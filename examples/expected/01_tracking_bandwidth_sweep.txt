@@ -1,0 +1,28 @@
+correlation = 1, ideal tree, no path noise: residual 0.000 fs  (PLL itself 186.2 fs in band)
+no tracker, ideal tree: residual 282.84 fs = sqrt(200^2 + 200^2) = 282.84 fs
+
+ tracker bw [Hz]  closed form [fs]  synth [fs]  eye width [UI]  eye height [mV]
+            none            295.41      294.60           0.772            209.8
+           1e+05            295.40                       0.772            209.8
+           3e+05            295.39                       0.772            209.8
+           1e+06            295.36      294.56           0.772            209.8
+           3e+06            295.28                       0.772            209.8
+           1e+07            294.97                       0.772            209.8
+           3e+07            294.09                       0.773            209.8
+           1e+08            291.03      290.17           0.775            209.8
+           3e+08            282.40                       0.780            209.8
+           1e+09            253.57                       0.799            209.8
+           3e+09            183.61                       0.842            209.9
+           1e+10             53.29                       0.908            209.9
+             inf              0.00        0.00           0.919            209.9
+
+correlation sweep at the configured 2 MHz tracker (ideal tree, same path noise):
+ correlation  residual [fs]  of which PLL leak [fs]
+        1.00         282.76                    0.00
+        0.99         283.38                   18.74
+        0.90         288.90                   59.26
+        0.50         312.27                  132.51
+        0.00         339.22                  187.40
+
+half-way point: the residual drops to half its untracked value at a tracker bandwidth of 4.16e+09 Hz
+wrote examples/output/01_tracking_bandwidth_sweep.png

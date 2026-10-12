@@ -1,0 +1,21 @@
+link: standard package, 32 GT/s, 25 mm, 1 lane, forwarded clock 16 GHz DDR
+channel: insertion loss -2.95 dB at Nyquist (16 GHz), main cursor 163.3 mV of 200 mV
+cursors at the peak [mV]: pre 1.23 2.34 8.09 | main 163.33 | post 8.35 2.42 1.29 0.83
+
+jitter budget at the sampler (RMS, closed form):
+  Tx PLL in band 122.1 kHz .. 16 GHz : 186.2 fs  (what an independent clock would add)
+  common-mode leak (tree delay 30 ps, bandwidth 20 GHz)        : 59.4 fs
+  data path 200 fs after the 2 MHz tracker              : 199.9 fs
+  clock path 200 fs through tree and tracker                : 183.6 fs
+  receive tree 100 fs                                         : 100.0 fs
+  total residual                                            : 295.3 fs = 0.0095 UI
+
+statistical engine [~s]:
+  sampling phase -0.0198 UI from the pulse peak (eye centre), BER there 0.00e+00
+  eye height at BER 1e-27: 209.8 mV  vs target 40 mV (source: survey) -> margin +169.8 mV
+  eye width  at BER 1e-27: 0.772 UI  vs target 0.75 UI (source: survey) -> margin +0.022 UI
+  BER target 1e-27 (source: survey); 12 of 69 ISI cursors enumerated, the rest 0.66 mV RMS
+  verdict: PASS
+
+time engine [~s]: 0 errors in 400000 symbols (statistics predict 0.0e+00); sampled eye opening 260.1 mV; jitter the sampler saw 295.0 fs RMS
+wrote examples/output/00_single_lane_eye.png

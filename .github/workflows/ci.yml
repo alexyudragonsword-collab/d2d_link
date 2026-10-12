@@ -1,0 +1,93 @@
+name: ci
+
+# lint + tests + every example at smoke size + vendor drift, on every push / PR.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check src/ tests/ examples/ tools/
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the floor requires-python declares; 3.12 the current default
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[touchstone,plot,test]"
+      - name: Tests
+        run: pytest -q
+
+  examples:
+    # Every example end to end with n_symbols capped (tools/run_examples.py
+    # --smoke): catches the run-time drift test_examples.py cannot see --
+    # renamed config fields, result keys, shapes -- not the numbers, which the
+    # examples-full workflow compares against examples/expected/.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[touchstone,plot,test]"
+      - name: Run every example (smoke size)
+        run: python tools/run_examples.py --smoke
+
+  # Vendor drift: src/d2d_link/vendor must still match the pinned Halo_Serdes
+  # and pll_simulator commits (polar_tx's vendor_check method). The siblings
+  # are checked out at exactly the pinned SHAs, so --strict (stale pins fail)
+  # is satisfiable here and --fail-on-skip makes an unverified file red
+  # rather than a pass.
+  vendor-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: d2d_link
+      - name: Checkout Halo_Serdes (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: alexyudragonsword-collab/Halo_Serdes
+          ref: c13da1e60584538b1cc3324c18266ba5beb76d37
+          path: _siblings/Halo_Serdes
+      - name: Checkout pll_simulator (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: alexyudragonsword-collab/pll_simulator
+          ref: 00e48a2f6f7c11c0b6f106234f1490493d43e082
+          path: _siblings/pll_simulator
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Vendor drift check
+        working-directory: d2d_link
+        run: >
+          python tools/vendor_check.py --strict --fail-on-skip
+          --siblings Halo_Serdes=${{ github.workspace }}/_siblings/Halo_Serdes
+          pll_simulator=${{ github.workspace }}/_siblings/pll_simulator

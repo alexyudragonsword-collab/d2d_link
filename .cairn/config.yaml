@@ -1,0 +1,20 @@
+version: 0.1
+project:
+  name: "d2d_link"
+  summary: "die-to-die / UCIe 短距并行链路的行为级仿真框架:前向时钟抖动跟踪、多 lane、几乎不均衡、无 FEC 下的极低 BER 与 lane repair;Halo_Serdes 的姊妹库。"
+cairn:
+  knowledge_dir: "cairn"
+  # Date of the skill spec this instance was initialized against (stamped by
+  # init from references/upgrade.md's "Current spec date"; not a user decision).
+  skill_spec_date: "2026-08-07"
+  # git_policy: track | ignore | private_sync
+  git_policy: "track"
+  # language: en | zh | ...
+  language: "zh"
+graduation:
+  # (c) Deferred — no knowledge base connected yet; provider decisions are
+  #     collected at the first graduation (references/graduation.md).
+  provider: none
+history:
+  # migration_mode: start_fresh | inventory_only | selective_migrate
+  migration_mode: "start_fresh"

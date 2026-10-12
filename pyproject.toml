@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "d2d-link"
+version = "0.1.0"
+description = "Behavioural simulation of die-to-die / UCIe short-reach parallel links: forwarded-clock jitter tracking, multi-lane, statistical BER to 1e-27"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Touchstone import goes through the vendored Halo_Serdes reader, which
+# needs scikit-rf; the analytic channel path does not.
+touchstone = ["scikit-rf>=0.29"]
+plot = ["matplotlib>=3.7"]
+test = ["pytest>=7.0", "ruff>=0.4"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+# vendored copies are checked against upstream, not re-linted here
+extend-exclude = ["src/d2d_link/vendor"]
+
+[tool.ruff.lint]
+# Gate on real defects (pyflakes: undefined names, unused imports/vars) and
+# syntax errors -- not stylistic churn, same as Halo_Serdes.
+select = ["E9", "F"]

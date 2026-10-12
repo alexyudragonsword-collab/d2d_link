@@ -1,0 +1,37 @@
+# Milestone 1 baseline: standard package, 32 GT/s, one lane, forwarded DDR clock.
+# Every number the examples and tests use for this link comes from here
+# (invariant #1). Targets are left unset: they resolve to the survey table in
+# data/spec/ucie_survey.yaml and print with their source.
+data_rate_gtps: 32.0
+package:
+  kind: standard
+channel:
+  kind: analytic
+  length_mm: 25.0          # the survey reach of the standard package
+  zs_ohm: 50.0
+  zl_ohm: 50.0
+lanes:
+  count: 1
+clocking:
+  scheme: forwarded_ddr
+  pll_profile: data/clock_profiles/bench_markulic16_sspll_40m_10p24g.yaml
+  correlation: 1.0
+  data_path_rj_s: 200.0e-15
+  clock_path_rj_s: 200.0e-15
+  tree_delay_ps: 30.0
+  tree_bw_hz: 20.0e9
+  tree_rj_s: 100.0e-15
+  track_bw_hz: 2.0e6
+tx:
+  swing_vpp: 0.4
+  bw_hz: 60.0e9          # driver edge bandwidth
+rx:
+  noise_rms_v: 3.0e-3
+  ctle:
+    enable: false
+sim:
+  osr: 32
+  n_symbols: 400000
+  seed: 1
+  pattern: prbs31
+  engine: statistical
