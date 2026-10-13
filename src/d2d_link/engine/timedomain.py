@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.signal import fftconvolve
 
-from ..channel.model import LinkResponse, link_response
+from ..channel.model import LinkResponse, link_response, noise_shaping_gain
 from ..clock.forwarded import ForwardedClock
 from ..config.schema import LinkConfig
 from ..core.prbs import PatternSource
@@ -168,6 +168,49 @@ def shifted_pulse(pulse: np.ndarray, shift_samples: float) -> np.ndarray:
     return np.interp(idx, np.arange(pulse.size), pulse, left=0.0, right=0.0)
 
 
+class _NoiseFeed:
+    """Gaussian noise at the sampling instants. Referred at the sampler it is
+    one white sample per symbol. Referred at the input (``rx.noise_at:
+    input``) the waveform path really filters it: white noise on the
+    waveform grid (per-sample sigma = sigma_in sqrt(osr), the PSD
+    sigma_in^2 / f_N of the config's convention) through the front end x
+    CTLE impulse, continuous across chunks (the raw tail is kept as filter
+    state), read at each symbol's own fractional sampling instant -- an
+    independent check of ``noise_shaping_gain``'s integral that also carries
+    the noise's correlation between symbols. The samples mode has no
+    waveform and takes the marginal sigma (the integral)."""
+
+    def __init__(self, cfg: LinkConfig, resp: LinkResponse, rng: np.random.Generator, filtered: bool):
+        self.rng = rng
+        self.sigma_in = cfg.rx.noise_rms_v
+        self.osr = cfg.sim.osr
+        self.filtered = filtered and cfg.rx.noise_at == "input" and resp.noise_impulse is not None
+        self.sigma_marginal = self.sigma_in * noise_shaping_gain(cfg)
+        if self.filtered:
+            self.h = resp.noise_impulse.y
+            self.sigma_grid = self.sigma_in * math.sqrt(self.osr)
+            self.tail = rng.normal(0.0, self.sigma_grid, self.h.size - 1) if self.h.size > 1 else np.zeros(0)
+
+    def at(self, idx: np.ndarray) -> np.ndarray:
+        """Noise at the sampling indices ``idx`` (waveform samples, monotonic,
+        ~osr apart) of one chunk."""
+        m = idx.size
+        if self.sigma_in <= 0.0:
+            return np.zeros(m)
+        if not self.filtered:
+            return self.rng.normal(0.0, self.sigma_marginal, m)
+        # the noise process is independent of the signal's timing: the chunk's
+        # instants are mapped onto a fresh stretch of the process, keeping
+        # their fractional positions and spacing
+        rel = idx - (math.floor(idx[0]) - self.osr)
+        n_wave = int(math.ceil(rel.max())) + 2
+        raw = np.concatenate([self.tail, self.rng.normal(0.0, self.sigma_grid, n_wave)])
+        y = fftconvolve(raw, self.h)[self.tail.size: self.tail.size + n_wave]
+        if self.tail.size:
+            self.tail = raw[-self.tail.size:]
+        return np.interp(rel, np.arange(n_wave), y)
+
+
 def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
              phase_ui: float | None = None, skew_residual_ui: float = 0.0,
              jitter_s: np.ndarray | None = None, clock: ForwardedClock | None = None,
@@ -208,8 +251,10 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
     n_tail = int(np.ceil(pulse.size / osr)) + 1 + margin
     n_pre = int(np.ceil(i0 / osr)) + 1 + margin
     vref = cfg.rx.vref_offset_v
-    sigma = cfg.rx.noise_rms_v
     victim = SymbolStream(sim.pattern, rng, n_tail, n_pre)
+    # the same generator, drawn once per chunk after the symbols as before:
+    # the sampler-referred stream is the phase 1-6 one, sample for sample
+    noise = _NoiseFeed(cfg, resp, rng, filtered=(mode != "samples"))
     xt = []
     for d, rel_skew_ui, seed in aggressors:
         px = (resp.xtalk_pulses or {}).get(d)
@@ -269,8 +314,7 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
                 seq_a, _ = stream.next(m)
                 cur_a = (1.0 - frac)[:, None] * px_pad[idx] + frac[:, None] * px_pad[idx + 1]
                 s = s + np.einsum("nk,nk->n", cur_a, seq_a[sym_idx])
-            if sigma > 0.0:
-                s = s + rng.normal(0.0, sigma, m)
+            s = s + noise.at(pos_main)
         else:
             x = np.zeros(seq.size * osr)
             x[::osr] = seq
@@ -284,8 +328,7 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
             if not (idx.min() >= 0.0 and idx.max() <= y.size - 1):   # np.interp would clamp silently
                 raise AssertionError(f"sampling instant outside the chunk's waveform: idx {idx.min():.1f}.."
                                      f"{idx.max():.1f} of {y.size} samples (phase {phase_ui:+.3f} UI)")
-            s = np.interp(idx, np.arange(y.size), y) + rng.normal(0.0, sigma, m) if sigma > 0.0 \
-                else np.interp(idx, np.arange(y.size), y)
+            s = np.interp(idx, np.arange(y.size), y) + noise.at(idx)
         dec = np.where(s > vref, 1.0, -1.0)
         err_at = np.flatnonzero(dec != b)
         n_err += int(err_at.size)
@@ -314,6 +357,7 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
                       error_bursts=n_bursts, eye_time_ui=eye_t, eye_traces=traces, samples=s_all, sample_bits=b_all,
                       extras={"main_cursor_v": resp.main_amplitude, "n_aggressors": len(xt),
                               "block_step_ratio": feed.block_step_ratio(clock), "mode": mode,
+                              "sigma_noise_v": noise.sigma_marginal, "noise_filtered": noise.filtered,
                               "n_cursors_used": int(ks.size) if mode == "samples" else None})
 
 

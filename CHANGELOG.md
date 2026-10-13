@@ -4,6 +4,35 @@
 
 ---
 
+## [0.9.0] — 2026-10-13 — 段 7:收端机制(默认值保持旧行为;现有配置指纹逐位相同)
+
+### 新增
+- **收端前端带宽** `rx.bw_hz`:数据路径上的一阶极点(`channel/model.py::rx_response`),与发端极点、CTLE 一起进主脉冲与 FEXT / NEXT 脉冲;
+  留空 = 平坦(段 1–6 的理想化)。时钟树带宽(`clocking.tree_bw_hz`)滤时钟相位,这是数据边沿的对应项 —— 关掉 ROADMAP 旧 P2 #2。
+  x1 25 mm:前端 48 / 32 / 24 GHz 眼 215.6 → 208.8 / 196.5 / 179.9 mV(噪声在采样点)。
+- **噪声在哪里进入** `rx.noise_at: sampler | input`:`input` 时 `noise_rms_v` 是前端输入处白噪声在奈奎斯特带内的 RMS(理想积分接收机的噪声带宽),
+  采样器看到 σ · √(∫₀^∞ |H_fe H_ctle|² df / f_N)(`noise_shaping_gain`,tan 换元一次 quad,一阶极点闭式复现到 3e-10);要求有限 `bw_hz`。
+  时域波形路径真的把网格白噪声滤过前端 × CTLE(块间保留滤波器状态)再按分数采样瞬间读出(`_NoiseFeed`),与积分值 1.5 % 内(网格带限 3 % 方差);
+  `samples` 模式用边缘 σ。**CTLE 不再白拿增益**:35 mm / 32 GHz 前端,噪声在采样点时 6 dB 最好(222.7 mV),在输入时 4 dB 最好(179.0 mV,6 dB 168.8);
+  行为级 CTLE 两极点一零点本身是低通,≤ 2 dB 峭度比不开还省噪声。`StatResult.extras` 新增 `noise_gain`、`sigma_noise_input_v`;
+  `TimeResult.extras` 新增 `sigma_noise_v`、`noise_filtered`。
+- **训练 BER** `rx.training_ber`:链路训练在眼监视器能看见的 BER 上找眼边并居中,浴盆不对称时中点偏离目标 BER 的中点,lane 按围绕实际采样点的
+  对称开口付眼宽(`extras["training_centre_ui"]`、`extras["centre_offset_ui"]`);留空 = 目标 BER(旧行为)。x1 1e-3:偏 −0.00075 UI,眼宽 0.7741 → 0.7726;
+  无抖动 8 mV 噪声的 25 mm 线偏 −0.034 UI(0.714 → 0.646);x5 耦合中间 lane 偏 −0.0235 UI、眼宽 0.691 → 0.644(有串扰的 lane 付 0.03–0.05 UI)。
+- `budget_report.py`:报告新增 "Receiver" 段(前端、噪声口径与增益、CTLE、训练偏移);配置写了 `rx.bw_hz` 时 `--sensitivity` 把它列为 config 旋钮。
+  表单字段同步;`docs/USAGE.md` 的 `rx` 行;新专题 `cairn/receiver.md`;示例 09 `09_receiver_front_end.py`。
+- 测试(+7,`tests/test_receiver.py`):一阶极点闭式、默认不变与平坦前端、配置约束、CTLE 峭度的噪声单调性、前端极点让脉冲变慢与输入噪声缩眼、
+  时域滤噪声落在积分上(采到的 RMS 3 % 内、BER 对 Q 函数 2× 内、samples 模式边缘 σ)、训练偏移按对称开口扣眼宽。
+
+### 修复
+- 段 7 自己的:第一版把训练中点当 `center`,"偏离中心"的判断永远为假、眼宽没扣;现在与目标中点比(配置固定的采样相位仍是它自己的中心)。
+
+### 没做(记入 ROADMAP / `cairn/receiver.md`)
+- bundled 配置仍是平坦前端 + 采样点噪声:前端带宽没有规范数字,是设计的主张,等用户给再改基线;随机 DCD 有意不加(与白抖动不可区分);
+  训练的 deskew 分辩率与眼监视器样本数的统计误差。
+
+---
+
 ## [0.8.0] — 2026-10-13 — 段 6:串扰物理(无实测数据版;现有配置指纹逐位相同)
 
 ### 新增

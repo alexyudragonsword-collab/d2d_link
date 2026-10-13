@@ -33,15 +33,18 @@
    需要决定:(a) 终端按实际 |Z0(f)| 匹配,或 (b) 用 RDL 的实测 / 场解 RLGC(拿不到),或 (c) 在 `--sensitivity` 里把 R_dc 列为低速档的决定参数。
    复现:`python tools/budget_report.py` 对 `advanced_32g_x64_spare.yaml` 把 `data_rate_gtps` 改 4,看 lane 表眼高;对比 `channel.rdc_ohm_m: 200`。
 
-2. **树带宽只滤时钟相位,没有等效地滤数据边沿**(属于收端前端带宽,段 7);树延时的块内循环卷绕已量化为 `ForwardedClock.tree_wrap_fraction`
-   (30 ps / 2^18 UI = 3.7e-6,每块约一个边沿),不再是开放问题。
+2. **bundled 配置的接收机仍是平坦前端、噪声在采样点**(段 7 给了字段,没有给基线数字):`rx.bw_hz` 没有规范值,是设计的主张。
+   示例 09:x1 的眼高随前端 48 / 32 / 24 GHz 从 215.6 → 208.8 / 196.5 / 179.9 mV(噪声在采样点),噪声改到输入(同一 3 mV)则 137.9 / 150.5 / 148.7 mV;
+   32 GT/s 标准封装的判定是否随之翻转没有查(x5 中间 lane 裕度 −0.059 UI,前端极点只会更差)。需要用户给接收机带宽与噪声口径,再改基线并重跑示例。
+   复现:`python examples/09_receiver_front_end.py` 的第一张表;配置里写了 `rx.bw_hz` 后 `budget_report.py --sensitivity` 把它列为 config 旋钮。
 3. **Touchstone 路径只测了合成的无损 4 端口**(`tests/test_channel.py`);没有真实封装 S 参数文件。接口留着,数据没有。
 
 ## P3 — 能力扩展
 
 1. 串扰:NEXT 的反向 lane 相位是固定配置值(`lanes.reverse_phase_ui`),没有随机相位平均;回程模块的时钟与本模块无关的建模没有;
    单端 Touchstone 文件里距离 d 的左右两个邻 lane 取较强的一条(引擎按距离索引攻击 lane);带状线只做了一阶(FEXT = 0)。
-2. 占空比误差的随机部分、前向时钟的四分之一速率变体(`clocking.scheme` 目前只有 `forwarded_ddr`)。
+2. 前向时钟的四分之一速率变体(`clocking.scheme` 目前只有 `forwarded_ddr`)。随机占空比误差有意不加(与白抖动不可区分,段 3 / 段 7 两次确认)。
+3. 收端(段 7 之后还没有的):训练的 deskew 分辨率与眼监视器的样本数(`rx.training_ber` 只给了居中的 BER,没有给它的统计误差)、前端的非线性与失调、噪声在时域里的符号间相关对簇统计的影响(波形路径已带相关,`error_bursts` 没有按它解读)。
 3. 桌面 GUI 与 Android:`config/form.py::SECTIONS` 已按 Halo 的方式声明了全部字段;Halo 的 `config_bridge` / Dash 表单可以直接搬。
 
 ## 边界(有意不做)

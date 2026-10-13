@@ -35,7 +35,7 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 | `channel` | `kind: analytic`(`length_mm`,RLGC 可逐项覆盖)或 `touchstone`(`file`,经 vendored Halo 读法);`xtalk: fext`(行为级幅度,`xtalk_adjacent_db` 留空取封装预设)或 `xtalk: coupled`(从几何估计:`trace_pitch_um` 留空取规范表的 bump 间距,线宽 / 介质厚 / εr 取 `PACKAGE_STACKUP` 预设);段 6:`routing`、`xtalk: touchstone`、`xtalk_next` + `next_db`、`touchstone_mode` + `touchstone_lanes` |
 | `lanes` | `count`、`skew_ps` / `skew_sigma_ps`、`deskew_step_ps`、`spare_count`、`failed`、`repair`、`reverse_adjacent` + `reverse_phase_ui`(旁边有反向 lane 的物理 lane,取 NEXT) |
 | `clocking` | 发端:`pll_profile`、`correlation`、`data_path_rj_s`、`clock_path_rj_s`、`*_wander_s` + `wander_corner_hz`;收端:`local_pll_profile` + `local_pll_fn_hz`(环路自然频率,锁到前向时钟,必须给;−3 dB 带宽 = 2.48 f_n @ ζ = 1,旧键 `local_pll_bw_hz` 仍可读、给 DeprecationWarning)、`tree_delay_ps`、`tree_bw_hz`、`tree_rj_s`、`track_bw_hz`、`track_delay_ui`(延迟在反馈路径里,过快 + 延迟会被 schema 之后的构造拒绝为不稳定)、`pi_step_ui`、`dcd_ui`(收端)、`tx_dcd_ui`(发端共模,有本地 PLL 时才显现)、`wander_floor_hz`(漫游 RMS 的频带下沿) |
-| `tx` / `rx` | `swing_vpp`、`bw_hz`;`noise_rms_v`、`ctle.*`、`sampling_phase_ui`、`vref_offset_v` |
+| `tx` / `rx` | `swing_vpp`、`bw_hz`;`noise_rms_v` + `noise_at`(`sampler`:采样点处的 RMS,默认;`input`:前端输入处的白噪声,以奈奎斯特带内 RMS 给出,经前端 × CTLE 整形后到采样器,需要有限的 `bw_hz`)、`bw_hz`(收端前端一阶极点,留空 = 平坦,段 7)、`ctle.*`、`sampling_phase_ui`、`vref_offset_v`、`training_ber`(训练在哪个 BER 上找眼边并居中;留空 = 目标 BER) |
 | `sim` | `osr`、`n_symbols`、`seed`、`pattern`、`engine`、`time_mode`(waveform / samples)+ `time_cursor_floor`、统计引擎的 ISI 分布 bin(`stat_isi_bin_v`)/ 相位网格参数 |
 | `target` | 留空 = 规范表(带 `source: survey`);写了 = 配置自己的主张 |
 

@@ -1,0 +1,36 @@
+x1 standard package, 25 mm, 32 GT/s, noise 3 mV, Tx pole 60 GHz, clock tree 20 GHz
+  rx front end  main [mV]    noise at sampler: eye    noise at input: sigma_sampler / eye
+          flat      164.5          215.6 mV / 0.774 UI (white noise through a flat front end has no RMS)
+        48 GHz      163.0          208.8 mV / 0.755 UI          6.51 mV   137.9 mV / 0.701 UI
+        32 GHz      160.0          196.5 mV / 0.740 UI          5.32 mV   150.5 mV / 0.696 UI
+        24 GHz      156.0          179.9 mV / 0.721 UI          4.60 mV   148.7 mV / 0.683 UI
+        16 GHz      147.2          143.4 mV / 0.666 UI          3.76 mV   129.3 mV / 0.640 UI
+  the flat front end is the idealisation of every earlier version; the bundled configs keep it until a design gives a number
+
+CTLE at 35 mm (the survey reach x 1.4 of example 02), front end 32 GHz:
+ CTLE peak  noise gain        at sampler: eye          at input: eye
+        0        1.772        153.5 mV / 0.703        108.7 mV / 0.641
+        1        1.323        150.1 mV / 0.680        131.6 mV / 0.651
+        2        1.407        168.1 mV / 0.701        144.6 mV / 0.670
+        4        1.621        215.6 mV / 0.731        179.0 mV / 0.696
+        6        1.911        222.7 mV / 0.732        168.8 mV / 0.691
+  best peaking: 6 dB with the noise at the sampler, 4 dB with it at the input -- the CTLE's gain is bought with noise once the noise is where it physically enters
+
+training centres the eye at its own BER:
+                  link  training BER  centre [UI]  offset [UI]  eye [UI]  eye [mV]
+                    x1  target 1e-27     -0.00778     +0.00000    0.7741     215.6
+                    x1         1e-03     -0.00854     -0.00075    0.7726     215.6
+                    x1         1e-06     -0.00839     -0.00061    0.7729     215.6
+                    x1         1e-09     -0.00826     -0.00048    0.7731     215.6
+    x5 coupled, lane 0         1e-03     -0.00789     -0.00364    0.7407     175.4   (target-centred 0.7479 UI)
+    x5 coupled, lane 1         1e-03     +0.00005     -0.00778    0.6463     172.1   (target-centred 0.6619 UI)
+    x5 coupled, lane 2         1e-03     -0.00369     -0.02345    0.6440     137.5   (target-centred 0.6909 UI)
+    x5 coupled, lane 3         1e-03     -0.00180     -0.01455    0.6543     156.1   (target-centred 0.6834 UI)
+    x5 coupled, lane 4         1e-03     -0.00576     -0.00354    0.7022     192.7   (target-centred 0.7093 UI)
+  x5 module FAIL target-centred, FAIL trained at 1e-3 (worst lane 1 -> 2); x1's bathtub is nearly symmetric and training costs 0.002 UI, the crosstalk-laden lanes pay up to 0.047 UI (lane 2)
+
+time engine on a 1 mm line, 45 mV at the input of a 24 GHz front end, 400000 symbols:
+  statistics: sigma at the sampler 69.07 mV (gain 1.535), BER 2.45e-03
+  waveform path, white noise filtered through the front end: sampled noise RMS 68.43 mV, BER 2.10e-03 (838 errors), ratio 0.86
+  the filtered noise is band-limited to osr / (2 UI) = 512 GHz; the integral runs to infinity (the missing variance: 3.0 %)
+wrote examples/output/09_receiver_front_end.png

@@ -7,9 +7,11 @@ terminations) or from a Touchstone file (vendored ``touchstone`` reader).
 H is normalised so a lossless matched line has H = 1: ``tx.swing_vpp`` is
 then the swing a matched load would see and the receiver gets ``swing * |H|``.
 
-``link_response`` adds the transmitter's bandwidth and the optional CTLE and
-turns H into the pulse response on the waveform grid (``sim.osr`` samples
-per UI); both engines read their cursors off that one pulse.
+``link_response`` adds the transmitter's bandwidth, the receiver front end's
+(``rx.bw_hz``, phase 7) and the optional CTLE and turns H into the pulse
+response on the waveform grid (``sim.osr`` samples per UI); both engines read
+their cursors off that one pulse. ``noise_shaping_gain`` is what the same
+front end and CTLE do to white input noise (``rx.noise_at: input``).
 """
 
 from __future__ import annotations
@@ -124,6 +126,46 @@ def tx_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
     return np.ones_like(f, dtype=complex) if not np.isfinite(bw) else 1.0 / (1.0 + 1j * f / bw)
 
 
+def rx_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
+    """The receiver front end's first-order pole at ``rx.bw_hz`` on the data
+    path (pads, ESD, input amplifier); flat when the config leaves it None.
+    The clock tree has its own bandwidth (``clocking.tree_bw_hz``) on the
+    clock's phase -- this is the data edges' counterpart."""
+    bw = cfg.rx.bw_hz
+    return np.ones_like(f, dtype=complex) if bw is None else 1.0 / (1.0 + 1j * f / bw)
+
+
+def noise_shaping_gain(cfg: LinkConfig) -> float:
+    """sigma at the sampler / sigma at the input for white input noise
+    (``rx.noise_at: input``): sqrt(integral_0^inf |H_fe(f) H_ctle(f)|^2 df / f_N),
+    the input RMS being referred to the Nyquist band (an ideal integrating
+    receiver's noise bandwidth is exactly f_N). The integral runs to
+    infinity -- the sampler's noise is physics, not a waveform-grid number;
+    the time engine's filtered noise is band-limited to osr / (2 UI) and
+    sees a little less (3 % of the variance for a 24 GHz front end on the
+    32x grid of 32 GT/s). 1.0 when the noise is referred at the sampler."""
+    if cfg.rx.noise_at != "input":
+        return 1.0
+    from scipy.integrate import quad
+
+    def h2(f: float) -> float:
+        x = np.array([f])
+        return float(np.abs(rx_response(cfg, x) * ctle_response(cfg, x))[0] ** 2)
+
+    bw = cfg.rx.bw_hz
+    # f = bw tan(theta) folds [0, inf) onto [0, pi/2): the integrand stays
+    # bounded (|H|^2 falls at least as 1/f^2, sec^2 grows as f^2) and the
+    # one quad resolves the pole region and the tail alike
+    total = quad(lambda th: h2(bw * math.tan(th)) * bw / math.cos(th) ** 2, 0.0, 0.5 * math.pi - 1e-9,
+                 limit=200, epsabs=0.0, epsrel=1e-10)[0]
+    return math.sqrt(total / cfg.f_nyquist)
+
+
+def sampler_noise_rms_v(cfg: LinkConfig) -> float:
+    """The Gaussian noise RMS at the decision point both engines use."""
+    return cfg.rx.noise_rms_v * noise_shaping_gain(cfg)
+
+
 def ctle_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
     """One zero, two poles, unity DC gain; the zero sits ``peak_db`` below fp1."""
     c = cfg.rx.ctle
@@ -194,6 +236,7 @@ class LinkResponse:
     H_total: np.ndarray      # channel x Tx x CTLE on channel.f
     osr: int
     xtalk_pulses: dict = None   # {neighbour distance: Waveform [V]}; empty when crosstalk is off
+    noise_impulse: Waveform | None = None   # front end x CTLE impulse (sum = 1) for rx.noise_at: input
 
     @property
     def main_index(self) -> int:
@@ -238,7 +281,8 @@ class LinkResponse:
 def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkResponse:
     ch = channel if channel is not None else ChannelModel.from_config(cfg)
     f = ch.f
-    H = ch.H * tx_response(cfg, f) * ctle_response(cfg, f)
+    rx_front = rx_response(cfg, f) * ctle_response(cfg, f)
+    H = ch.H * tx_response(cfg, f) * rx_front
     h = freq2impulse(H, f)
     if not np.isclose(h.dt, cfg.dt, rtol=1e-6):
         raise ValueError(f"impulse dt {h.dt:.3e} does not match the waveform grid {cfg.dt:.3e}")
@@ -246,7 +290,7 @@ def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkR
     amp = 0.5 * cfg.tx.swing_vpp
     pulse = np.convolve(h.y, np.ones(osr))[: h.y.size] * amp
     xt = {}
-    front = tx_response(cfg, f) * ctle_response(cfg, f)
+    front = tx_response(cfg, f) * rx_front
     if cfg.channel.xtalk == "touchstone":
         for k, hx_f in (ch.xtalk_H or {}).items():
             hx = freq2impulse(hx_f * front, f)
@@ -258,8 +302,10 @@ def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkR
     if cfg.channel.xtalk_next != "none":
         hn = freq2impulse(next_response(cfg, f) * front, f)
         xt["next"] = Waveform(np.convolve(hn.y, np.ones(osr))[: hn.y.size] * amp, hn.dt)
-    return LinkResponse(Waveform(pulse, h.dt), h, ch, H, osr, xt)
+    noise_h = freq2impulse(rx_front, f) if cfg.rx.noise_at == "input" else None
+    return LinkResponse(Waveform(pulse, h.dt), h, ch, H, osr, xt, noise_h)
 
 
-__all__ = ["ChannelModel", "LinkResponse", "link_response", "tx_response", "ctle_response",
-           "xtalk_response", "next_response", "read_cursors", "fill_dc"]
+__all__ = ["ChannelModel", "LinkResponse", "link_response", "tx_response", "rx_response", "ctle_response",
+           "noise_shaping_gain", "sampler_noise_rms_v", "xtalk_response", "next_response", "read_cursors",
+           "fill_dc"]

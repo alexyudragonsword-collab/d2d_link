@@ -67,6 +67,15 @@ Markulic 2016 SSPLL 剖面(带内 186 fs),数据 / 时钟路径各 200 fs 白抖
 
 见 [`docs/USAGE.md`](docs/USAGE.md)、[`docs/clock_profile.md`](docs/clock_profile.md);结论与被推翻的判断在 `cairn/LOG.md`。
 
+## 段 7:收端机制(0.9.0)
+
+`rx.bw_hz`(收端前端一阶极点,数据边沿的"树带宽")、`rx.noise_at: sampler | input`(噪声在采样点还是在前端输入 —— CTLE 的噪声代价由此而来)、
+`rx.training_ber`(训练在哪个 BER 上居中);默认值全部保持旧行为,bundled 配置指纹逐位相同。机制与数字见 `cairn/receiver.md`。
+
+| 示例 | 问题 | 答案(2026-10-13,0.9.0) |
+|---|---|---|
+| `09_receiver_front_end.py` | 接收机自己花掉多少 | x1 25 mm:前端 48 / 32 / 24 GHz 眼高 215.6 → 208.8 / 196.5 / 179.9 mV(噪声在采样点);同一 3 mV 改到输入:137.9 / 150.5 / 148.7 mV(窄前端省噪声,32 GHz 附近最好)。35 mm + 32 GHz 前端的 CTLE:噪声在采样点 6 dB 最好 222.7 mV,在输入 4 dB 最好 179.0 mV(6 dB 掉到 168.8)。训练 1e-3 居中:x1 偏 −0.0008 UI(眼宽 −0.002),x5 耦合中间 lane 偏 −0.024 UI、眼宽 0.691 → 0.644。时域滤噪声:采到 68.5 对闭式 69.05 mV |
+
 ## 规范数字
 
 本库拿不到 UCIe 规范原文。速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 15 条,全部在 `data/spec/ucie_survey.yaml`,
@@ -82,12 +91,12 @@ grep "source: survey" data/spec/ucie_survey.yaml
 |---|---|
 | `src/d2d_link/config/` | frozen `LinkConfig`、YAML 加载、表单字段声明(`form.py`) |
 | `src/d2d_link/clock/` | 剖面读取、**前向时钟模型**(发端 PLL、本地 PLL、树、跟踪器;闭式预算 + 逐符号合成) |
-| `src/d2d_link/channel/` | 解析 RLGC 走线 / Touchstone → 脉冲响应;邻 lane FEXT 串扰脉冲 |
+| `src/d2d_link/channel/` | 解析 RLGC 走线 / Touchstone → 脉冲响应;FEXT / NEXT 串扰脉冲;收端前端与噪声整形(段 7) |
 | `src/d2d_link/engine/` | 统计引擎(主)、时域引擎(校核)、lane 映射与修复、链路判定 |
 | `src/d2d_link/spec/` | 规范数字表的读取 |
 | `src/d2d_link/vendor/` | Halo_Serdes 的 S 参数读法 / RLGC / 响应转换,pll_simulator 的相噪合成与积分;完整 SHA 钉住,`tools/vendor_check.py` 守 |
 | `tools/` | `fingerprint.py`、`example_drift.py`、`run_examples.py`、`vendor_check.py`、`budget_report.py` |
-| `cairn/` | 项目知识:铁律论证、前向时钟、双引擎、规范来源、坑;`LOG.md` 每轮数字与被推翻的判断 |
+| `cairn/` | 项目知识:铁律论证、前向时钟、双引擎、串扰、收端、规范来源、坑;`LOG.md` 每轮数字与被推翻的判断 |
 
 ## 不做
 

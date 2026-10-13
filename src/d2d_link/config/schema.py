@@ -394,10 +394,35 @@ class CtleConfig:
 
 @dataclass(frozen=True)
 class RxConfig:
-    noise_rms_v: float = 2.0e-3            # input-referred noise at the sampler [V RMS]
+    """The receiver: a front end of bandwidth ``bw_hz`` (first-order pole on
+    the data path -- pads, ESD, the input amplifier; None = flat, the
+    idealisation every version before phase 7 made), the optional CTLE, the
+    sampler. ``noise_rms_v`` is Gaussian noise; where it is referred decides
+    what the CTLE and the front end do to it:
+
+    - ``noise_at: sampler`` -- the RMS at the decision point, whatever the
+      front end does (the phase 1-6 convention; nothing shapes it).
+    - ``noise_at: input`` -- white noise at the front end's input, given as the
+      RMS an ideal integrating receiver would see (PSD ``noise_rms_v**2 / f_N``,
+      f_N the Nyquist frequency). The sampler then sees
+      ``noise_rms_v * sqrt(integral |H_fe H_ctle|^2 df / f_N)`` -- a CTLE's
+      peaking costs noise, a narrow front end saves it. Needs a finite
+      ``bw_hz`` (white noise through a flat front end has no RMS).
+
+    ``training_ber`` is the BER at which link training finds the eye's edges
+    and centres the sampler between them (an eye monitor sweeping the phase
+    interpolator sees ~1e-3..1e-6 in its dwell, not the 1e-27 the link is
+    judged at); None centres at the target BER's opening, the earlier
+    idealisation. The eye width is then the symmetric opening around where
+    the sampler really sits."""
+
+    noise_rms_v: float = 2.0e-3            # Gaussian noise [V RMS]; see noise_at
+    noise_at: Literal["sampler", "input"] = "sampler"
+    bw_hz: Optional[float] = None          # front-end -3 dB bandwidth on the data path [Hz]; None = flat
     ctle: CtleConfig = field(default_factory=CtleConfig)
     sampling_phase_ui: Optional[float] = None   # None = the bathtub minimum (eye-centred tracker)
     vref_offset_v: float = 0.0             # decision threshold offset from mid-swing
+    training_ber: Optional[float] = None   # eye-centring BER of link training; None = the target BER
 
     def __post_init__(self):
         _finite_nonneg(self.noise_rms_v, "rx.noise_rms_v")
@@ -405,6 +430,13 @@ class RxConfig:
         if self.sampling_phase_ui is not None:
             _require(-0.5 <= self.sampling_phase_ui <= 0.5,
                      f"rx.sampling_phase_ui must be in [-0.5, 0.5], got {self.sampling_phase_ui}")
+        if self.bw_hz is not None:
+            _finite_pos(self.bw_hz, "rx.bw_hz")
+        _require(self.noise_at == "sampler" or self.bw_hz is not None,
+                 "rx.noise_at: input needs a finite rx.bw_hz (white noise through a flat front end has no RMS)")
+        if self.training_ber is not None:
+            _require(0.0 < self.training_ber < 0.5,
+                     f"rx.training_ber must be in (0, 0.5), got {self.training_ber!r}")
 
 
 # ---------------------------------------------------------------------------

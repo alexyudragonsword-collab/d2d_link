@@ -107,13 +107,16 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
         _f("tx.bw_hz", "Driver bandwidth [GHz] (empty = 2x Nyquist)", "opt_float", scale=1e9),
     ]),
     ("rx", "Receiver", [
-        _f("rx.noise_rms_v", "Sampler noise [mV RMS]", "float", scale=1e-3),
+        _f("rx.noise_rms_v", "Noise [mV RMS] (at the sampler, or at the input in the Nyquist band)", "float", scale=1e-3),
+        _f("rx.noise_at", "Noise referred at", "enum", options=["sampler", "input"]),
+        _f("rx.bw_hz", "Front-end bandwidth [GHz] (empty = flat)", "opt_float", scale=1e9),
         _f("rx.ctle.enable", "CTLE", "bool"),
         _f("rx.ctle.peak_db", "CTLE peaking [dB]", "float"),
         _f("rx.ctle.fp1_hz", "CTLE pole 1 [GHz] (empty = Nyquist)", "opt_float", scale=1e9),
         _f("rx.ctle.fp2_hz", "CTLE pole 2 [GHz] (empty = 2x Nyquist)", "opt_float", scale=1e9),
         _f("rx.sampling_phase_ui", "Sampling phase [UI] (empty = eye centre)", "opt_float"),
         _f("rx.vref_offset_v", "Vref offset [mV]", "float", scale=1e-3),
+        _f("rx.training_ber", "Training BER for eye centring (empty = target BER)", "opt_float"),
     ]),
     ("sim", "Simulation", [
         _f("sim.osr", "Samples per UI", "int"),

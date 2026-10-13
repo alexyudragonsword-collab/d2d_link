@@ -50,7 +50,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.special import erfc, log_ndtr
 
-from ..channel.model import LinkResponse, link_response
+from ..channel.model import LinkResponse, link_response, noise_shaping_gain
 from ..clock.forwarded import ForwardedClock, JitterBudget
 from ..config.schema import LinkConfig
 from ..spec import survey
@@ -322,7 +322,8 @@ class StatisticalEngine:
         self.nodes, self.weights = jitter_quadrature(self.sigma_j_ui, cfg.sim.stat_phase_points,
                                                      cfg.sim.stat_jitter_sigmas, self.quant_ui, self.spurs_ui)
         self.bin_v = cfg.sim.stat_isi_bin_v
-        self.sigma_n = cfg.rx.noise_rms_v
+        self.noise_gain = noise_shaping_gain(cfg)          # 1 unless rx.noise_at: input
+        self.sigma_n = cfg.rx.noise_rms_v * self.noise_gain
         self.vref = cfg.rx.vref_offset_v
         self._models: dict[float, IsiModel] = {}
         self._tails: dict[tuple[float, float, float], np.ndarray] = {}
@@ -531,13 +532,23 @@ class StatisticalEngine:
             center = 0.5 * (left + right)
         else:
             center = float(phases[i_min])
+        target_centre = center
+        if cfg.rx.training_ber is not None and ew > 0.0:
+            # link training centres the sampler between the edges it can see
+            # at its own BER (phase 7): an asymmetric bathtub puts that
+            # midpoint off the target opening's, and the lane spends eye
+            # width on the offset like it does on a skew residual
+            training = self.eye_region(phases, ber, cfg.rx.training_ber, refine=self.eye_edge)
+            if training is not None:
+                center = 0.5 * (training[0] + training[1])
         if cfg.rx.sampling_phase_ui is not None:
-            center = cfg.rx.sampling_phase_ui
+            center = target_centre = cfg.rx.sampling_phase_ui
         phase = center + skew_residual_ui
-        if ew > 0.0 and phase != center:
-            # a lane sampled off the eye's centre (a deskew residual, a fixed
-            # phase) has only the symmetric opening around its own sampling
-            # instant to spend: the same bathtub, read from where it samples
+        if ew > 0.0 and phase != target_centre:
+            # a lane sampled off the eye's centre (a deskew residual, a
+            # training offset) has only the symmetric opening around its own
+            # sampling instant to spend: the same bathtub, read from where it
+            # samples (a configured fixed phase is its own centre)
             ew = max(0.0, min(2.0 * (right - phase), 2.0 * (phase - left), ew))
         log_ber = self.log10_error_probability(phase)
         eh = self.half_eye(phase, target_ber, +1) + self.half_eye(phase, target_ber, -1)
@@ -556,6 +567,8 @@ class StatisticalEngine:
                     "quantisation_ui": self.quant_ui, "log10_ber_min": float(ber[i_min]),
                     "spur_rms_s": self.budget.spur_s, "n_spurs": len(self.spurs_ui),
                     "phase_min_ui": float(phases[i_min]),
+                    "training_centre_ui": float(center), "centre_offset_ui": float(center - target_centre),
+                    "noise_gain": float(self.noise_gain), "sigma_noise_input_v": float(cfg.rx.noise_rms_v),
                     "eye_width_raw_ui": float(ew_raw), "eye_width_clipped": bool(clipped),
                     "insertion_loss_nyquist_db": self.resp.channel.insertion_loss_db(cfg.f_nyquist)})
 

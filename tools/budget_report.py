@@ -77,6 +77,12 @@ def report(cfg, res, clock) -> dict:
                             if cfg.channel.xtalk != "none" else None}),
         "channel_model": ({"rlgc_source": "model", **{k: v for k, v in cfg.rlgc().items()}}
                           if cfg.channel.kind == "analytic" else {"file": cfg.channel.file}),
+        "receiver": {"bw_hz": cfg.rx.bw_hz, "noise_at": cfg.rx.noise_at, "noise_rms_mv": 1e3 * cfg.rx.noise_rms_v,
+                     "noise_gain": res.stat[0].extras["noise_gain"] if res.stat else None,
+                     "sigma_sampler_mv": 1e3 * res.stat[0].sigma_noise_v if res.stat else None,
+                     "ctle_peak_db": cfg.rx.ctle.peak_db if cfg.rx.ctle.enable else None,
+                     "training_ber": cfg.rx.training_ber,
+                     "centre_offset_ui": [r.extras["centre_offset_ui"] for r in res.stat]},
         "lanes": [{"logical": r.lane, "physical": lm.logical_to_physical[r.lane],
                    "skew_ps": float(res.skew_ps[lm.logical_to_physical[r.lane]]),
                    "skew_residual_ui": r.skew_residual_ui, "aggressors": r.extras["n_aggressors"],
@@ -115,6 +121,17 @@ def to_markdown(rep: dict) -> str:
         lines.append(f"Behavioural FEXT level {x['adjacent_db']:.1f} dB at Nyquist (nearest neighbour).")
     else:
         lines.append("Off.")
+    rx = rep["receiver"]
+    fe = "flat (an idealisation: no front-end pole)" if rx["bw_hz"] is None else f"{rx['bw_hz'] / 1e9:g} GHz first-order"
+    where = (f"referred at the input in the Nyquist band, {rx['sigma_sampler_mv']:.2f} mV at the sampler "
+             f"(front end x CTLE gain {rx['noise_gain']:.3f})" if rx["noise_at"] == "input"
+             else "referred at the sampler (nothing shapes it)")
+    ctle = f"CTLE {rx['ctle_peak_db']:g} dB peaking" if rx["ctle_peak_db"] is not None else "no CTLE"
+    train = (f"training centres the eye at BER {rx['training_ber']:.0e}: offsets "
+             + ", ".join(f"{o:+.4f}" for o in rx["centre_offset_ui"]) + " UI"
+             if rx["training_ber"] is not None else "the sampler sits at the target opening's centre (ideal training)")
+    lines += ["", "## Receiver", "",
+              f"Front end {fe}; {ctle}; noise {rx['noise_rms_mv']:.2f} mV RMS {where}; {train}."]
     lines += ["", "## Lanes", "",
               "| logical | physical | skew [ps] | residual [UI] | aggressors | xtalk [mV] | eye height [mV] | "
               "eye width [UI] | margin EH [mV] | margin EW [UI] | log10 BER | pass |",
@@ -161,6 +178,10 @@ def sensitivity_knobs(cfg) -> list[dict]:
         adj = cfg.xtalk_db()[0]
         knobs.append(dict(label="xtalk_adjacent_db", path="channel.xtalk_adjacent_db", nominal=adj,
                           source="config" if ch.xtalk_adjacent_db is not None else "model", rel=0.2))
+    if cfg.rx.bw_hz is not None:
+        # the receiver's bandwidth is the design's claim, and with the noise
+        # at the input it moves both the pulse and the noise
+        knobs.append(dict(label="rx_bw_hz", path="rx.bw_hz", nominal=cfg.rx.bw_hz, source="config", rel=0.2))
     return knobs
 
 
