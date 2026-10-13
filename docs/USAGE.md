@@ -35,7 +35,7 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 | `lanes` | `count`、`skew_ps` / `skew_sigma_ps`、`deskew_step_ps`、`spare_count`、`failed`、`repair` |
 | `clocking` | 发端:`pll_profile`、`correlation`、`data_path_rj_s`、`clock_path_rj_s`、`*_wander_s` + `wander_corner_hz`;收端:`local_pll_profile` + `local_pll_fn_hz`(环路自然频率,锁到前向时钟,必须给;−3 dB 带宽 = 2.48 f_n @ ζ = 1,旧键 `local_pll_bw_hz` 仍可读、给 DeprecationWarning)、`tree_delay_ps`、`tree_bw_hz`、`tree_rj_s`、`track_bw_hz`、`track_delay_ui`(延迟在反馈路径里,过快 + 延迟会被 schema 之后的构造拒绝为不稳定)、`pi_step_ui`、`dcd_ui`(收端)、`tx_dcd_ui`(发端共模,有本地 PLL 时才显现)、`wander_floor_hz`(漫游 RMS 的频带下沿) |
 | `tx` / `rx` | `swing_vpp`、`bw_hz`;`noise_rms_v`、`ctle.*`、`sampling_phase_ui`、`vref_offset_v` |
-| `sim` | `osr`、`n_symbols`、`seed`、`pattern`、`engine`、统计引擎的 ISI 分布 bin(`stat_isi_bin_v`)/ 相位网格参数 |
+| `sim` | `osr`、`n_symbols`、`seed`、`pattern`、`engine`、`time_mode`(waveform / samples)+ `time_cursor_floor`、统计引擎的 ISI 分布 bin(`stat_isi_bin_v`)/ 相位网格参数 |
 | `target` | 留空 = 规范表(带 `source: survey`);写了 = 配置自己的主张 |
 
 `d2d_link.config.form.SECTIONS` 按 Halo 的方式声明了每个字段的表单行(标签、类型、显示比例);GUI 这一轮不做,
@@ -44,7 +44,8 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 ## 两个引擎(铁律 3)
 
 - `run_statistical(cfg)`:主引擎,BER 到 1e-27,眼高 / 眼宽在目标 BER 处,浴盆,残余抖动预算。
-- `run_time(cfg, phase_ui=...)`:时域校核,`sim.n_symbols` 个符号;`sim.engine: both` 时 `run_link` 两个都跑并给出比。
+- `run_time(cfg, phase_ui=...)`:时域校核,`sim.n_symbols` 个符号(> 2^24 时抖动按块流式合成);`sim.engine: both` 时 `run_link` 两个都跑并给出比。
+  `pytest -m slow tests/test_engines_deep.py` 跑 1e9 符号的 3e-8 一致性点(每周 CI);`D2D_DEEP_SYMBOLS` / `D2D_DEEP_BER` 可改。
 - `run_link(cfg)`:整个模块 —— lane 映射与修复、逐 lane skew 残余、邻 lane 串扰(按物理邻接,死 lane 与闲置备用 lane 静默)、
   最差 lane 判定;`LinkResult.summary()`。
 - `ForwardedClock(cfg).budget()`:残余抖动的闭式分解(发端泄漏、本地 PLL、路径白噪、漫游、树);`residual_vs_local_pll_bw`、`residual_vs_track_bw` 扫曲线。

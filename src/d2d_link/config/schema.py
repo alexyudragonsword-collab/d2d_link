@@ -392,6 +392,9 @@ class SimConfig:
     stat_phase_points: int = 64        # bathtub phases per UI
     stat_jitter_sigmas: float = 12.0   # jitter quadrature reach [sigma]; 1e-27 needs 10.8
     engine: Literal["statistical", "time", "both"] = "statistical"
+    time_mode: Literal["waveform", "samples"] = "waveform"   # time engine: full waveform, or sampled values only
+                                                            # (sum of interpolated cursors; much faster, no eye traces)
+    time_cursor_floor: float = 1.0e-6  # samples mode: cursors below this fraction of the main cursor are dropped
 
     def __post_init__(self):
         _require(self.osr >= 4, f"sim.osr must be >= 4, got {self.osr}")
@@ -401,6 +404,8 @@ class SimConfig:
                  f"sim.jitter_block must be a power of two >= 64, got {self.jitter_block}")
         _finite_pos(self.stat_isi_bin_v, "sim.stat_isi_bin_v")
         _require(self.stat_phase_points >= 8, "sim.stat_phase_points must be >= 8")
+        _require_in(self.time_mode, {"waveform", "samples"}, "sim.time_mode")
+        _require(0.0 <= self.time_cursor_floor < 1.0, "sim.time_cursor_floor must be in [0, 1)")
         _require(math.isfinite(self.stat_jitter_sigmas) and self.stat_jitter_sigmas >= 1.0,
                  "sim.stat_jitter_sigmas must be >= 1")
         _require_in(self.pattern, {"prbs15", "prbs31", "random"}, "sim.pattern")

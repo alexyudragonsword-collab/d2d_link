@@ -351,12 +351,21 @@ class ForwardedClock:
         PLL phase, the clock path, the local PLL and the tree once per block
         for the module, the data path once per lane; the tracker's state runs
         on across blocks. Below fs/block nothing is representable, which is
-        where the closed form's band starts too.
+        where the closed form's band starts too. :meth:`synthesize_blocks`
+        yields the same blocks one at a time for runs too long to hold.
         """
+        n_lanes = self.cfg.lanes.count if n_lanes is None else n_lanes
+        blocks = list(self.synthesize_blocks(n_edges, rng, n_lanes))
+        out = np.concatenate(blocks, axis=1) if blocks else np.empty((n_lanes, 0))
+        self.block_step_ratio = self._block_step_ratio(out[0], self.cfg.sim.jitter_block) if n_lanes else float("nan")
+        return out
+
+    def synthesize_blocks(self, n_edges: int, rng: np.random.Generator, n_lanes: int | None = None):
+        """The blocks of :meth:`synthesize`, each ``(n_lanes, <= jitter_block)``,
+        as a generator: a 2.5e9-symbol run never holds its jitter at once."""
         ck = self.cfg.clocking
         n_lanes = self.cfg.lanes.count if n_lanes is None else n_lanes
         block = self.cfg.sim.jitter_block
-        out = np.empty((n_lanes, n_edges))
         a = self.alpha
         b_coef, a_coef = self._tracker_coefficients()
         zi = np.zeros((n_lanes, max(len(b_coef), len(a_coef)) - 1)) if a > 0.0 else None
@@ -372,6 +381,7 @@ class ForwardedClock:
         while pos < n_edges:
             n = min(block, n_edges - pos)
             n_fft = block if n < block else n   # a short tail keeps the block's grid
+            out = np.empty((n_lanes, n))
             c = self._pll_block(n_fft, rng) + self._sinusoids(tx_spurs, ph_c, pos, n_fft)
             if self.rho == 1.0:
                 clk = c
@@ -400,10 +410,9 @@ class ForwardedClock:
                     if step_s > 0.0:
                         theta = step_s * np.round(theta / step_s)
                     delta = delta - theta
-                out[lane, pos:pos + n] = delta
+                out[lane] = delta
+            yield out
             pos += n
-        self.block_step_ratio = self._block_step_ratio(out[0], block)
-        return out
 
     @staticmethod
     def _block_step_ratio(x: np.ndarray, block: int) -> float:

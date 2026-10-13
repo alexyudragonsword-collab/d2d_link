@@ -105,3 +105,22 @@ def test_bundled_repair_configs():
     adv = load_config(REPO / "configs" / "advanced_32g_x64_spare.yaml")
     lm = lane_map(adv)
     assert lm.active_width == 64 and 12 not in lm.logical_to_physical and 40 not in lm.logical_to_physical
+
+
+def test_identical_lanes_share_one_statistical_run():
+    """Lanes with the same neighbours at the same relative skews and the same
+    residual are the same computation: run_link reuses the result (the x16
+    inner lanes collapse to one run) and the numbers are those of a direct run."""
+    from d2d_link.config import ChannelConfig
+    from d2d_link.engine import run_statistical
+
+    sim = SimConfig(stat_phase_points=16)
+    ck = ClockingConfig(pll_profile=PROFILE, data_path_rj_s=200e-15, clock_path_rj_s=200e-15)
+    res = run_link(LinkConfig(lanes=LaneConfig(count=6), channel=ChannelConfig(xtalk="fext"), clocking=ck, sim=sim))
+    inner = [r for r in res.stat if r.extras["n_aggressors"] == 4]
+    assert len(inner) == 2 and inner[0].eye_height_v == inner[1].eye_height_v and inner[0].lane != inner[1].lane
+    assert res.stat[0].eye_height_v == res.stat[5].eye_height_v            # the two edge lanes
+    assert res.stat[0].eye_height_v != inner[0].eye_height_v
+    direct = run_statistical(LinkConfig(lanes=LaneConfig(count=6), channel=ChannelConfig(xtalk="fext"), clocking=ck, sim=sim),
+                             lane=2, aggressors=((1, 0.0), (2, 0.0), (1, 0.0), (2, 0.0)))
+    assert direct.eye_height_v == inner[0].eye_height_v

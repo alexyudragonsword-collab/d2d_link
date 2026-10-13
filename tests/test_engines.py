@@ -74,3 +74,28 @@ def test_reach_is_within_2x_of_the_survey():
         if r.passes:
             last_pass = length
     assert last_pass is not None and 0.5 <= last_pass / reach <= 2.0, (last_pass, reach)
+
+
+def test_one_in_a_million_point_within_2x():
+    """Invariant #3 at a BER the suite can afford: the sampler noise tuned so
+    the statistics predict 1e-6 at the eye centre, 2.5e7 symbols (~25 errors
+    expected). The 1e-8 point runs weekly (tests/test_engines_deep.py)."""
+    from d2d_link.engine.statistical import StatisticalEngine
+
+    cfg = dataclasses.replace(BASE, sim=dataclasses.replace(BASE.sim, n_symbols=25_000_000))
+    eng = StatisticalEngine(cfg)
+    phase = eng.run().phase_ui
+    lo, hi = 1e-3, 0.3
+    for _ in range(36):
+        mid = (lo * hi) ** 0.5
+        eng.sigma_n = mid
+        if eng.error_probability(phase) > 1e-6:
+            hi = mid
+        else:
+            lo = mid
+    tuned = dataclasses.replace(cfg, rx=RxConfig(noise_rms_v=(lo * hi) ** 0.5))
+    s = run_statistical(tuned)
+    assert 5e-7 < s.ber < 2e-6
+    t = run_time(tuned, phase_ui=s.phase_ui)
+    assert t.n_errors >= 10, t.n_errors
+    assert 0.5 < t.ber / s.ber < 2.0, (t.ber, s.ber, t.n_errors)

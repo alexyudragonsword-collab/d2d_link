@@ -119,6 +119,8 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
         _f("sim.stat_phase_points", "Bathtub phases per UI", "int"),
         _f("sim.stat_jitter_sigmas", "Jitter quadrature reach [sigma]", "float"),
         _f("sim.engine", "Engine", "enum", options=["statistical", "time", "both"]),
+        _f("sim.time_mode", "Time engine mode", "enum", options=["waveform", "samples"]),
+        _f("sim.time_cursor_floor", "Samples mode: cursor floor [fraction of main]", "float"),
     ]),
     ("target", "Targets (empty = survey table)", [
         _f("target.ber", "BER target", "opt_float"),

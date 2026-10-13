@@ -4,6 +4,29 @@
 
 ---
 
+## [0.7.0] — 2026-10-13 — 段 4:性能与深一致性(指纹逐位相同)
+
+### 新增
+- **深一致性点**:`tests/test_engines.py::test_one_in_a_million_point_within_2x`(1e-6,2.5e7 符号,套件内,~3 min);
+  `tests/test_engines_deep.py`(`pytest -m slow`,默认排除):1e9 符号的 3e-8 点,每周由 `examples-full.yml` 的 `deep` 作业跑;
+  `D2D_DEEP_SYMBOLS=2500000000 D2D_DEEP_BER=1e-8` 是真正的 1e-8 / 25 误码点(≈ 5 h,手动)。
+- **流式抖动合成**:`ForwardedClock.synthesize_blocks()` 逐块产出;`run_time` 在 > 2^24 符号时流式消费(`_JitterFeed`),2.5e9 符号不再要 20 GB。
+- **`sim.time_mode: samples`**:只算采样值(每符号光标按自己的采样瞬间线性内插,与波形路径 `np.interp` 同一算术;误码逐个相同,样本差 1e-12 V),
+  `sim.time_cursor_floor`(默认 1e-6 × 主光标)是唯一近似。诚实结论:有损线的脉冲尾 130 UI 内都高于 1e-6,光标一个不少,
+  **不比 FFT 波形快**(1e6 符号 9 s 对 6 s);短记忆信道(先进 2 mm、floor 1e-4)快 4×。无眼图轨迹。
+- `run_link` 对邻接与残余 skew 相同的 lane 复用统计结果(x16 内侧 6 lane 一次算完);时域 `extras["mode" | "n_cursors_used"]`。
+
+### 修改(逐位不变)
+- 统计引擎:`_shift_add` 对 |c| < bin 的光标把两次相同加法合成 `a + a`(精确)、`log10_tail` 标量路径不 reshape、`_logsumexp` 一维快路径、
+  `errstate` 只进一次、模型缓存上限 5 万。x1 每 lane 4.6 → 4.2 s。指纹 `fp_p3` → `fp_p4a` 2698 项逐位相同。
+- `pytest` 默认 `-m 'not slow'`;`tools/run_examples.py` 默认超时 2400 s(段 3 已提)。
+
+### 没做(会动数字,记入 ROADMAP P2 #0)
+- 眼边求根相位贴细网格(省 ~1.8 s/lane,边差 ~1e-5 UI)、`half_eye` 60 → 30 步、方案里"快 10–50×"的只采样时域(理由见上)。
+- 方案里的 `width_degrade` 非 2 幂、攻击 lane 按逻辑编号播种:前者 UCIe 的宽度只有 16 / 64 与其一半,非 2 幂是实验配置,不改;后者会动有串扰的时域数字,留给下一次。
+
+---
+
 ## [0.6.0] — 2026-10-13 — 段 3:时钟模型保真(杂散、真反馈跟踪器、PLL 带宽口径、漫游频带、块缝、发端 DCD;附带眼边求根)
 
 ### 修改(模型)

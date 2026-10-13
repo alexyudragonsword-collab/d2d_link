@@ -65,13 +65,18 @@ def qfunc(x):
 
 def _logsumexp(a: np.ndarray, axis: int | None = None) -> np.ndarray | float:
     """log(sum(exp(a))) without scipy's per-call overhead (this engine calls
-    it tens of thousands of times on short arrays); all-(-inf) rows give -inf."""
+    it tens of thousands of times on short arrays); all-(-inf) rows give -inf.
+    Callers hold the ``errstate`` (log of 0): one context per tail, not two."""
     a = np.asarray(a, dtype=np.float64)
+    if axis is None:
+        m = float(np.max(a))
+        if not math.isfinite(m):
+            m = 0.0
+        return float(np.log(np.sum(np.exp(a - m))) + m)
     m = np.max(a, axis=axis, keepdims=True)
     m = np.where(np.isfinite(m), m, 0.0)
-    with np.errstate(divide="ignore"):
-        out = np.log(np.sum(np.exp(a - m), axis=axis, keepdims=True)) + m
-    return out.reshape(-1) if axis is not None else float(out.reshape(()))
+    out = np.log(np.sum(np.exp(a - m), axis=axis, keepdims=True)) + m
+    return out.reshape(-1)
 
 
 def resolved_targets(cfg: LinkConfig) -> dict:
@@ -117,11 +122,19 @@ def _shift_add(p: np.ndarray, s: float) -> np.ndarray:
     m = j + 1
     n = p.size
     q = np.zeros(n + 2 * m)
-    q[m + j: m + j + n] += 0.5 * (1.0 - f) * p
-    q[m - j: m - j + n] += 0.5 * (1.0 - f) * p
+    half = 0.5 * (1.0 - f) * p
+    if j == 0:
+        # both half-weight copies land on the same bins: a + a is exact, so
+        # this is bit for bit the two additions it replaces (most cursors of
+        # a long tail are below one bin and take this path)
+        q[m: m + n] = half + half
+    else:
+        q[m + j: m + j + n] += half
+        q[m - j: m - j + n] += half
     if f > 0.0:
-        q[m + j + 1: m + j + 1 + n] += 0.5 * f * p
-        q[m - j - 1: m - j - 1 + n] += 0.5 * f * p
+        frac = 0.5 * f * p
+        q[m + j + 1: m + j + 1 + n] += frac
+        q[m - j - 1: m - j - 1 + n] += frac
     return q
 
 
@@ -146,6 +159,16 @@ def isi_model(cursors: np.ndarray, i_main: int, bin_v: float, extra: np.ndarray 
 def log10_tail(m: IsiModel, sigma_noise: float, v) -> np.ndarray | float:
     """log10 P(sample < v | +1 sent) with Gaussian noise ``sigma_noise`` at
     the sampler; ``v`` may be an array of thresholds."""
+    if isinstance(v, (float, int)):
+        # the scalar path (the eye-height bisection calls it ~12k times per
+        # lane): the same arithmetic as the array path, one row, no reshapes
+        x = (float(v) - m.main) - m.values_v
+        with np.errstate(divide="ignore"):
+            if sigma_noise <= 0.0:
+                terms = np.where(x > 0.0, m.log_pmf, -np.inf)
+            else:
+                terms = m.log_pmf + log_ndtr(x / sigma_noise)
+            return _logsumexp(terms) / LN10
     v = np.asarray(v, dtype=np.float64)
     scalar = v.ndim == 0
     v = np.atleast_1d(v)
@@ -303,12 +326,16 @@ class StatisticalEngine:
         self.vref = cfg.rx.vref_offset_v
         self._models: dict[float, IsiModel] = {}
         self._tails: dict[tuple[float, float, float], np.ndarray] = {}
+        self.max_cached_models = 50_000       # ~1300 bins x 50k models ~ 1 GB: the cache is cleared beyond it
 
     # ----------------------------------------------------------- pieces
     def model_at(self, phase_ui: float) -> IsiModel:
         key = round(phase_ui * 1e9)
         m = self._models.get(key)
         if m is None:
+            if len(self._models) >= self.max_cached_models:
+                self._models.clear()
+                self._tails.clear()
             c, i_main = self.resp.cursors(phase_ui)
             extra = [self.resp.xtalk_cursors(d, phase_ui, skew) for d, skew in self.aggressors]
             extra = np.concatenate(extra) if extra else None

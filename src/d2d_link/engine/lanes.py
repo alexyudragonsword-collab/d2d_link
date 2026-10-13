@@ -11,6 +11,7 @@ the link by its worst lane. A single lane is the same code with count = 1.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from dataclasses import dataclass, field
 
@@ -190,9 +191,20 @@ def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     active = [(lane, phys) for lane, phys in enumerate(lm.logical_to_physical) if phys not in lm.unrepaired]
     aggr = {phys: aggressors_of(cfg, lm, phys, skews) for _, phys in active}
     stat = []
+    seen: dict[tuple, StatResult] = {}
     for lane, phys in active:
-        engine = StatisticalEngine(cfg, resp, clock, tuple((d, sk) for d, sk, _ in aggr[phys]))
-        stat.append(engine.run(lane, residual_skew_ui(cfg, skews[phys], clock.alpha > 0.0)))
+        key_aggr = tuple((d, sk) for d, sk, _ in aggr[phys])
+        resid = residual_skew_ui(cfg, skews[phys], clock.alpha > 0.0)
+        key = (key_aggr, resid)
+        if key in seen:
+            # the same neighbours at the same relative skews and the same
+            # residual: the statistical result is the same lane for lane
+            # (the engine is deterministic), so it is reused, not recomputed
+            stat.append(dataclasses.replace(seen[key], lane=lane))
+            continue
+        engine = StatisticalEngine(cfg, resp, clock, key_aggr)
+        seen[key] = engine.run(lane, resid)
+        stat.append(seen[key])
     time: list[TimeResult] = []
     if cfg.sim.engine in ("time", "both"):
         n_active = len(stat)

@@ -42,6 +42,11 @@ authoring_mode: ai_generated
 
 **时域引擎**(`engine/timedomain.py`)不近似统计引擎假设的任何东西:同一脉冲(fftconvolve)、同一噪声(采样点上加)、
 同一抖动谱(`ForwardedClock.synthesize` 的逐符号残余);分块含过去 n_tail 与未来 n_pre 符号。PRBS 按 t 位一步向量化。
+段 4:超过 2^24 符号时抖动按块流式合成(`synthesize_blocks`),2.5e9 符号不再需要 20 GB;`sim.time_mode: samples` 只算采样值
+(每符号的光标按它自己的采样瞬间线性内插后与符号序列点乘,与波形路径的 `np.interp` 同一算术,误码逐个相同、样本差 1e-12 V),
+唯一近似是 `time_cursor_floor`(默认 1e-6 × 主光标)—— 但 25 mm 有损线的脉冲尾在 130 UI 内都高于它,光标一个不少,所以**不比 FFT 波形快**
+(1e6 符号 9 s 对 6 s);只在短记忆信道上(先进 2 mm、floor 1e-4:47 个光标,1.5 s 对 5.9 s)有意义。结论:FFT 波形路径在 numpy 里已接近最优,
+"快 10–50×"的预期不成立。
 
 ## 2× 判据量到的点(25 mm、32 GT/s、`tests/test_engines.py`)
 
@@ -52,6 +57,19 @@ authoring_mode: ai_generated
 | 混合:噪声 45 mV + 两路 2 ps、无跟踪 | — | ≥ 25 误码 | 0.5–2× 内(`test_mixed_noise_and_jitter_within_2x`;早期 40 mV 的 9 误码点 0.54 已换掉) |
 
 示例 03(2e7 符号):噪声主导 1e-6 处 1.23(24 误码)、抖动主导 1e-6 处 1.22(16 误码)、混合 1e-5 处 0.87(17 误码 / 2e6)。
+
+## 深一致性(段 4)
+
+| 点 | 符号数 | 用时(本机) | 在哪 |
+|---|---|---|---|
+| 1e-6,噪声主导 25 mm | 2.5e7 | ~3 min | `tests/test_engines.py::test_one_in_a_million_point_within_2x`(套件) |
+| 3e-8,同一链路 | 1e9 | ~1.75 h | `tests/test_engines_deep.py`(`pytest -m slow`;每周 `examples-full.yml` 的 `deep`) |
+| 1e-8(25 误码) | 2.5e9 | ~5 h | 同一测试,`D2D_DEEP_SYMBOLS=2500000000 D2D_DEEP_BER=1e-8`,手动 |
+
+统计引擎(段 4 的逐位不变优化):`_shift_add` 对 |c| < bin 的光标合并两次加法(a + a 精确)、尾的标量路径不再 reshape、
+`_logsumexp` 一维快路径、模型缓存上限 5 万;`run_link` 对邻接与残余 skew 相同的 lane 复用结果(x16 内侧 6 个 lane 一次算完)。
+x1 每 lane 4.6 → 4.2 s;指纹 2698 项逐位相同(`fp_p3` → `fp_p4a`)。还在的热点:眼边求根的模型不命中缓存(每 lane ~1.8 s)、
+`half_eye` 60 步二分 —— 改它们都会动数字,留给下一次"数字会变"的段。
 
 ## 里程碑 2 的点(`tests/test_engines_m2.py`、`tests/test_xtalk.py`、示例 06)
 

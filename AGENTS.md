@@ -36,7 +36,7 @@ die-to-die / UCIe 短距并行链路的行为级仿真框架:前向时钟、多 
 
 1. **配置是唯一真值** —— 封装类型、速率、lane 数、时钟方案全部在一个 frozen `LinkConfig` 里,示例和 GUI 只读它(`tests/test_invariants.py::test_law1_*`)。
 2. **前向时钟的抖动跟踪是核心机制** —— 数据与前向时钟共享发端 PLL 的相噪,收端看到的是两者之差经跟踪带宽滤波后的残余。禁止任何"把前向时钟当独立时钟"的捷径;相关 = 1 时残余抖动必须为零(`tests/test_forwarded_clock.py`)。
-3. **统计引擎是主引擎** —— BER 1e-27 不可能时域仿真出来;时域引擎只在可测 BER(1e-6…1e-9)上做一致性检查,LTI + 高斯噪声下两者必须在 2× 内(`tests/test_engines.py`)。
+3. **统计引擎是主引擎** —— BER 1e-27 不可能时域仿真出来;时域引擎只在可测 BER 上做一致性检查,LTI + 高斯噪声下两者必须在 2× 内:~1e-4 与 1e-6 在套件(`tests/test_engines.py`),3e-8(1e9 符号)每周(`tests/test_engines_deep.py`,`pytest -m slow`),1e-8 本身要 2.5e9 符号约 5 小时、手动触发。
 4. **多 lane 从第一天就在** —— lane 间 skew、公共时钟、lane repair 是配置项;单 lane 只是 `lanes.count = 1`(`tests/test_lanes.py`)。
 5. **规范数字只用原文** —— 拿不到原文的数字全部标 `source: survey` 并注明出处,不编;`grep "source: survey"` 一次列全(`tests/test_spec_sources.py`)。原文贴进来后再改成 `source: spec`。规范不管的模型估计数(走线损耗、叠层、行为级串扰)标 `source: model`,`grep "source: model"` 一次列全,`budget_report.py --sensitivity` 看哪些估计决定结论。
 6. **数值指纹** —— 重构必须用 `tools/fingerprint.py` 证明逐位不变(`tests/test_fingerprint.py`)。

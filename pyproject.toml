@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "d2d-link"
-version = "0.6.0"
+version = "0.7.0"
 description = "Behavioural simulation of die-to-die / UCIe short-reach parallel links: forwarded-clock jitter tracking, multi-lane, statistical BER to 1e-27"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,6 +27,8 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: the weekly deep-consistency run (a 1e-8 point, ~1 h); excluded by default"]
+addopts = "-m 'not slow'"
 
 [tool.ruff]
 line-length = 100
