@@ -50,7 +50,8 @@ def test_law1_examples_read_the_config_files():
     for p in sorted((REPO / "examples").glob("[0-9][0-9]_*.py")):
         s = p.read_text(encoding="utf-8")
         assert "load_config(" in s, f"{p.name} must start from a config file"
-        assert "data_rate_gtps=" not in s, f"{p.name} sets the rate outside the config"
+        # a sweep may take the rate from the survey table; a literal number may not
+        assert not re.search(r"data_rate_gtps\s*=\s*[0-9]", s), f"{p.name} sets a literal rate outside the config"
 
 
 def test_law2_no_independent_receive_clock_anywhere():

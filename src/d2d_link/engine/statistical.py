@@ -243,11 +243,65 @@ class StatisticalEngine:
                 lo = mid
         return lo
 
-    def bathtub(self) -> tuple[np.ndarray, np.ndarray]:
-        n = self.cfg.sim.stat_phase_points
-        phases = np.linspace(-0.5, 0.5, n + 1)
+    def bathtub(self, lo: float = -0.5, hi: float = 0.5) -> tuple[np.ndarray, np.ndarray]:
+        n = int(round(self.cfg.sim.stat_phase_points * (hi - lo)))
+        phases = np.linspace(lo, hi, n + 1)
         ber = np.array([self.error_probability(p) for p in phases])
         return phases, ber
+
+    def bathtub_around_the_eye(self, target: float) -> tuple[np.ndarray, np.ndarray]:
+        """The bathtub over [-0.5, 0.5] UI from the pulse peak, extended by half
+        a UI on a side where the opening at ``target`` reaches the window's
+        edge (a flat-topped pulse puts its peak at a plateau's end and its
+        whole eye on one side). At most one extension per side."""
+        lo, hi = -0.5, 0.5
+        phases, ber = self.bathtub(lo, hi)
+        for _ in range(2):
+            region = self.eye_region(phases, ber, target)
+            if region is None:
+                break
+            left, right = region
+            grow_lo = left <= phases[0] + 1e-12
+            grow_hi = right >= phases[-1] - 1e-12
+            if not (grow_lo or grow_hi):
+                break
+            if grow_lo:
+                lo -= 0.5
+            if grow_hi:
+                hi += 0.5
+            phases, ber = self.bathtub(lo, hi)
+        return phases, ber
+
+    @staticmethod
+    def eye_region(phases: np.ndarray, ber: np.ndarray, target: float) -> tuple[float, float] | None:
+        """The widest contiguous opening with BER <= target on the bathtub,
+        edges interpolated in log BER; ties go to the opening centred nearest
+        zero; None when the eye is closed at the target. The BER is *not*
+        periodic in the phase -- it is the error rate of deciding *this*
+        symbol, 0.5 one UI away where the neighbour's cursor is sampled -- so
+        there is one opening, around this symbol's main cursor."""
+        n = ber.size
+        ok = ber <= target
+        if not ok.any():
+            return None
+        lt = np.log10(max(target, 1e-300))
+        lb = np.log10(np.maximum(ber, 1e-300))
+        best = None
+        i = 0
+        while i < n:
+            if not ok[i]:
+                i += 1
+                continue
+            j = i
+            while j + 1 < n and ok[j + 1]:
+                j += 1
+            left = phases[i] if i == 0 else np.interp(lt, [lb[i], lb[i - 1]], [phases[i], phases[i - 1]])
+            right = phases[j] if j == n - 1 else np.interp(lt, [lb[j], lb[j + 1]], [phases[j], phases[j + 1]])
+            key = (-round(float(right - left), 12), abs(0.5 * float(left + right)))
+            if best is None or key < best[0]:
+                best = (key, float(left), float(right))
+            i = j + 1
+        return (best[1], best[2]) if best else None
 
     @staticmethod
     def eye_width(phases: np.ndarray, ber: np.ndarray, target: float, i_center: int) -> float:
@@ -277,10 +331,15 @@ class StatisticalEngine:
         cfg = self.cfg
         targets = resolved_targets(cfg)
         target_ber = targets["ber"][0]
-        phases, ber = self.bathtub()
+        phases, ber = self.bathtub_around_the_eye(target_ber)
         i_min = int(np.argmin(ber))
-        left, right = self.eye_edges(phases, ber, target_ber, i_min)
-        ew = right - left
+        region = self.eye_region(phases, ber, target_ber)
+        if region is not None:
+            left, right = region
+            ew = right - left
+        else:
+            left = right = float(phases[i_min])
+            ew = 0.0
         if cfg.rx.sampling_phase_ui is not None:
             center = cfg.rx.sampling_phase_ui
         elif ew > 0.0:

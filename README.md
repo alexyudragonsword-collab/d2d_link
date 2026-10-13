@@ -47,6 +47,15 @@ Markulic 2016 SSPLL 剖面(带内 186 fs),数据 / 时钟路径各 200 fs 白抖
 | `05_module_xtalk_repair.py` | 整个模块能不能过 | x16 降宽后 8 lane 全过,最差眼宽 0.752 对 0.75 UI;串扰费 21 mV / 0.018 UI,−20 dB 时关门。x64 两死 lane 备用修复 64/64 过,邻数 0..4 |
 | `06_m2_consistency.py` | 新机制上统计 / 时域 | 本地 PLL 0.92、量化 + 延迟跟踪器 0.74、x3 串扰中间 lane 0.86、先进封装 + CTLE + DCD 0.80、漫游 + 噪声 0.82;五点都在 0.5–2× 内 |
 
+## 里程碑 3:串扰的耦合线估计、速率档扫描、预算报表
+
+`channel.xtalk: coupled` 用规范表里的 bump 间距(source: survey)和封装叠层预设(模型估计)算 FEXT 幅度:标准封装 25 mm **−18.6 dB**,
+先进封装 2 mm −56.9 dB。`tools/budget_report.py` 把一条链路的时序预算写成报表。
+
+| 示例 | 问题 | 答案(2026-10-13) |
+|---|---|---|
+| `07_rate_sweep.py` | 哪个速率档在哪种封装上过 | 标准 25 mm:4–24 GT/s 过,32 GT/s 眼宽 0.671 < 0.75 UI 不过(串扰 −18.6 dB 是主因,M2 的 −30 dB 预设下能过);先进 2 mm:六档全过,眼宽 0.982 → 0.786 UI |
+
 见 [`docs/USAGE.md`](docs/USAGE.md)、[`docs/clock_profile.md`](docs/clock_profile.md);结论与被推翻的判断在 `cairn/LOG.md`。
 
 ## 规范数字
@@ -68,7 +77,7 @@ grep "source: survey" data/spec/ucie_survey.yaml
 | `src/d2d_link/engine/` | 统计引擎(主)、时域引擎(校核)、lane 映射与修复、链路判定 |
 | `src/d2d_link/spec/` | 规范数字表的读取 |
 | `src/d2d_link/vendor/` | Halo_Serdes 的 S 参数读法 / RLGC / 响应转换,pll_simulator 的相噪合成与积分;完整 SHA 钉住,`tools/vendor_check.py` 守 |
-| `tools/` | `fingerprint.py`、`example_drift.py`、`run_examples.py`、`vendor_check.py` |
+| `tools/` | `fingerprint.py`、`example_drift.py`、`run_examples.py`、`vendor_check.py`、`budget_report.py` |
 | `cairn/` | 项目知识:铁律论证、前向时钟、双引擎、规范来源、坑;`LOG.md` 每轮数字与被推翻的判断 |
 
 ## 不做

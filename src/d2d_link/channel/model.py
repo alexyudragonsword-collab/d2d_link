@@ -105,7 +105,7 @@ def xtalk_response(cfg: LinkConfig, f: np.ndarray, neighbour: int) -> np.ndarray
     f = np.asarray(f, dtype=np.float64)
     if cfg.channel.xtalk == "none" or neighbour not in (1, 2):
         return np.zeros_like(f, dtype=complex)
-    adj, sec = cfg.xtalk_db()
+    adj, sec = cfg.xtalk_db()          # configured level, or the coupled-line estimate
     level = 10.0 ** ((adj if neighbour == 1 else sec) / 20.0)
     u = 1j * f / cfg.f_nyquist
     return level * math.sqrt(2.0) * u / (1.0 + u)

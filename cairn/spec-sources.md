@@ -19,6 +19,12 @@ authoring_mode: ai_generated
 - 升级流程:用户把原文贴进 `cairn/Reference/`(只追加)→ 对应条目改 `source: spec`、加 `quote` 与 `section` → `tests/test_spec_sources.py`
   自动要求 quote 非空 → LOG 记一条。
 
+## 规范数字进入模型的地方(里程碑 3)
+
+- `standard.bump_pitch_um` / `advanced.bump_pitch_um` 的中值是耦合线串扰估计的默认 lane 间距(`channel/coupled.py::trace_pitch_um`),
+  报表与示例打印 `pitch 115 um (source: survey)`;配置里显式给 `channel.trace_pitch_um` 时标 `config`。
+- `data_rates_gtps` 是示例 07 的扫描轴。
+
 ## 决策记录
 
 - 规范数字不进代码:`TargetConfig` 字段默认 None,运行时按 package 解析成 `(value, source)`,结果行打印 `source: xxx`。

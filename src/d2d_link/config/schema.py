@@ -69,6 +69,17 @@ PACKAGE_RLGC: dict[str, dict[str, float]] = {
 PACKAGE_XTALK_DB: dict[str, float] = {"standard": -30.0, "advanced": -24.0}
 
 
+#: Per-package routing stack-up for the coupled-line crosstalk estimate
+#: (``ChannelConfig.xtalk == "coupled"``): trace width, dielectric height
+#: under the trace and its relative permittivity. Model estimates for an
+#: organic build-up layer (standard) and a thin RDL (advanced); the trace
+#: pitch itself defaults to the package's bump pitch from the survey table.
+PACKAGE_STACKUP: dict[str, dict[str, float]] = {
+    "standard": dict(trace_width_um=20.0, dielectric_height_um=30.0, eps_r=3.5),
+    "advanced": dict(trace_width_um=2.0, dielectric_height_um=4.0, eps_r=3.3),
+}
+
+
 @dataclass(frozen=True)
 class PackageConfig:
     """Which package the link is built on. Selects the RLGC preset and the
@@ -102,17 +113,29 @@ class ChannelConfig:
     loss_tangent: Optional[float] = None
     g_s_m: Optional[float] = None
     # lane-to-lane crosstalk (needs lanes.count > 1 to do anything)
-    xtalk: Literal["none", "fext"] = "none"     # far-end coupling from the neighbour lanes
+    #   fext    : behavioural level, xtalk_adjacent_db / xtalk_second_db (None -> package preset)
+    #   coupled : the level estimated from the routing geometry below (coupled microstrip, first order)
+    xtalk: Literal["none", "fext", "coupled"] = "none"
     xtalk_adjacent_db: Optional[float] = None   # |X/H| at Nyquist, nearest neighbour; None -> package preset
     xtalk_second_db: Optional[float] = None     # second neighbour; None -> adjacent - 12 dB
+    trace_pitch_um: Optional[float] = None      # centre-to-centre lane pitch; None -> the package's bump pitch (survey)
+    trace_width_um: Optional[float] = None      # None -> PACKAGE_STACKUP
+    dielectric_height_um: Optional[float] = None
+    eps_r: Optional[float] = None
 
     def __post_init__(self):
         _require_in(self.kind, {"analytic", "touchstone"}, "channel.kind")
-        _require_in(self.xtalk, {"none", "fext"}, "channel.xtalk")
+        _require_in(self.xtalk, {"none", "fext", "coupled"}, "channel.xtalk")
         for name in ("xtalk_adjacent_db", "xtalk_second_db"):
             v = getattr(self, name)
             if v is not None:
                 _require(math.isfinite(v) and v < 0.0, f"channel.{name} must be a negative dB figure, got {v!r}")
+        for name in ("trace_pitch_um", "trace_width_um", "dielectric_height_um"):
+            v = getattr(self, name)
+            if v is not None:
+                _finite_pos(v, f"channel.{name}")
+        if self.eps_r is not None:
+            _require(math.isfinite(self.eps_r) and self.eps_r >= 1.0, f"channel.eps_r must be >= 1, got {self.eps_r!r}")
         _finite_nonneg(self.length_mm, "channel.length_mm")
         _require(self.n_freq >= 16, f"channel.n_freq must be >= 16, got {self.n_freq}")
         _finite_pos(self.zs_ohm, "channel.zs_ohm")
@@ -421,11 +444,23 @@ class LinkConfig:
         return 0.5 * self.symbol_rate
 
     def xtalk_db(self) -> tuple[float, float]:
-        """(nearest, second neighbour) far-end crosstalk at Nyquist [dB]."""
+        """(nearest, second neighbour) far-end crosstalk at Nyquist [dB]: the
+        configured / preset levels for ``xtalk: fext``, the coupled-line
+        estimate (``channel.coupled.fext_db``) for ``xtalk: coupled``."""
+        if self.channel.xtalk == "coupled":
+            from ..channel.coupled import fext_db
+
+            return fext_db(self)
         adj = self.channel.xtalk_adjacent_db
         adj = PACKAGE_XTALK_DB[self.package.kind] if adj is None else adj
         sec = self.channel.xtalk_second_db
         return adj, (adj - 12.0 if sec is None else sec)
+
+    def stackup(self) -> dict[str, float]:
+        """Trace width, dielectric height and eps_r: explicit fields over the package preset."""
+        preset = PACKAGE_STACKUP[self.package.kind]
+        return {k: (getattr(self.channel, k) if getattr(self.channel, k) is not None else v)
+                for k, v in preset.items()}
 
     def rlgc(self) -> dict[str, float]:
         """The analytic line's RLGC: explicit channel fields over the package preset."""

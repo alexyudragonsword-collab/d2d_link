@@ -109,3 +109,26 @@ def test_jitter_quadrature_is_normalised_and_wide_enough():
     assert x[1] - x[0] <= 0.009 / 4
     x0, w0 = jitter_quadrature(0.0, 64, 12.0)
     assert x0.tolist() == [0.0] and w0.tolist() == [1.0]
+
+
+def test_bathtub_window_follows_a_flat_topped_eye():
+    """A short line at a low rate has a 1-UI plateau whose 'peak' sample is at
+    its end; the whole eye lies on one side of it and the +-0.5 UI window
+    extends to hold it (it read half an eye, 0.5 UI, before). The BER is not
+    periodic in the phase -- one UI away the neighbour is sampled -- so the
+    search is a plain widest-opening search on the extended window."""
+    from d2d_link.config import PackageConfig
+
+    low = LinkConfig(data_rate_gtps=4.0, package=PackageConfig(kind="advanced"),
+                     channel=ChannelConfig(length_mm=2.0), rx=RxConfig(noise_rms_v=3e-3),
+                     sim=SimConfig(stat_phase_points=32))
+    r = run_statistical(low)
+    assert r.eye_width_ui > 0.9 and r.bathtub_phase_ui[0] <= -1.0 + 1e-12
+    assert r.bathtub_ber[-1] == pytest.approx(0.5)                    # one UI on: the neighbour's cursor
+    # the milestone-1 link keeps its +-0.5 UI window and its numbers
+    from d2d_link.config import load_config
+    from conftest import REPO
+
+    r1 = run_statistical(load_config(REPO / "configs" / "standard_32g_x1.yaml"))
+    assert r1.bathtub_phase_ui[0] == -0.5 and r1.bathtub_phase_ui[-1] == 0.5 and r1.bathtub_ber.size == 65
+    assert r1.eye_width_ui == pytest.approx(0.772, abs=0.001)

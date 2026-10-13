@@ -9,6 +9,7 @@ python examples/03_stat_vs_time.py           # 1e-6 处的一致性比,约 3–5
 python examples/04_local_pll_bandwidth.py    # 收端本地 PLL 的环路带宽
 python examples/05_module_xtalk_repair.py    # x16 / x64 模块:skew、串扰、修复
 python examples/06_m2_consistency.py         # 新机制上的统计 / 时域一致性
+python examples/07_rate_sweep.py             # 规范表全部速率档 × 两种封装,耦合串扰,预算报表
 pytest -q
 ```
 
@@ -30,7 +31,7 @@ print(res.summary())      # 每 lane:BER、眼高/眼宽对目标(带 source)、
 | 段 | 关键字段 |
 |---|---|
 | `package.kind` | `standard` / `advanced`:选 RLGC 预设与规范表的 reach / pitch / 模块宽度行 |
-| `channel` | `kind: analytic`(`length_mm`,RLGC 可逐项覆盖)或 `touchstone`(`file`,经 vendored Halo 读法);`xtalk: fext` 打开邻 lane 远端串扰(`xtalk_adjacent_db` 留空取封装预设) |
+| `channel` | `kind: analytic`(`length_mm`,RLGC 可逐项覆盖)或 `touchstone`(`file`,经 vendored Halo 读法);`xtalk: fext`(行为级幅度,`xtalk_adjacent_db` 留空取封装预设)或 `xtalk: coupled`(从几何估计:`trace_pitch_um` 留空取规范表的 bump 间距,线宽 / 介质厚 / εr 取 `PACKAGE_STACKUP` 预设) |
 | `lanes` | `count`、`skew_ps` / `skew_sigma_ps`、`deskew_step_ps`、`spare_count`、`failed`、`repair` |
 | `clocking` | 发端:`pll_profile`、`correlation`、`data_path_rj_s`、`clock_path_rj_s`、`*_wander_s` + `wander_corner_hz`;收端:`local_pll_profile` + `local_pll_bw_hz`(锁到前向时钟,必须给带宽)、`tree_delay_ps`、`tree_bw_hz`、`tree_rj_s`、`track_bw_hz`、`track_delay_ui`、`pi_step_ui`、`dcd_ui` |
 | `tx` / `rx` | `swing_vpp`、`bw_hz`;`noise_rms_v`、`ctle.*`、`sampling_phase_ui`、`vref_offset_v` |
@@ -61,4 +62,5 @@ grep "source: survey" data/spec/ucie_survey.yaml     # 所有未核实的数字
 | `python tools/run_examples.py --smoke` | 每个示例以 2 万符号跑一遍(CI) |
 | `python tools/run_examples.py --save new/` 然后 `python tools/example_drift.py compare new/` | 全尺寸输出与 `examples/expected/` 逐行比,列出文档里仍引用旧值的行 |
 | `python tools/fingerprint.py record a.json` / `compare a.json b.json` | 重构前后逐位比对(铁律 6) |
+| `python tools/budget_report.py configs/x.yaml [-o x.md] [--json x.json]` | 时序预算报表:逐项抖动(fs / UI)、目标与来源、串扰参数、逐 lane 眼与裕度 |
 | `python tools/vendor_check.py --strict --siblings Halo_Serdes=... pll_simulator=...` | vendored 文件与钉住的上游一致 |

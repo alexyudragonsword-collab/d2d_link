@@ -1,0 +1,24 @@
+data rates [4, 8, 12, 16, 24, 32] GT/s (source: survey)
+
+standard package at 25 mm (survey reach 25 mm): pitch 115 um (source: survey), FEXT estimate -18.6 dB at Nyquist for 32 GT/s
+ GT/s  UI [ps]  IL@Nyq [dB]  FEXT [dB]  jitter [UI]  eye height [mV]  eye width [UI]        BER  pass
+    4   250.00        -0.89      -36.7       0.0011            293.6           0.979    0.0e+00   yes
+    8   125.00        -1.30      -30.7       0.0023            268.8           0.947    0.0e+00   yes
+   12    83.33        -1.64      -27.2       0.0035            244.4           0.905    0.0e+00   yes
+   16    62.50        -1.94      -24.7       0.0047            221.5           0.871    0.0e+00   yes
+   24    41.67        -2.47      -21.1       0.0071            176.9           0.789   3.8e-257   yes
+   32    31.25        -2.95      -18.6       0.0094            137.5           0.671   9.1e-162    no
+  first failing rate 32 GT/s, limited by eye width (eye 137.5 mV / 0.671 UI vs targets 40 mV / 0.75 UI, source: survey)
+
+advanced package at 2 mm (survey reach 2 mm): pitch 40 um (source: survey), FEXT estimate -56.9 dB at Nyquist for 32 GT/s
+ GT/s  UI [ps]  IL@Nyq [dB]  FEXT [dB]  jitter [UI]  eye height [mV]  eye width [UI]        BER  pass
+    4   250.00        -0.53      -75.0       0.0011            317.4           0.982    0.0e+00   yes
+    8   125.00        -0.61      -68.9       0.0023            310.8           0.946    0.0e+00   yes
+   12    83.33        -0.67      -65.4       0.0035            308.6           0.911    0.0e+00   yes
+   16    62.50        -0.73      -62.9       0.0047            306.8           0.896    0.0e+00   yes
+   24    41.67        -0.82      -59.4       0.0071            302.9           0.837    0.0e+00   yes
+   32    31.25        -0.91      -56.9       0.0094            298.3           0.786    0.0e+00   yes
+  every rate passes
+
+budget report for the standard package at 32 GT/s: 07_budget_standard_32g.md; total 327.0 fs of which Tx leak 120.5, local PLL 48.1, quantisation 140.7 fs
+wrote examples/output/07_rate_sweep.png

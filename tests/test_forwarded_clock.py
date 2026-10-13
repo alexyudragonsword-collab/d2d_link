@@ -116,3 +116,14 @@ def test_block_tail_keeps_the_grid():
     cfg = dataclasses.replace(_cfg(data_path_rj_s=200e-15), sim=dataclasses.replace(LinkConfig().sim, jitter_block=1024))
     eps = ForwardedClock(cfg).synthesize(2500, np.random.default_rng(2))
     assert eps.shape == (1, 2500) and np.all(np.isfinite(eps))
+
+
+def test_partial_correlation_matches_closed_form_over_many_blocks():
+    """rho < 1 puts an independent 1/f^2-like realisation into the clock path,
+    whose RMS scatters by ~10% per block; averaged over blocks it converges
+    on the closed form (ROADMAP P2 #4)."""
+    fc = ForwardedClock(_cfg(correlation=0.0))
+    rng = np.random.default_rng(9)
+    var = [float(np.var(fc.synthesize(1 << 18, rng)[0])) for _ in range(12)]
+    assert math.sqrt(np.mean(var)) == pytest.approx(fc.residual_sigma_s(), rel=0.04)
+    assert np.std(np.sqrt(var)) / np.mean(np.sqrt(var)) > 0.02   # and one block alone does scatter
