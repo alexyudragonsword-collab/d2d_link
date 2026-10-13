@@ -190,3 +190,9 @@ def test_tx_duty_cycle_error_is_common_mode_until_a_local_pll_regenerates_the_cl
     assert cm.eye_width_ui == plain.eye_width_ui and cm.eye_height_v == plain.eye_height_v
     rx = run_statistical(LinkConfig(clocking=ClockingConfig(pll_profile=PROFILE, dcd_ui=0.1), sim=sim))
     assert rx.eye_width_ui < plain.eye_width_ui - 0.05
+
+
+def test_tree_delay_wrap_is_a_number():
+    fc = ForwardedClock(LinkConfig(clocking=ClockingConfig(pll_profile=PROFILE, tree_delay_ps=30.0)))
+    assert fc.tree_wrap_fraction == pytest.approx(30e-12 / (fc.cfg.sim.jitter_block * fc.ui))
+    assert fc.tree_wrap_fraction < 1e-5 and ForwardedClock(LinkConfig()).tree_wrap_fraction == 0.0

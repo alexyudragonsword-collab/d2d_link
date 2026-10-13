@@ -100,3 +100,59 @@ def test_time_engine_takes_aggressors_directly():
     quiet = run_time(cfg, phase_ui=0.0)
     loud = run_time(cfg, phase_ui=0.0, aggressors=((1, 0.0, 7), (1, 0.2, 8)))
     assert loud.extras["n_aggressors"] == 2 and loud.n_errors > quiet.n_errors
+
+
+def test_near_end_crosstalk_from_a_reverse_lane():
+    """A reverse-direction neighbour launches at this receiver's die: the
+    backward-coupled wave is K_b (kappa / 4) times the aggressor's pulse minus
+    the same pulse a round trip of the coupled length later -- two lobes
+    2 tau_c apart, no channel loss on either. Only the lanes named in
+    lanes.reverse_adjacent take it."""
+    from conftest import REPO
+    from d2d_link.channel.coupled import coupling_fraction, describe, trace_pitch_um
+    from d2d_link.channel.model import next_response
+    from d2d_link.config import load_config
+
+    base = load_config(REPO / "configs" / "standard_32g_x5_coupled.yaml")
+    cfg = dataclasses.replace(base, channel=dataclasses.replace(base.channel, xtalk_next="coupled"),
+                              lanes=dataclasses.replace(base.lanes, count=3, reverse_adjacent=(0, 2)),
+                              sim=dataclasses.replace(base.sim, stat_phase_points=16))
+    pitch, _ = trace_pitch_um(cfg)
+    kb = 0.25 * coupling_fraction(pitch, cfg.stackup()["dielectric_height_um"])
+    assert cfg.next_ratio() == pytest.approx(kb) and 20 * np.log10(kb) == pytest.approx(-36.0, abs=0.1)
+    assert base.next_ratio() == 0.0 and describe(cfg)["next_db"] == pytest.approx(20 * np.log10(kb))
+    f = np.array([0.0, 1.0 / (4.0 * cfg.coupled_delay_s())])          # DC: cancels; quarter period of the round trip: 2 K_b
+    assert next_response(cfg, f)[0] == 0.0 and abs(next_response(cfg, f)[1]) == pytest.approx(2 * kb)
+    r = link_response(cfg)
+    pn = r.xtalk_pulses["next"].y
+    assert np.max(pn) == pytest.approx(kb * 0.5 * cfg.tx.swing_vpp, rel=0.05)
+    assert np.min(pn) == pytest.approx(-np.max(pn), rel=0.05)
+    lobes_ui = (np.argmin(pn) - np.argmax(pn)) / r.osr
+    assert lobes_ui == pytest.approx(2.0 * cfg.coupled_delay_s() / cfg.ui, abs=0.3)   # 8.5 UI at 25 mm (the driver pole skews the lobes)
+    assert r.xtalk_cursors("next", 0.0).size > 0
+    lm, sk = lane_map(cfg), physical_skews_ps(cfg)
+    assert aggressors_of(cfg, lm, 0, sk)[-1][0] == "next" and all(a[0] != "next" for a in aggressors_of(cfg, lm, 1, sk))
+    res = run_link(cfg)
+    plain = run_link(dataclasses.replace(cfg, channel=dataclasses.replace(cfg.channel, xtalk_next="none")))
+    assert [s.extras["n_aggressors"] for s in res.stat] == [3, 2, 3]
+    assert res.stat[0].eye_width_ui < plain.stat[0].eye_width_ui and res.stat[1].eye_width_ui == plain.stat[1].eye_width_ui
+    fixed = dataclasses.replace(cfg, channel=dataclasses.replace(cfg.channel, xtalk_next="fixed", next_db=-20.0))
+    assert fixed.next_ratio() == pytest.approx(0.1)
+    with pytest.raises(ValueError, match="next_db"):
+        ChannelConfig(xtalk_next="fixed")
+    with pytest.raises(ValueError, match="reverse_adjacent"):
+        LaneConfig(count=4, reverse_adjacent=(4,))
+
+
+def test_engines_agree_with_strong_near_end_crosstalk():
+    cfg = LinkConfig(channel=dataclasses.replace(X, xtalk="none", xtalk_next="fixed", next_db=-14.0),
+                     lanes=LaneConfig(count=1, reverse_adjacent=(0,), reverse_phase_ui=0.3),
+                     clocking=ClockingConfig(pll_profile=PROFILE, data_path_rj_s=200e-15, clock_path_rj_s=200e-15),
+                     rx=RxConfig(noise_rms_v=0.045),
+                     sim=SimConfig(n_symbols=300_000, engine="both", stat_phase_points=32))
+    res = run_link(cfg)
+    assert res.stat[0].extras["n_aggressors"] == 1 and res.stat[0].extras["xtalk_rms_v"] > 5e-3
+    (t,) = res.time
+    assert t.n_errors >= 40 and t.extras["n_aggressors"] == 1
+    (ratio,) = res.consistency_ratios()
+    assert 0.5 < ratio < 2.0, ratio

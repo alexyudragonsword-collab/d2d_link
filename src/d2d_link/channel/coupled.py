@@ -54,7 +54,7 @@ def fext_ratio_at(cfg: LinkConfig, spacing_um: float) -> float:
     """|X/H| at the Nyquist frequency for two lanes ``spacing_um`` apart."""
     st = cfg.stackup()
     eps_eff = st["eps_eff"]
-    mismatch = max(1.0 - eps_eff / st["eps_r"], 0.0)
+    mismatch = max(1.0 - eps_eff / st["eps_r"], 0.0)      # 0 for a stripline: no first-order FEXT
     v = C0 / math.sqrt(eps_eff)
     kappa = coupling_fraction(spacing_um, st["dielectric_height_um"])
     tau = kappa * mismatch * (cfg.coupled_length_mm() * 1e-3) / (2.0 * v)
@@ -79,11 +79,13 @@ def describe(cfg: LinkConfig) -> dict:
     adj, sec = fext_db(cfg)
     ch = cfg.channel
     explicit = {k for k in ("trace_width_um", "dielectric_height_um", "eps_r") if getattr(ch, k) is not None}
+    kb = cfg.next_ratio()
     return {"pitch_um": pitch, "pitch_source": src, **st,
             "stackup_source": "config" if explicit else "model",
-            "coupled_length_mm": cfg.coupled_length_mm(),
+            "coupled_length_mm": cfg.coupled_length_mm(), "coupled_delay_ps": 1e12 * cfg.coupled_delay_s(),
             "kappa_adjacent": coupling_fraction(pitch, st["dielectric_height_um"]),
-            "mismatch": 1.0 - eps_eff / st["eps_r"], "fext_adjacent_db": adj, "fext_second_db": sec}
+            "mismatch": 1.0 - eps_eff / st["eps_r"], "fext_adjacent_db": adj, "fext_second_db": sec,
+            "next_mode": cfg.channel.xtalk_next, "next_db": 20.0 * math.log10(kb) if kb > 0.0 else None}
 
 
 __all__ = ["fext_db", "fext_ratio_at", "describe", "trace_pitch_um", "eps_eff_microstrip", "coupling_fraction"]

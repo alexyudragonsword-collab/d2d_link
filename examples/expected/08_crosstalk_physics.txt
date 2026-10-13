@@ -1,0 +1,23 @@
+x5 module, standard package, 25 mm, 32 GT/s, coupled-line crosstalk estimate
+   routing  eps_eff  FEXT adj [dB]  delay [ps]  mid eye [mV]  mid eye [UI] worst lane  verdict
+microstrip     2.54          -18.6       132.8         143.1         0.691          1     FAIL
+ stripline     3.50 none (1st order)       156.0         211.8         0.761          0     PASS
+  the 32 GT/s verdict on the standard package is a routing assumption: a stripline of the same geometry passes
+
+near-end crosstalk from the return module on edge lanes [0, 4]: K_b = kappa/4 = -36.0 dB, two lobes 266 ps = 8.5 UI apart, peak 3.3 mV of 164.6 mV main
+ lane aggressors xtalk [mV]  eye [mV] off/on  eye [UI] off/on
+    0    2 -> 3   11.6 -> 12.4   175.9 / 164.4    0.748 / 0.737
+    1    3 -> 3    9.1 -> 9.1    173.4 / 173.4    0.662 / 0.662
+    2    4 -> 4   14.5 -> 14.5   143.1 / 143.1    0.691 / 0.691
+    3    3 -> 3   12.6 -> 12.6   158.9 / 158.9    0.683 / 0.683
+    4    2 -> 3    6.7 -> 8.1    193.1 / 181.3    0.709 / 0.700
+  module FAIL with NEXT (worst lane 1); the reverse lane's symbols sit 0 UI off this module's sampling instant (a config choice)
+
+synthetic single-ended 6-port file 08_synthetic_3lane.s6p (the analytic 25 mm line as 3 lanes, FEXT -20 dB / -32 dB at Nyquist):
+  read back for lane 0: |H| -2.80 dB at Nyquist (analytic -2.80 dB), coupling from the neighbour -22.8 dB, second -34.8 dB
+ lane  file: eye [mV] / [UI] analytic -20 dB: eye [mV] / [UI]
+    0        182.3 / 0.751                   182.3 / 0.751
+    1        183.8 / 0.687                   184.0 / 0.687
+    2        184.5 / 0.746                   184.6 / 0.746
+  file path and analytic path agree to 0.12 mV on a file built from the analytic model: the reader is exercised end to end; a real package extraction would replace both numbers -- the reader is ready, the data is not
+wrote examples/output/08_crosstalk_physics.png

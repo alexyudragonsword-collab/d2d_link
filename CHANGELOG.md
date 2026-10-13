@@ -4,6 +4,35 @@
 
 ---
 
+## [0.8.0] — 2026-10-13 — 段 6:串扰物理(无实测数据版;现有配置指纹逐位相同)
+
+### 新增
+- **`channel.routing: microstrip | stripline`**:带状线均匀介质 ε_eff = ε_r,一阶 FEXT 为 0(估计给 −300 dB 下限),同几何的线更慢(L、C 由 ε_r 推出)。
+  **32 GT/s 标准封装不过是微带假设的产物**:同几何布成带状线就过(示例 08)。
+- **近端串扰** `channel.xtalk_next: none | coupled | fixed` + `next_db`,`lanes.reverse_adjacent` / `reverse_phase_ui`:模块边缘 lane 旁的
+  反向 lane 在本 lane 的收端 die 上发射,后向波 K_b [p(t) − p(t − 2τ_c)],K_b = κ/4(coupled)或配置值(fixed),不经有损线;
+  `next_response()`、`LinkConfig.next_ratio()` / `coupled_delay_s()`;引擎接口用 `"next"` 键(`xtalk_pulses["next"]`,攻击 lane 元组 `("next", 相位, 种子)`)。
+  标准 25 mm:K_b −36.0 dB,两瓣 8.5 UI 相距;−14 dB 固定 NEXT 上两引擎 1e-4 处 2× 内。
+- **单端多端口 Touchstone**(`channel.touchstone_mode: single_ended`、`touchstone_lanes`、`xtalk: touchstone`;`channel/touchstone_se.py`,
+  vendored 读法不动):2N 端口(1..N 近端、N+1..2N 远端),每个 2 端口子网络用 vendored 的内插与端接;文件自己的耦合项成为串扰脉冲
+  (`ChannelModel.xtalk_H`),距离 d 取两侧较强的那条。合成无损 3 lane 文件:|H| = 1,耦合 0.0707 对 0.0707,lane 间互易。
+- `ForwardedClock.tree_wrap_fraction`(树延时在块内循环卷绕的比例:30 ps / 2^18 UI = 3.7e-6);`describe()` 增加 `routing`、`coupled_delay_ps`、
+  `next_mode` / `next_db`;表单字段同步。示例 08 `08_crosstalk_physics.py`:x5 中间 lane 微带 143.1 mV / 0.691 UI(FAIL)对带状线 211.8 mV / 0.761 UI(PASS);
+  边缘 lane 加 NEXT 眼宽 0.748 → 0.737;解析线合成的 6 端口文件与解析路径眼高差 0.12 mV。
+- 测试(+6):带状线无一阶 FEXT 且线更慢、NEXT 脉冲(DC 抵消、1/(4τ_c) 处 2K_b、两瓣间距、只有 `reverse_adjacent` 的 lane 受害)、
+  强 NEXT 两引擎 2×、单端 6 端口读回(|H|、耦合幅度、互易、配置约束)、树卷绕数、配置校验。
+
+### 修复
+- **Touchstone 信道的直流缺口**(M1 起就有,无示例使用、测试只查带内 |H|):vendored 内插把文件频带之外的传输项填 0,而本库的网格从 DC 开始,
+  于是任何 Touchstone 信道的 H(0) = 0 —— 脉冲带一条长负尾,合成的 25 mm 文件把 182 mV 的眼读成 60 mV。`channel/model.py::fill_dc` 用带内最低
+  两点按 √f 外推直流幅度(导体损耗的低频规律),上限 1、不低于最低点;两种读法都经过它。测试:文件路径与解析路径的光标和、主光标 2e-3 内一致。
+
+### 没做(记入 ROADMAP / `cairn/crosstalk.md`)
+- 真实封装耦合线 S 参数(用户确认拿不到);NEXT 反向 lane 的随机相位平均;文件里左右邻 lane 的区分;带状线二阶 FEXT;
+  树带宽对数据边沿的等效滤波归段 7(收端前端带宽)。
+
+---
+
 ## [0.7.0] — 2026-10-13 — 段 4:性能与深一致性(指纹逐位相同)
 
 ### 新增

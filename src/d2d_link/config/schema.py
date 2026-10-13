@@ -116,9 +116,21 @@ class ChannelConfig:
     # lane-to-lane crosstalk (needs lanes.count > 1 to do anything)
     #   fext    : behavioural level, xtalk_adjacent_db / xtalk_second_db (None -> package preset)
     #   coupled : the level estimated from the routing geometry below (coupled microstrip, first order)
-    xtalk: Literal["none", "fext", "coupled"] = "none"
+    #   touchstone : the file's own coupling terms (single-ended multi-port file, see touchstone_mode)
+    xtalk: Literal["none", "fext", "coupled", "touchstone"] = "none"
     xtalk_adjacent_db: Optional[float] = None   # |X/H| at Nyquist, nearest neighbour; None -> package preset
     xtalk_second_db: Optional[float] = None     # second neighbour; None -> adjacent - 12 dB
+    # near-end crosstalk from a reverse-direction neighbour (lanes.reverse_adjacent names the victims):
+    #   coupled : backward coupling K_b = kappa / 4 from the stack-up geometry
+    #   fixed   : next_db as K_b in dB
+    xtalk_next: Literal["none", "coupled", "fixed"] = "none"
+    next_db: Optional[float] = None
+    routing: Literal["microstrip", "stripline"] = "microstrip"   # stripline: homogeneous dielectric, eps_eff = eps_r,
+                                                                 # no first-order FEXT (odd and even modes travel together)
+    touchstone_mode: Literal["differential", "single_ended"] = "differential"   # 4/8/12-port differential (Halo reader)
+                                                                                # or a single-ended 2N-port: ports 1..N the
+                                                                                # near ends of lanes 0..N-1, N+1..2N the far ends
+    touchstone_lanes: Optional[int] = None      # N for a single-ended file; None -> ports / 2
     trace_pitch_um: Optional[float] = None      # centre-to-centre lane pitch; None -> the package's bump pitch (survey)
     trace_width_um: Optional[float] = None      # None -> PACKAGE_STACKUP (source: model)
     dielectric_height_um: Optional[float] = None
@@ -128,11 +140,22 @@ class ChannelConfig:
 
     def __post_init__(self):
         _require_in(self.kind, {"analytic", "touchstone"}, "channel.kind")
-        _require_in(self.xtalk, {"none", "fext", "coupled"}, "channel.xtalk")
-        for name in ("xtalk_adjacent_db", "xtalk_second_db"):
+        _require_in(self.xtalk, {"none", "fext", "coupled", "touchstone"}, "channel.xtalk")
+        _require_in(self.xtalk_next, {"none", "coupled", "fixed"}, "channel.xtalk_next")
+        _require_in(self.routing, {"microstrip", "stripline"}, "channel.routing")
+        _require_in(self.touchstone_mode, {"differential", "single_ended"}, "channel.touchstone_mode")
+        for name in ("xtalk_adjacent_db", "xtalk_second_db", "next_db"):
             v = getattr(self, name)
             if v is not None:
                 _require(math.isfinite(v) and v < 0.0, f"channel.{name} must be a negative dB figure, got {v!r}")
+        if self.xtalk_next == "fixed":
+            _require(self.next_db is not None, "channel.xtalk_next 'fixed' needs channel.next_db")
+        if self.xtalk == "touchstone":
+            _require(self.kind == "touchstone" and self.touchstone_mode == "single_ended",
+                     "channel.xtalk 'touchstone' takes the coupling from a single-ended multi-port file: "
+                     "set channel.kind touchstone and channel.touchstone_mode single_ended")
+        if self.touchstone_lanes is not None:
+            _require(self.touchstone_lanes >= 1, "channel.touchstone_lanes must be >= 1")
         for name in ("trace_pitch_um", "trace_width_um", "dielectric_height_um", "z0_ohm", "coupled_length_mm"):
             v = getattr(self, name)
             if v is not None:
@@ -186,10 +209,19 @@ class LaneConfig:
     spare_count: int = 0
     failed: tuple[int, ...] = ()
     repair: Literal["none", "spare", "width_degrade"] = "none"
+    # physical lanes whose outer neighbour is a lane of the *other* direction
+    # (a module's edge lanes next to the return module): they take near-end
+    # crosstalk from it when channel.xtalk_next is on; the reverse lane's
+    # symbols sit reverse_phase_ui off this module's sampling instant
+    reverse_adjacent: tuple[int, ...] = ()
+    reverse_phase_ui: float = 0.0
 
     def __post_init__(self):
         _require(self.count >= 1, f"lanes.count must be >= 1, got {self.count}")
         n_phys = self.count + self.spare_count
+        for i in self.reverse_adjacent:
+            _require(0 <= i < n_phys, f"lanes.reverse_adjacent names lane {i}, module has {n_phys} physical lanes")
+        _require(math.isfinite(self.reverse_phase_ui), "lanes.reverse_phase_ui must be finite")
         _require(len(self.skew_ps) <= n_phys,
                  f"lanes.skew_ps has {len(self.skew_ps)} entries for {n_phys} physical lanes")
         _finite_nonneg(self.skew_sigma_ps, "lanes.skew_sigma_ps")
@@ -499,8 +531,29 @@ class LinkConfig:
         preset = PACKAGE_STACKUP[self.package.kind]
         st = {k: (getattr(self.channel, k) if getattr(self.channel, k) is not None else v)
               for k, v in preset.items()}
-        st["eps_eff"] = eps_eff_microstrip(st["eps_r"], st["trace_width_um"], st["dielectric_height_um"])
+        st["eps_eff"] = (st["eps_r"] if self.channel.routing == "stripline"
+                         else eps_eff_microstrip(st["eps_r"], st["trace_width_um"], st["dielectric_height_um"]))
+        st["routing"] = self.channel.routing
         return st
+
+    def next_ratio(self) -> float:
+        """Backward (near-end) coupling coefficient K_b of a reverse-direction
+        neighbour: kappa / 4 from the stack-up for ``xtalk_next: coupled``
+        (Johnson & Graham's weak-coupling backward coefficient), the configured
+        level for ``fixed``, 0 when off."""
+        ch = self.channel
+        if ch.xtalk_next == "none":
+            return 0.0
+        if ch.xtalk_next == "fixed":
+            return 10.0 ** (ch.next_db / 20.0)
+        from ..channel.coupled import coupling_fraction, trace_pitch_um
+
+        pitch, _ = trace_pitch_um(self)
+        return 0.25 * coupling_fraction(pitch, self.stackup()["dielectric_height_um"])
+
+    def coupled_delay_s(self) -> float:
+        """One-way propagation delay of the coupled length at the stack-up's speed."""
+        return self.coupled_length_mm() * 1e-3 * math.sqrt(self.stackup()["eps_eff"]) / C0
 
     def rlgc(self) -> dict[str, float]:
         """The analytic line's RLGC: explicit channel fields over the package

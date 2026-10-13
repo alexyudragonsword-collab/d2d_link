@@ -169,17 +169,24 @@ class LinkResult:
 
 def aggressors_of(cfg: LinkConfig, lm: LaneMap, phys: int, skews_ps: np.ndarray) -> tuple:
     """``(neighbour distance, relative skew [UI], aggressor physical lane)`` for
-    every *active* physical lane within two places of ``phys``. Failed lanes
-    and unused spares are silent. The relative skew is the aggressor's static
-    skew minus the victim's: its symbols arrive that much later."""
-    if cfg.channel.xtalk == "none":
-        return ()
-    active = {p for p in lm.logical_to_physical if p not in lm.unrepaired}
+    every *active* physical lane within two places of ``phys``, plus
+    ``("next", reverse_phase_ui, seed)`` when ``phys`` has a reverse-direction
+    neighbour (``lanes.reverse_adjacent``) and near-end crosstalk is on.
+    Failed lanes and unused spares are silent. The relative skew is the
+    aggressor's static skew minus the victim's: its symbols arrive that much
+    later."""
     out = []
-    for q in sorted(active):
-        d = abs(q - phys)
-        if 1 <= d <= 2:
-            out.append((d, float((skews_ps[q] - skews_ps[phys]) * 1e-12 / cfg.ui), q))
+    if cfg.channel.xtalk != "none":
+        active = {p for p in lm.logical_to_physical if p not in lm.unrepaired}
+        for q in sorted(active):
+            d = abs(q - phys)
+            if 1 <= d <= 2:
+                out.append((d, float((skews_ps[q] - skews_ps[phys]) * 1e-12 / cfg.ui), q))
+    if cfg.channel.xtalk_next != "none" and phys in cfg.lanes.reverse_adjacent:
+        # the reverse-direction neighbour: its own symbols (seeded apart from
+        # every forward lane), launched at this receiver's die, at the
+        # configured phase against this module's sampling instant
+        out.append(("next", float(cfg.lanes.reverse_phase_ui), 10_000 + phys))
     return tuple(out)
 
 

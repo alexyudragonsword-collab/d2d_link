@@ -201,6 +201,13 @@ class ForwardedClock:
         s0 = sigma_s ** 2 / band
         return s0 / (1.0 + (f / fc) ** 2)
 
+    @property
+    def tree_wrap_fraction(self) -> float:
+        """The share of each synthesis block the tree delay wraps around
+        (the block-wise FFT filtering is circular): tau / (block UI). 30 ps
+        on 2^18 UI of 31.25 ps is 3.7e-6 -- about one edge per block."""
+        return self.tau / (self.cfg.sim.jitter_block * self.ui)
+
     def h_tree(self, f: np.ndarray) -> np.ndarray:
         """Clock tree: first-order lowpass (or flat) times the delay."""
         f = np.asarray(f, dtype=np.float64)

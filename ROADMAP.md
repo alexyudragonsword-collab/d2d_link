@@ -16,8 +16,9 @@
 
 2. **串扰的耦合线估计是一阶猜测,却决定了 32 GT/s 标准封装的结论**。`channel/coupled.py`:κ = 1/(1 + (s/h)²)、速度差 (1 − ε_eff/ε_r)、
    线性长度增长;h = 30 µm 微带、ε_r 3.5 全是 `PACKAGE_STACKUP` 的模型值。给出 −18.6 dB(示例 07),模块因此在 32 GT/s 不过;
-   示例 05 的 x16 / 20 mm 模块在 M2 的行为级 −30 dB 预设下能过(另一个模块)。封装的耦合线 S 参数拿不到(用户确认),所以下一步是
-   带状线选项与 NEXT 的合成模型(段 6)。段 2 已把预设带上 `source: model`(`data/spec/model_presets.yaml`)并给了敏感性报告:
+   示例 05 的 x16 / 20 mm 模块在 M2 的行为级 −30 dB 预设下能过(另一个模块)。封装的耦合线 S 参数拿不到(用户确认)。
+   段 6 已给出带状线选项(同几何一阶 FEXT 为 0,模块因此能过 —— 结论是微带假设的产物)、反向 lane 的 NEXT 与单端多端口文件读法
+   (`xtalk: touchstone`),见 `cairn/crosstalk.md`;真实文件到了用它对比 `coupled`,目标 6 dB 内。段 2 的敏感性报告:
    复现:`python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity`,看 "Sensitivity" 段里标 **yes** 的参数。
 
 ## P2 — 一致性与能力
@@ -32,13 +33,14 @@
    需要决定:(a) 终端按实际 |Z0(f)| 匹配,或 (b) 用 RDL 的实测 / 场解 RLGC(拿不到),或 (c) 在 `--sensitivity` 里把 R_dc 列为低速档的决定参数。
    复现:`python tools/budget_report.py` 对 `advanced_32g_x64_spare.yaml` 把 `data_rate_gtps` 改 4,看 lane 表眼高;对比 `channel.rdc_ohm_m: 200`。
 
-2. **树带宽只滤时钟相位,没有等效地滤数据边沿**;树延时在闭式里是精确的 e^{−jωτ},在合成里是块内循环卷绕(块长 2^18 UI,
-   τ ≤ 100 ps ≈ 3 UI,影响可忽略,但没有量)。
+2. **树带宽只滤时钟相位,没有等效地滤数据边沿**(属于收端前端带宽,段 7);树延时的块内循环卷绕已量化为 `ForwardedClock.tree_wrap_fraction`
+   (30 ps / 2^18 UI = 3.7e-6,每块约一个边沿),不再是开放问题。
 3. **Touchstone 路径只测了合成的无损 4 端口**(`tests/test_channel.py`);没有真实封装 S 参数文件。接口留着,数据没有。
 
 ## P3 — 能力扩展
 
-1. 串扰只有 FEXT(行为级幅度或一阶耦合线估计,见 P1 #2),没有 NEXT、没有耦合线的真实频响与反射。
+1. 串扰:NEXT 的反向 lane 相位是固定配置值(`lanes.reverse_phase_ui`),没有随机相位平均;回程模块的时钟与本模块无关的建模没有;
+   单端 Touchstone 文件里距离 d 的左右两个邻 lane 取较强的一条(引擎按距离索引攻击 lane);带状线只做了一阶(FEXT = 0)。
 2. 占空比误差的随机部分、前向时钟的四分之一速率变体(`clocking.scheme` 目前只有 `forwarded_ddr`)。
 3. 桌面 GUI 与 Android:`config/form.py::SECTIONS` 已按 Halo 的方式声明了全部字段;Halo 的 `config_bridge` / Dash 表单可以直接搬。
 

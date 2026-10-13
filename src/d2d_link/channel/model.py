@@ -26,10 +26,12 @@ from ..vendor.halo.waveform import Waveform
 
 
 class ChannelModel:
-    def __init__(self, H: np.ndarray, f: np.ndarray, name: str = ""):
+    def __init__(self, H: np.ndarray, f: np.ndarray, name: str = "",
+                 xtalk_H: dict[int, np.ndarray] | None = None):
         self.H = np.asarray(H, dtype=complex)
         self.f = np.asarray(f, dtype=np.float64)
         self.name = name
+        self.xtalk_H = xtalk_H        # aggressor -> this lane's receiver, by neighbour distance (Touchstone files)
         if self.H.shape != self.f.shape:
             raise ValueError("H and f must have the same shape")
         if self.f[0] != 0.0:
@@ -46,8 +48,21 @@ class ChannelModel:
         ch = cfg.channel
         f = cls.grid(cfg)
         if ch.kind == "touchstone":
+            if ch.touchstone_mode == "single_ended":
+                return cls.from_touchstone_single_ended(ch.file, f, ch.zs_ohm, ch.zl_ohm, ch.lane, ch.touchstone_lanes)
             return cls.from_touchstone(ch.file, f, ch.zs_ohm, ch.zl_ohm, ch.renumber, ch.lane)
         return cls.from_rlgc(cfg, f)
+
+    @classmethod
+    def from_touchstone_single_ended(cls, path: str, f: np.ndarray, zs: float, zl: float, lane: int = 0,
+                                     n_lanes: int | None = None) -> "ChannelModel":
+        """A single-ended 2N-port file (``channel/touchstone_se.py``): the
+        lane's through path, with the file's far-end coupling from the
+        neighbours kept on ``xtalk_H`` for ``channel.xtalk: touchstone``."""
+        from .touchstone_se import read_single_ended
+
+        H, xt = read_single_ended(path, f, zs, zl, lane, n_lanes)
+        return cls(H, f, name=f"{path}[lane {lane}]", xtalk_H=xt)
 
     @classmethod
     def from_rlgc(cls, cfg: LinkConfig, f: np.ndarray) -> "ChannelModel":
@@ -71,12 +86,35 @@ class ChannelModel:
         sdd = import_diff_network(path, renumber=renumber, lane=lane)
         sdd_i = interp_s2p(sdd, f)
         H = terminate_renormalize(sdd_i, 2.0 * zs, 2.0 * zl) / (zl / (zs + zl))
-        return cls(H, f, name=path)
+        return cls(fill_dc(H, f), f, name=path)
 
     # ------------------------------------------------------------ metrics
     def insertion_loss_db(self, f_hz: float) -> float:
         """|H| at ``f_hz`` in dB (0 dB = matched lossless)."""
         return float(20.0 * np.log10(max(abs(np.interp(f_hz, self.f, np.abs(self.H))), 1e-300)))
+
+
+def fill_dc(H: np.ndarray, f: np.ndarray) -> np.ndarray:
+    """A measured network rarely holds a DC point, and the vendored
+    interpolation fills transmission terms outside the file's band with 0 --
+    below it too, so on this DC-inclusive grid the through path came out with
+    H(0) = 0: a notch that put a long negative tail on every pulse (phase 6
+    found it with a synthetic file: a 182 mV eye read 60 mV). The DC value
+    extrapolates the two lowest in-band magnitudes in sqrt(f) (conductor loss
+    goes as sqrt(f) at low frequency: log|H| = -a sqrt(f) - b), capped at 1 and
+    never below the lowest point; real (a line has no phase at DC)."""
+    H = np.asarray(H, dtype=complex).copy()
+    if f.size > 2 and f[0] == 0.0 and H[0] == 0.0:
+        h1, h2 = abs(H[1]), abs(H[2])
+        if 0.0 < h2 < h1 <= 1.0:
+            a = (math.log(h1) - math.log(h2)) / (math.sqrt(f[2]) - math.sqrt(f[1]))
+            b = -math.log(h1) - a * math.sqrt(f[1])
+            H[0] = min(1.0, max(h1, math.exp(-b)))
+        else:
+            H[0] = min(1.0, h1)
+    elif f.size > 1 and f[0] == 0.0 and H[0] == 0.0:
+        H[0] = abs(H[1])
+    return H
 
 
 def tx_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
@@ -105,12 +143,28 @@ def xtalk_response(cfg: LinkConfig, f: np.ndarray, neighbour: int) -> np.ndarray
     (1 + jf/fn) with k set by the configured level at the Nyquist frequency
     fn. Zero when crosstalk is off or the neighbour is further than two lanes."""
     f = np.asarray(f, dtype=np.float64)
-    if cfg.channel.xtalk == "none" or neighbour not in (1, 2):
+    if cfg.channel.xtalk in ("none", "touchstone") or neighbour not in (1, 2):
         return np.zeros_like(f, dtype=complex)
     adj, sec = cfg.xtalk_db()          # configured level, or the coupled-line estimate
     level = 10.0 ** ((adj if neighbour == 1 else sec) / 20.0)
     u = 1j * f / cfg.f_nyquist
     return level * math.sqrt(2.0) * u / (1.0 + u)
+
+
+def next_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
+    """Near-end crosstalk a reverse-direction neighbour launches at this
+    lane's receiving die: the backward-coupled wave of a weakly coupled pair
+    is K_b times the aggressor's signal minus the same signal delayed by the
+    round trip of the coupled length, 2 tau_c (Johnson & Graham: a step
+    couples back as a pulse of height K_b and length 2 tau_c). It never
+    travels the lossy line, so there is no channel H in it; the aggressor's
+    driver edge and this receiver's CTLE apply."""
+    f = np.asarray(f, dtype=np.float64)
+    kb = cfg.next_ratio()
+    if kb == 0.0:
+        return np.zeros_like(f, dtype=complex)
+    tau = cfg.coupled_delay_s()
+    return kb * (1.0 - np.exp(-2j * math.pi * f * 2.0 * tau))
 
 
 def read_cursors(pulse: np.ndarray, position: float, osr: int, n_max: int = 64,
@@ -165,13 +219,14 @@ class LinkResponse:
         ends are dropped; at most ``n_max`` on each side."""
         return read_cursors(self.pulse.y, self.main_index + phase_ui * self.osr, self.osr, n_max)
 
-    def xtalk_cursors(self, neighbour: int, phase_ui: float, rel_skew_ui: float = 0.0,
+    def xtalk_cursors(self, neighbour, phase_ui: float, rel_skew_ui: float = 0.0,
                       n_max: int = 64) -> np.ndarray:
         """Baud-spaced crosstalk cursors a neighbour ``neighbour`` lanes away
         leaves at this lane's sampling instant (``phase_ui`` from its own
         peak). The aggressor's symbols arrive ``rel_skew_ui`` later than the
-        victim's, so its pulse is read that much earlier. Empty when there is
-        no coupling at that distance."""
+        victim's, so its pulse is read that much earlier. ``neighbour`` is a
+        distance (1, 2) or ``"next"`` for the reverse-direction neighbour's
+        near-end pulse. Empty when there is no coupling of that kind."""
         pulses = self.xtalk_pulses or {}
         if neighbour not in pulses:
             return np.zeros(0)
@@ -191,12 +246,20 @@ def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkR
     amp = 0.5 * cfg.tx.swing_vpp
     pulse = np.convolve(h.y, np.ones(osr))[: h.y.size] * amp
     xt = {}
-    if cfg.channel.xtalk != "none":
+    front = tx_response(cfg, f) * ctle_response(cfg, f)
+    if cfg.channel.xtalk == "touchstone":
+        for k, hx_f in (ch.xtalk_H or {}).items():
+            hx = freq2impulse(hx_f * front, f)
+            xt[k] = Waveform(np.convolve(hx.y, np.ones(osr))[: hx.y.size] * amp, hx.dt)
+    elif cfg.channel.xtalk != "none":
         for k in (1, 2):
             hx = freq2impulse(H * xtalk_response(cfg, f, k), f)
             xt[k] = Waveform(np.convolve(hx.y, np.ones(osr))[: hx.y.size] * amp, hx.dt)
+    if cfg.channel.xtalk_next != "none":
+        hn = freq2impulse(next_response(cfg, f) * front, f)
+        xt["next"] = Waveform(np.convolve(hn.y, np.ones(osr))[: hn.y.size] * amp, hn.dt)
     return LinkResponse(Waveform(pulse, h.dt), h, ch, H, osr, xt)
 
 
 __all__ = ["ChannelModel", "LinkResponse", "link_response", "tx_response", "ctle_response",
-           "xtalk_response", "read_cursors"]
+           "xtalk_response", "next_response", "read_cursors", "fill_dc"]

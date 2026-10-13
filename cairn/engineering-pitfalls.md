@@ -65,3 +65,11 @@ authoring_mode: ai_generated
   BER 是判决**本符号**的误码率,偏一个 UI 采到邻符号就是 0.5,不周期。
 - 改法:`bathtub_around_the_eye` —— 开眼区碰到窗口边就向该侧再扩 0.5 UI(每侧最多一次);未触边的配置逐位不变。
   `tests/test_statistical.py::test_bathtub_window_follows_a_flat_topped_eye`。
+
+## Touchstone 文件没有直流点(段 6,2026-10-13)
+
+- 现象:任何 `channel.kind: touchstone` 信道的 H(0) = 0,脉冲带长负尾;合成的 25 mm 文件眼 182 → 60 mV。M1 起存在,无示例使用,测试只查带内 |H|。
+- 原因:vendored `interp_s2p` 对带外传输项填 0(PyBERT 的保守做法,针对高频),而本库的网格从 DC 开始,DC 也在带外。
+- 修法:`channel/model.py::fill_dc` —— 带内最低两点按 √f 外推 log|H| 到 DC,上限 1、不低于最低点,实数;两种读法都走它。
+- 教训:读取路径的测试要看到**光标和 / 主光标**,不只看带内幅度;合成测试文件要用有损线,无损线在带边振铃(69 个 1.5 mV 光标)会掩盖真正的缺陷。
+

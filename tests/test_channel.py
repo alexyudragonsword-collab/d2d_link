@@ -1,5 +1,7 @@
 """Channel and pulse response."""
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -82,3 +84,85 @@ def test_touchstone_path_through_vendored_reader(tmp_path):
     cfg2 = LinkConfig(channel=ChannelConfig(kind="touchstone", file=str(path), renumber=False))
     ch = ChannelModel.from_config(cfg2)
     assert np.allclose(np.abs(ch.H[1:-1]), 1.0, atol=0.02)
+
+
+def test_single_ended_multiport_touchstone_carries_its_own_crosstalk(tmp_path):
+    """A 2N-port single-ended file (ports 1..N near ends, N+1..2N far ends):
+    the lane's through path reads 1 on a lossless matched line and the
+    neighbours' coupling terms become the crosstalk pulses, reciprocal
+    between lanes, with no behavioural shape imposed."""
+    skrf = pytest.importorskip("skrf")
+    from d2d_link.config import LaneConfig
+
+    cfg = LinkConfig()
+    f = ChannelModel.grid(cfg)[1:]
+    beta = 2 * np.pi * f * np.sqrt(2.656e-7 * 1.063e-10)
+    thru = np.exp(-1j * beta * 0.025)
+    kx = 0.1 * (1j * f / cfg.f_nyquist) / (1 + 1j * f / cfg.f_nyquist)      # -20 dB at Nyquist, FEXT-shaped
+    n = 3
+    s = np.zeros((f.size, 2 * n, 2 * n), dtype=complex)
+    for i in range(n):
+        s[:, n + i, i] = s[:, i, n + i] = thru
+        for j in range(n):
+            if abs(i - j) == 1:
+                s[:, n + i, j] = s[:, j, n + i] = kx * thru
+            elif abs(i - j) == 2:
+                s[:, n + i, j] = s[:, j, n + i] = 0.3 * kx * thru
+    path = tmp_path / "lanes"
+    skrf.Network(f=f, s=s, z0=50.0, f_unit="Hz").write_touchstone(str(path), form="ri")
+    file = str(path) + ".s6p"
+    mid = LinkConfig(channel=ChannelConfig(kind="touchstone", file=file, touchstone_mode="single_ended", lane=1,
+                                           xtalk="touchstone"), lanes=LaneConfig(count=3))
+    ch = ChannelModel.from_config(mid)
+    k = int(np.argmin(np.abs(ch.f - cfg.f_nyquist)))
+    assert np.allclose(np.abs(ch.H[1:-1]), 1.0, atol=0.02) and sorted(ch.xtalk_H) == [1]
+    assert abs(ch.xtalk_H[1][k]) == pytest.approx(0.1 / np.sqrt(2.0), rel=0.02)          # |kx| at Nyquist
+    edge = ChannelModel.from_config(dataclasses.replace(mid, channel=dataclasses.replace(mid.channel, lane=0)))
+    assert sorted(edge.xtalk_H) == [1, 2] and abs(edge.xtalk_H[2][k]) == pytest.approx(0.03 / np.sqrt(2.0), rel=0.02)
+    assert np.allclose(edge.xtalk_H[1], ch.xtalk_H[1])                                     # reciprocal coupling
+    r = link_response(mid)
+    assert sorted(r.xtalk_pulses) == [1] and 0.03 < np.max(np.abs(r.xtalk_pulses[1].y)) / r.main_amplitude < 0.1
+    with pytest.raises(ValueError, match="single-ended"):
+        ChannelConfig(kind="touchstone", file=file, xtalk="touchstone")
+    with pytest.raises(ValueError, match="2N"):
+        ChannelModel.from_touchstone_single_ended(file, ChannelModel.grid(cfg), 50.0, 50.0, 0, n_lanes=4)
+
+
+def test_touchstone_channels_have_no_dc_notch(tmp_path):
+    """The file has no DC point and the interpolation fills transmission
+    outside its band with 0: without fill_dc the through path read H(0) = 0,
+    a notch that hung a long negative tail on the pulse (a 182 mV eye read
+    60 mV in example 08's first draft). Both readers carry the lowest in-band
+    magnitude to DC; the pulse's cursor sum then matches the lossy line's."""
+    skrf = pytest.importorskip("skrf")
+    from d2d_link.channel.model import fill_dc
+    from d2d_link.config import LaneConfig
+
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0))
+    ana = ChannelModel.from_config(cfg)
+    f = ana.f[1:]
+    n = 2
+    s = np.zeros((f.size, 2 * n, 2 * n), dtype=complex)
+    for i in range(n):
+        s[:, n + i, i] = s[:, i, n + i] = ana.H[1:]
+    path = tmp_path / "lossy"
+    skrf.Network(f=f, s=s, z0=50.0, f_unit="Hz").write_touchstone(str(path), form="ri")
+    se = LinkConfig(channel=ChannelConfig(kind="touchstone", file=str(path) + ".s4p", touchstone_mode="single_ended",
+                                          coupled_length_mm=25.0), lanes=LaneConfig(count=2))
+    ch = ChannelModel.from_config(se)
+    assert abs(ch.H[0]) == pytest.approx(abs(ana.H[0]), rel=2e-3) and ch.H[0].imag == 0.0   # sqrt(f) extrapolation to DC
+    assert np.allclose(np.abs(ch.H[1:-1]), np.abs(ana.H[1:-1]), rtol=1e-3)
+    r_file, r_ana = link_response(se), link_response(cfg)
+    assert np.sum(r_file.cursors(0.0)[0]) == pytest.approx(np.sum(r_ana.cursors(0.0)[0]), rel=2e-3)
+    assert r_file.main_amplitude == pytest.approx(r_ana.main_amplitude, rel=2e-3)
+    # the differential reader goes through the same fill (its port order is 1+, 2+, 1-, 2-: through = 0 -> 1, 2 -> 3)
+    sd = np.zeros_like(s)
+    sd[:, 1, 0] = sd[:, 0, 1] = sd[:, 3, 2] = sd[:, 2, 3] = ana.H[1:]
+    skrf.Network(f=f, s=sd, z0=50.0, f_unit="Hz").write_touchstone(str(tmp_path / "lossy_diff"), form="ri")
+    diff = ChannelModel.from_config(LinkConfig(channel=ChannelConfig(kind="touchstone", file=str(tmp_path / "lossy_diff.s4p"),
+                                                                     renumber=False)))
+    assert diff.H[0] != 0.0 and abs(diff.H[0]) == pytest.approx(abs(ana.H[0]), rel=2e-3)
+    h = np.array([0.0, 0.5 + 0.1j, 0.4]); assert abs(fill_dc(h, np.array([0.0, 1.0, 2.0]))[0]) >= abs(0.5 + 0.1j)
+    assert fill_dc(np.array([0.9, 0.5, 0.4]), np.array([0.0, 1.0, 2.0]))[0] == 0.9           # a file with DC is left alone
+    assert fill_dc(np.array([0.0, 0.5, 0.6]), np.array([0.0, 1.0, 2.0]))[0] == 0.5           # rising: no extrapolation, the lowest point
+

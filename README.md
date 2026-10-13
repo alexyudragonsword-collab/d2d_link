@@ -56,6 +56,15 @@ Markulic 2016 SSPLL 剖面(带内 186 fs),数据 / 时钟路径各 200 fs 白抖
 |---|---|---|
 | `07_rate_sweep.py` | 哪个速率档在哪种封装上过 | 标准 25 mm:4–24 GT/s 过,32 GT/s 中间 lane 眼 143.1 mV / 0.691 UI,眼宽 < 0.75 UI 不过(0.5.0 的 log 内插边给 0.693,0.4.0 的 L / C 预设 0.685,0.3.x 的枚举模型 0.671;串扰 −18.6 dB 是主因;示例 05 的 x16 / 20 mm 模块在 −30 dB 预设下能过,是另一个模块);先进 2 mm:六档全过,眼宽 0.960 → 0.781 UI |
 
+## 段 6:串扰物理(0.8.0)
+
+`channel.routing`(微带 / 带状线)、`channel.xtalk_next`(反向 lane 的近端串扰,K_b = κ/4)与单端 2N 端口 Touchstone 读法(`xtalk: touchstone`);
+机制与数字见 `cairn/crosstalk.md`。
+
+| 示例 | 问题 | 答案(2026-10-13,0.8.0) |
+|---|---|---|
+| `08_crosstalk_physics.py` | 串扰估计靠什么假设 | 同一 x5 / 25 mm 模块:微带 FEXT −18.6 dB → 中间 lane 143.1 mV / 0.691 UI 不过;**带状线一阶 FEXT 为 0 → 211.8 mV / 0.761 UI 过**(32 GT/s 标准封装的判定是布线假设)。边缘 lane 加反向 lane 的 NEXT(−36.0 dB,两瓣 8.5 UI):眼宽 0.748 → 0.737 UI。用解析线合成的 6 端口文件读回:与解析路径眼高差 0.12 mV(读法就位,真实 S 参数仍缺) |
+
 见 [`docs/USAGE.md`](docs/USAGE.md)、[`docs/clock_profile.md`](docs/clock_profile.md);结论与被推翻的判断在 `cairn/LOG.md`。
 
 ## 规范数字

@@ -141,3 +141,19 @@ def test_sensitivity_report_names_the_deciding_guesses(budget_tool):
     assert {"trace_pitch_um", "eps_r", "dielectric_height_um", "trace_width_um"} <= set(knobs)
     assert knobs["trace_pitch_um"]["source"] == "survey" and knobs["eps_r"]["source"] == "model"
 
+
+
+def test_stripline_has_no_first_order_fext_and_a_slower_line():
+    """A homogeneous dielectric lets the odd and even modes travel together:
+    eps_eff = eps_r, the first-order far-end term vanishes (the floor -300 dB),
+    and the same geometry's line is slower (L, C from eps_r, not Hammerstad)."""
+    micro = LinkConfig(channel=COUPLED)
+    strip = LinkConfig(channel=dataclasses.replace(COUPLED, routing="stripline"))
+    assert strip.stackup()["eps_eff"] == strip.stackup()["eps_r"] == 3.5 and strip.stackup()["routing"] == "stripline"
+    assert micro.stackup()["eps_eff"] < 3.5
+    assert fext_db(strip) == (-300.0, -300.0) and fext_db(micro)[0] > -30.0
+    assert strip.rlgc()["l_h_m"] > micro.rlgc()["l_h_m"] and strip.coupled_delay_s() > micro.coupled_delay_s()
+    assert describe(strip)["mismatch"] == 0.0
+    # the near-end coefficient does not care: kappa / 4 either way
+    nx = dataclasses.replace(COUPLED, xtalk_next="coupled")
+    assert LinkConfig(channel=nx).next_ratio() == LinkConfig(channel=dataclasses.replace(nx, routing="stripline")).next_ratio() > 0.0
