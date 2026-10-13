@@ -3,6 +3,20 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短(数字原值、被推翻的判断、下一步),
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-10-13 · 段 8 G1:浏览器 GUI 骨架(ccr-a2094794-9qa40v,0.11.0)
+
+- 先做了设计评审:我与 Opus 5.5 各出 PySide6 / Web 两张效果图,用户选"方案 4 骨架(报告即界面)+ 方案 3 的 lane 平面图 + 方案 1 的来源标签树,Web,只浅色";
+  实施方案在会话 scratchpad `gui_mockups/IMPLEMENTATION_PLAN.md`(三个里程碑 G1 / G2 / G3)。
+- 做了:`d2d_link.report`(从 tools 搬进包,指纹 3074 项逐位相同)、`d2d_link.gui`(Dash 4.4 浅色:标题句行内控件、Verdict / Jitter / Lanes / Crosstalk / Receiver 五段、
+  场景栏、队列(进程池 2)、导出、未核实输入卡、All fields 抽屉)、`tests/test_gui.py` 8 项(铁律 1 的 AST 守卫)、CI `gui` 作业、`cairn/gui.md`、USAGE / README。
+  真实 app 截图:x16 模块 29 s,页面与效果图一致。
+- 数字原值(空闲机器):x1 1.6 s、x5 耦合 21 s、x16 29 s、bundled x64(无串扰,去重)0.9 s;x5 耦合敏感性 17 次 6 min 7 s,
+  **没有单个 ±20 % 估计能翻转 FAIL**(名义裕度 −0.118;最近 −0.054 眼宽目标 0.70 UI、−0.061 介质厚 24 µm、−0.071 间距 138 µm)。
+- 被推翻的判断:(1) ROADMAP P1 #2 "看标 yes 的参数" —— 一个都没有,改成实跑事实;(2) 性能轮记的 x16 64 s / x5 40 s 是三任务并行时量的,空闲 29 / 21 s;
+  (3) "x64 约 5 分钟"只在开 FEXT 时成立(示例 05),bundled 配置没开串扰 0.9 s;(4) 抽屉的关闭按钮放在每秒重绘的部分里,
+  Dash 把"重新插入的输入"当触发,toggle 回调每秒把抽屉关一次 —— 按钮移到静态头部,抽屉只在编辑 / 折叠 / 换场景时重绘。
+- 下一步:G2(lane 平面图 + Inspector 浴盆、敏感性 tornado、Rate × package、Scenarios 比较),用户看截图后快进。
+
 ## 2026-10-13 · 性能轮(ccr-a2094794-9qa40v,0.10.0)
 
 - 做了:眼边求根先在细网格上二分、再一步离网格 Illinois;`half_eye` 在 √(−log tail) 上做 Illinois(~6 次到 0.1 µV,旧 60 步二分);

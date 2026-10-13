@@ -19,11 +19,12 @@
    示例 05 的 x16 / 20 mm 模块在 M2 的行为级 −30 dB 预设下能过(另一个模块)。封装的耦合线 S 参数拿不到(用户确认)。
    段 6 已给出带状线选项(同几何一阶 FEXT 为 0,模块因此能过 —— 结论是微带假设的产物)、反向 lane 的 NEXT 与单端多端口文件读法
    (`xtalk: touchstone`),见 `cairn/crosstalk.md`;真实文件到了用它对比 `coupled`,目标 6 dB 内。段 2 的敏感性报告:
-   复现:`python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity`,看 "Sensitivity" 段里标 **yes** 的参数。
+   复现:`python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity`。段 8 G1 实跑的结果:**没有任何单个 ±20 % 的估计能翻转这个 FAIL**
+   (名义裕度 −0.118;最接近 0 的是眼宽目标取 0.70 UI 的 −0.054、介质厚 24 µm 的 −0.061、bump 间距 138 µm 的 −0.071)。能翻转它的是布线假设(带状线,示例 08)。
 
 ## P2 — 一致性与能力
 
-0. **性能**(性能轮 0.10.0 之后):统计引擎每 lane 2.5 s(x1)/ ~8 s(349 光标的串扰 lane),x5 耦合模块 40 s、x16 模块 64 s,示例 05 / 07 231 / 313 s;
+0. **性能**(性能轮 0.10.0 之后):统计引擎每 lane 2.5 s(x1)/ ~8 s(349 光标的串扰 lane),x5 耦合模块 21 s、x16 模块 29 s(空闲机器;并行三个任务时量到 40 / 64 s),示例 05 / 07 231 / 313 s;
    剩下的热点(x1 每 lane 2.5 s 里 `_shift_add` 0.65 s、`log10_tail` 0.6 s)要把尾按模型批量算,收益约 0.5 s/lane。
    时域波形路径每 1e6 符号约 6 s,1e-8 的 25 误码点要 2.5e9 符号 ≈ 5 h(手动触发);`samples` 模式在有损线上不更快(脉冲尾 130 UI 内都 > 1e-6 主光标)。
    分块合成的缝(`block_step_ratio` ≈ 2,x16 模块)未折算到 BER。

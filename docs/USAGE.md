@@ -62,6 +62,18 @@ python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity
 走线的 L、C 不是预设:由 `channel.z0_ohm`(预设 50 Ω)与叠层几何的 Hammerstad ε_eff 推出(`LinkConfig.rlgc()`),显式给
 `l_h_m` / `c_f_m` 时覆盖。发端带宽 `tx.bw_hz` 留空 = 2 × Nyquist,`inf` = 理想边沿。
 
+## 浏览器 GUI(段 8)
+
+```bash
+pip install -e ".[gui]"
+d2d-link-gui configs/standard_32g_x16_module.yaml        # http://127.0.0.1:8050,左栏列出 configs/ 里的场景
+d2d-link-gui configs/standard_32g_x5_coupled.yaml --workers 2 --port 8050
+```
+
+页面就是 `tools/budget_report.py` 的报表:标题句里带下划线的值(封装、速率、长度、lane 数、串扰、布线)是控件,改一个就入队重跑,
+旧数字置灰保留到新结果落地;右栏是本页来源、队列、导出(Markdown 与 CLI 同文、JSON、overrides YAML)与"未核实输入";
+"All fields" 抽屉列出全部字段,带来源标签(yaml / default / model / survey / override)。GUI 不含仿真逻辑(铁律 1,`tests/test_gui.py` 守着)。
+
 ## 工具
 
 | 命令 | 作用 |

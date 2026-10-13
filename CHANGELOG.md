@@ -4,6 +4,25 @@
 
 ---
 
+## [0.11.0] — 2026-10-13 — 段 8 G1:浏览器 GUI 骨架(指纹逐位相同)
+
+### 新增
+- **`d2d_link.report`**:`budget_rows` / `report` / `to_markdown` / `sensitivity*` 从 `tools/budget_report.py` 搬进包(CLI 只剩入口);数字不变。
+- **`d2d_link.gui`**(`pip install d2d-link[gui]`,`d2d-link-gui config.yaml`):Dash ≥ 3 浅色页面,"报告即界面" —— 标题句里的封装 / 速率 / 长度 / lane 数 /
+  串扰 / 布线是控件,改一个入队重跑;段落 Verdict(三格 + 逐 lane 眼宽条 + "时序还是幅度判定"一句)、Clock-path jitter(fs 与方差占比)、
+  Lanes & repair(按裕度排序的表)、Crosstalk、Receiver;左栏场景(`configs/*.yaml`,带上次判定与耗时)与目录;右栏本页来源、队列(进程池 2 个 worker,
+  可取消,ETA)、导出(Markdown 与 CLI 逐字同文、JSON、overrides YAML)、未核实输入(survey 条目 + cite);抽屉 "All fields" 由 `form.SECTIONS` 生成,
+  带来源标签(yaml / default / model / survey / override),只写 overrides。
+- 测试(+8,`tests/test_gui.py`,不开浏览器):铁律 1 的 AST import 守卫、worker 结果可 JSON 且与示例 00 同数、各段含报表数字、导出同文、
+  state 的 override / 来源分类、队列缓存命中、app 建页与编辑、每个 bundled 配置可打开。CI 新作业 `gui`(只有它装 Dash)。
+- 文档:`docs/USAGE.md` GUI 段、`cairn/gui.md`;ROADMAP P1 #2 改为实跑事实(x5 耦合没有单个 ±20 % 估计能翻转 FAIL,裕度 −0.118);
+  x16 / x5 耗时改为空闲机器的 29 / 21 s。
+
+### 没做(G2 / G3)
+- lane 物理平面图与 Inspector 浴盆、敏感性 tornado、Rate × package、sweeps 附录、Compare with、磁盘缓存。
+
+---
+
 ## [0.10.0] — 2026-10-13 — 性能轮(数字会变的那次;变化全部 ≤ 3.5e-7 UI / 2.4e-8 V)
 
 ### 变更

@@ -76,6 +76,11 @@ Markulic 2016 SSPLL 剖面(带内 186 fs),数据 / 时钟路径各 200 fs 白抖
 |---|---|---|
 | `09_receiver_front_end.py` | 接收机自己花掉多少 | x1 25 mm:前端 48 / 32 / 24 GHz 眼高 215.6 → 208.8 / 196.5 / 179.9 mV(噪声在采样点);同一 3 mV 改到输入:137.9 / 150.5 / 148.7 mV(窄前端省噪声,32 GHz 附近最好)。35 mm + 32 GHz 前端的 CTLE:噪声在采样点 6 dB 最好 222.7 mV,在输入 4 dB 最好 179.0 mV(6 dB 掉到 168.8)。训练 1e-3 居中:x1 偏 −0.0008 UI(眼宽 −0.002),x5 耦合中间 lane 偏 −0.024 UI、眼宽 0.691 → 0.644。时域滤噪声:采到 68.5 对闭式 69.05 mV |
 
+## 段 8:浏览器 GUI(0.11.0,G1)
+
+`pip install -e ".[gui]"` 后 `d2d-link-gui configs/standard_32g_x16_module.yaml`:页面就是时序预算报表,标题句里的值是控件,改一个就入队重跑;
+右栏队列 / 导出 / 未核实输入,抽屉列全部字段带来源标签。GUI 不含仿真逻辑(铁律 1,`tests/test_gui.py` 用 AST 守);见 `docs/USAGE.md`、`cairn/gui.md`。
+
 ## 规范数字
 
 本库拿不到 UCIe 规范原文。速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 15 条,全部在 `src/d2d_link/data/spec/ucie_survey.yaml`,
@@ -95,7 +100,8 @@ grep "source: survey" src/d2d_link/data/spec/ucie_survey.yaml
 | `src/d2d_link/engine/` | 统计引擎(主)、时域引擎(校核)、lane 映射与修复、链路判定 |
 | `src/d2d_link/spec/`、`src/d2d_link/data/` | 规范数字表的读取;规范表、模型预设与随库的时钟剖面(package data,配置里仍写 `data/...`) |
 | `src/d2d_link/vendor/` | Halo_Serdes 的 S 参数读法 / RLGC / 响应转换,pll_simulator 的相噪合成与积分;完整 SHA 钉住,`tools/vendor_check.py` 守 |
-| `tools/` | `fingerprint.py`、`example_drift.py`、`run_examples.py`、`vendor_check.py`、`budget_report.py` |
+| `src/d2d_link/report.py`、`src/d2d_link/gui/` | 时序预算报表(dict / Markdown / 敏感性);浏览器 GUI(Dash,零仿真逻辑) |
+| `tools/` | `fingerprint.py`、`example_drift.py`、`run_examples.py`、`vendor_check.py`、`budget_report.py`(报表的 CLI) |
 | `cairn/` | 项目知识:铁律论证、前向时钟、双引擎、串扰、收端、规范来源、坑;`LOG.md` 每轮数字与被推翻的判断 |
 
 ## 不做
