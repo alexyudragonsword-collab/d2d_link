@@ -1,12 +1,12 @@
-local PLL, coloured clock noise: noise 37.99 mV, jitter 3042 fs, phase -0.0312 UI
+local PLL, coloured clock noise: noise 37.99 mV, jitter 3042 fs, phase +0.0000 UI
   statistical 9.774e-06 [~s]   time 9.000e-06 (36 errors in 35 bursts / 4.0e+06, 95% 6.1e-06..1.3e-05) [~s]   ratio 0.92 -> within 0.5-2x
-quantised, delayed tracker: noise 38.45 mV, jitter 2054 fs + PI step 0.03125 UI, phase -0.0156 UI
+quantised, delayed tracker: noise 38.45 mV, jitter 2054 fs + PI step 0.03125 UI, phase +0.0156 UI
   statistical 9.787e-06 [~s]   time 7.250e-06 (29 errors in 28 bursts / 4.0e+06, 95% 4.6e-06..1.1e-05) [~s]   ratio 0.74 -> within 0.5-2x
-path wander through the tracker: noise 38.42 mV, jitter 2206 fs, phase -0.0156 UI
+path wander through the tracker: noise 38.42 mV, jitter 2206 fs, phase +0.0156 UI
   statistical 9.772e-06 [~s]   time 8.000e-06 (32 errors in 31 bursts / 4.0e+06, 95% 5.2e-06..1.2e-05) [~s]   ratio 0.82 -> within 0.5-2x
 crosstalk, x3 module at -14 dB, middle lane (2 aggressors, 9.3 mV RMS crosstalk): noise 40.0 mV
   statistical 3.249e-05   time 2.800e-05 (56 errors in 56 bursts / 2.0e+06) [~s]   ratio 0.86 -> within 0.5-2x; edge lanes 0.90 / 0.92
-advanced package, CTLE, 0.06 UI DCD: noise 45.40 mV, jitter 1378 fs, phase -0.0469 UI
+advanced package, CTLE, 0.06 UI DCD: noise 45.40 mV, jitter 1378 fs, phase -0.0781 UI
   statistical 9.713e-06 [~s]   time 7.750e-06 (31 errors in 31 bursts / 4.0e+06, 95% 5.0e-06..1.1e-05) [~s]   ratio 0.80 -> within 0.5-2x
 
 5 points, ratios 0.74..0.92 -- all within 0.5-2x

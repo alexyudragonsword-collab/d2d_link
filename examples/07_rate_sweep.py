@@ -45,7 +45,7 @@ for name, cfg in cases.items():
     print(f"\n{name} package at {cfg.channel.length_mm:g} mm (survey reach {reach.value:g} mm): pitch {x['pitch_um']:g} um "
           f"(source: {x['pitch_source']}), FEXT estimate {x['fext_adjacent_db']:.1f} dB at Nyquist for 32 GT/s")
     print(f"{'GT/s':>5s} {'UI [ps]':>8s} {'IL@Nyq [dB]':>12s} {'FEXT [dB]':>10s} {'jitter [UI]':>12s} {'eye height [mV]':>16s} "
-          f"{'eye width [UI]':>15s} {'BER':>10s} {'pass':>5s}")
+          f"{'eye width [UI]':>15s} {'log10 BER':>10s} {'pass':>5s}")
     rows = []
     for rate in rates.value:
         c = dataclasses.replace(cfg, data_rate_gtps=float(rate))
@@ -54,7 +54,7 @@ for name, cfg in cases.items():
         rows.append((rate, mid, res.passes))
         print(f"{rate:5g} {1e12 * c.ui:8.2f} {mid.extras['insertion_loss_nyquist_db']:12.2f} {c.xtalk_db()[0]:10.1f} "
               f"{mid.sigma_jitter_s / c.ui:12.4f} {1e3 * mid.eye_height_v:16.1f} {mid.eye_width_ui:15.3f} "
-              f"{mid.ber:10.1e} {'yes' if res.passes else 'no':>5s}")
+              f"{mid.log10_ber:10.1f} {'yes' if res.passes else 'no':>5s}")
     results[name] = rows
     fails = [(r, m) for r, m, ok in rows if not ok]
     if fails:

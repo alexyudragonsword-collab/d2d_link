@@ -54,20 +54,21 @@ print(f"  total residual                                            : {1e15 * b.
 t0 = time.time()
 s = run_statistical(cfg, resp, clock=clock)
 print(f"\nstatistical engine [{time.time() - t0:.1f}s]:")
-print(f"  sampling phase {s.phase_ui:+.4f} UI from the pulse peak (eye centre), BER there {s.ber:.2e}")
+print(f"  sampling phase {s.phase_ui:+.4f} UI from the pulse's reference sample (eye centre), "
+      f"BER there 10^{s.log10_ber:.1f}")
 print(f"  eye height at BER {s.target_ber:.0e}: {1e3 * s.eye_height_v:.1f} mV  vs target "
       f"{fmt_target(s, 'eye_height_mv', 'mV')} -> margin {s.eye_height_margin_mv:+.1f} mV")
 print(f"  eye width  at BER {s.target_ber:.0e}: {s.eye_width_ui:.3f} UI  vs target "
       f"{fmt_target(s, 'eye_width_ui', 'UI')} -> margin {s.eye_width_margin_ui:+.3f} UI")
 print(f"  BER target {s.target_ber:.0e} (source: {s.targets['ber'][1]}); "
-      f"{s.extras['n_enumerated']} of {s.extras['n_cursors']} ISI cursors enumerated, the rest "
-      f"{1e3 * s.extras['sigma_isi_rest_v']:.2f} mV RMS")
+      f"{s.extras['n_cursors']} ISI cursors, {1e3 * s.extras['sigma_isi_v']:.2f} mV RMS, exact distribution on "
+      f"{s.extras['isi_bins']} bins of {1e6 * s.extras['isi_bin_v']:.0f} uV")
 print(f"  verdict: {'PASS' if s.passes else 'FAIL'}")
 
 t0 = time.time()
 td = run_time(cfg, resp, phase_ui=s.phase_ui, clock=clock)
 print(f"\ntime engine [{time.time() - t0:.1f}s]: {td.n_errors} errors in {td.n_symbols} symbols "
-      f"(statistics predict {s.ber * td.n_symbols:.1e}); sampled eye opening {1e3 * td.eye_height_sampled_v:.1f} mV; "
+      f"(statistics predict 10^{s.log10_ber + np.log10(td.n_symbols):.1f}); sampled eye opening {1e3 * td.eye_height_sampled_v:.1f} mV; "
       f"jitter the sampler saw {1e15 * td.jitter_rms_s:.1f} fs RMS")
 
 plt = plt_or_none()

@@ -11,6 +11,7 @@ the link by its worst lane. A single lane is the same code with count = 1.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -79,8 +80,20 @@ def physical_skews_ps(cfg: LinkConfig) -> np.ndarray:
     return out
 
 
-def residual_skew_ui(cfg: LinkConfig, skew_ps: float) -> float:
-    """What the per-lane deskew leaves: the skew modulo its step, centred."""
+def residual_skew_ui(cfg: LinkConfig, skew_ps: float, tracked: bool | None = None) -> float:
+    """What the lane's static skew leaves at the sampler.
+
+    With a per-lane tracker (``clocking.track_bw_hz > 0``) the answer is 0:
+    a static offset is DC to the tracking loop, which follows it exactly, and
+    all that remains of the deskew is the phase interpolator's quantisation,
+    which the engines already carry as a uniform jitter term. Without a
+    tracker the one-time deskew leaves the skew modulo its step, centred.
+    Earlier versions counted both at once. ``tracked`` overrides the config's
+    own answer (tests)."""
+    if tracked is None:
+        tracked = (cfg.clocking.track_bw_hz or 0.0) > 0.0
+    if tracked:
+        return 0.0
     step = cfg.lanes.deskew_step_ps
     if step <= 0.0:
         return 0.0
@@ -100,11 +113,19 @@ class LinkResult:
 
     @property
     def worst(self) -> StatResult:
-        return max(self.stat, key=lambda r: r.ber)
+        """The lane with the smallest eye margin relative to its target (eye
+        height or width, whichever is tighter). Not the largest BER: at a
+        1e-27 target every lane's BER at its own eye centre is far below
+        float resolution, and ranking by it picked lane 0 every time."""
+        return min(self.stat, key=lambda r: (r.margin, r.lane))
+
+    @property
+    def log10_ber_worst(self) -> float:
+        return max(r.log10_ber for r in self.stat)
 
     @property
     def ber_worst(self) -> float:
-        return self.worst.ber
+        return float(10.0 ** self.log10_ber_worst)
 
     @property
     def eye_height_min_v(self) -> float:
@@ -121,7 +142,16 @@ class LinkResult:
     def consistency_ratios(self) -> list[float]:
         """Time BER / statistical BER per lane run through both (invariant #3)."""
         by_lane = {r.lane: r for r in self.stat}
-        return [t.ber / by_lane[t.lane].ber if by_lane[t.lane].ber > 0 else float("inf") for t in self.time]
+        out = []
+        for t in self.time:
+            if t.ber <= 0.0:
+                out.append(0.0)
+                continue
+            try:
+                out.append(float(10.0 ** (math.log10(t.ber) - by_lane[t.lane].log10_ber)))
+            except OverflowError:
+                out.append(float("inf"))
+        return out
 
     def summary(self) -> str:
         lm = self.lanes
@@ -162,7 +192,7 @@ def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     stat = []
     for lane, phys in active:
         engine = StatisticalEngine(cfg, resp, clock, tuple((d, sk) for d, sk, _ in aggr[phys]))
-        stat.append(engine.run(lane, residual_skew_ui(cfg, skews[phys])))
+        stat.append(engine.run(lane, residual_skew_ui(cfg, skews[phys], clock.alpha > 0.0)))
     time: list[TimeResult] = []
     if cfg.sim.engine in ("time", "both"):
         n_active = len(stat)

@@ -4,6 +4,48 @@
 
 ---
 
+## [0.4.0] — 2026-10-13 — 段 1:结论可信度 A(数字会变,逐项解释在 `cairn/LOG.md`)
+
+### 修改(模型)
+- **ISI 分布精确化**(`engine/statistical.py`):"枚举最大 12 个光标 + 高斯余项"换成电压网格上的精确移位相加分布
+  (`sim.stat_isi_bin_v`,默认 50 µV;分数移位线性分到相邻两格)。一个光标也不丢。串扰眼由此收敛:x5 耦合模块中间 lane
+  (349 个光标)bin 100/50/20/10 µV → 眼宽 0.6844/0.6848/0.68488/0.68490 UI;旧枚举给 0.671(M=12)且随 M 不收敛。
+  `sim.stat_enumerate_cursors` 字段删除(配置文件里出现会被 loader 拒绝)。
+- **log 域尾**:`log_ndtr` + logsumexp(numpy 实现;scipy 的每次调用 0.5 ms 开销占一半运行时间)。`StatResult.log10_ber` 是原始量,
+  `ber` 是其反对数(1e-308 以下为 0.0);`bathtub_log10_ber` 同理。`summary()` 打 `BER 10^-436.0`。决策阈值处的尾按(模型、噪声)缓存。
+- **最差 lane 按裕度**(`engine/lanes.py`):`LinkResult.worst` 取 `StatResult.margin = min(眼高裕度/目标, 眼宽裕度/目标)` 最小者;
+  `log10_ber_worst` / `ber_worst`;`consistency_ratios` 用 log10 差。此前按 BER 取,1e-27 下全为 0.0,永远 lane 0。
+- **偏心 lane 的眼宽**:采样点偏离眼中心(无跟踪器的 deskew 残余、固定相位)时眼宽取围绕实际采样点的对称开口
+  `2·min(right − φ, φ − left)`,不再把整条浴盆的开口记给它。
+- **相位参考**(`channel/model.py::LinkResponse.main_index`):脉冲半幅宽的中点,不再是峰值样本(平顶脉冲上峰值三次把窗口带偏)。
+  bundled 配置的 `phase_ui` 整体平移,眼高 / 眼宽不因此改变。
+- **眼宽硬上限 1 UI**:`extras["eye_width_clipped"]` / `eye_width_raw_ui`,`summary()` 与报表打 "(clipped)"。
+  1 mm 无发端极点的线原始读数 1.026 UI → 1.000 (clipped)。
+- **静态 skew 与跟踪器的口径**(`residual_skew_ui(cfg, skew, tracked=None)`):有每 lane 跟踪器时静态残余为 0(直流被环路跟掉),
+  只剩 PI 量化;无跟踪器时保留 skew 模步长。此前两者同时计入。`standard_32g_x16_module` 八个 lane 的残余 skew 归零。
+- **时域引擎的分块填充**(`engine/timedomain.py`):`n_tail` / `n_pre` 按实际相位 + skew + DCD + |抖动|max 加余量;
+  采样点越界 **assert**,不再被 `np.interp` 静默钳位。
+
+### 新增
+- `StatResult.margin`、`log10_tail()`、`extras["sigma_isi_v" | "isi_bins" | "isi_bin_v" | "log10_ber_min"]`;
+  `tools/budget_report.py` lane 表打 log10 BER 与 clipped;`tools/fingerprint.py` 记录 `log10_ber`。
+- 测试(144 项):网格收敛(bin 100 vs 50 µV 眼宽差 < 0.002 UI)、log 域尾不下溢、眼宽 ≤ 1 UI 且有标志、最差 lane 按裕度(段 0 的 xfail 转正)、
+  有跟踪器时残余 skew 为 0 且两 lane 相同。
+
+### 数字(与 0.3.1 比;全文见 LOG)
+- x1 25 mm:眼 209.8 mV / 0.772 UI 不变,相位 −0.0200 → −0.0198 UI;每 lane 2.8 s(旧 3–4 s)。
+- reach 扫描:≤ 30 mm 眼高变 ≤ 0.2 mV;35–60 mm 眼高 +0.6…+3.4 mV、眼宽 +0.000…+0.007 UI(旧高斯余项在长线上悲观);30 mm 仍是最后通过的长度。
+- x16 模块(fingerprint 网格):眼宽 +0.005 UI、眼高 −1…+3 mV、相位从 −0.02…−0.07 收到 −0.015 左右(skew 口径);x64:眼宽 0.8096 → 0.8155。
+- 示例 03 / 06 的 2× 点逐行不变(统计 / 时域两边同一口径,工作点由二分重新找到同一处)。
+- 示例 05:x16 模块最差 lane 从“永远 lane 0”(228.1 mV / 0.763 UI)变成逻辑 lane 5(223.7 mV / 0.752 UI,裕度最小);八个 lane 残余 skew 0;
+  x64 最差 lane 54(物理 56)。示例 07:标准 25 mm 在 32 GT/s 的中间 lane 眼 137.5 mV / 0.671 UI → 138.7 mV / 0.685 UI,仍不过(眼宽);
+  24 GT/s 0.789 → 0.791 UI;先进封装六档结论不变。
+
+### 移除
+- `IsiModel.isi_values / sigma_rest / n_enumerated`、`extras["n_enumerated" | "sigma_isi_rest_v" | "ber_min"]`、`sim.stat_enumerate_cursors`。
+
+---
+
 ## [0.3.1] — 2026-10-13 — 段 0:卫生轮(体检后;指纹逐位相同)
 
 ### 修复

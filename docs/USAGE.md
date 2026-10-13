@@ -20,7 +20,7 @@ from d2d_link.config import load_config
 from d2d_link.engine import run_link
 
 res = run_link(load_config("configs/standard_32g_x1.yaml"))
-print(res.summary())      # 每 lane:BER、眼高/眼宽对目标(带 source)、残余抖动
+print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 source)、残余抖动;res.worst 是裕度最小的 lane
 ```
 
 ## 配置就是一切(铁律 1)
@@ -35,7 +35,7 @@ print(res.summary())      # 每 lane:BER、眼高/眼宽对目标(带 source)、
 | `lanes` | `count`、`skew_ps` / `skew_sigma_ps`、`deskew_step_ps`、`spare_count`、`failed`、`repair` |
 | `clocking` | 发端:`pll_profile`、`correlation`、`data_path_rj_s`、`clock_path_rj_s`、`*_wander_s` + `wander_corner_hz`;收端:`local_pll_profile` + `local_pll_bw_hz`(锁到前向时钟,必须给带宽)、`tree_delay_ps`、`tree_bw_hz`、`tree_rj_s`、`track_bw_hz`、`track_delay_ui`、`pi_step_ui`、`dcd_ui` |
 | `tx` / `rx` | `swing_vpp`、`bw_hz`;`noise_rms_v`、`ctle.*`、`sampling_phase_ui`、`vref_offset_v` |
-| `sim` | `osr`、`n_symbols`、`seed`、`pattern`、`engine`、统计引擎的枚举 / 网格参数 |
+| `sim` | `osr`、`n_symbols`、`seed`、`pattern`、`engine`、统计引擎的 ISI 分布 bin(`stat_isi_bin_v`)/ 相位网格参数 |
 | `target` | 留空 = 规范表(带 `source: survey`);写了 = 配置自己的主张 |
 
 `d2d_link.config.form.SECTIONS` 按 Halo 的方式声明了每个字段的表单行(标签、类型、显示比例);GUI 这一轮不做,

@@ -118,9 +118,16 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
         jitter_s = clock.synthesize(n, np.random.default_rng([sim.seed, 0xC10C]), 1)[0]
     pulse = resp.pulse.y
     i0 = resp.main_index
-    n_tail = int(np.ceil(pulse.size / osr)) + 1
-    n_pre = int(np.ceil(i0 / osr)) + 1          # future symbols whose precursors reach the chunk
     dcd = cfg.clocking.dcd_ui
+    # past symbols whose postcursors reach the chunk, and future ones whose
+    # precursors do, each with one more UI of slack; a sampling instant that
+    # the phase, the skew, the duty-cycle offset and the jitter carry further
+    # than that slack needs more padding on both ends (an eye read from a
+    # window extended to +-1 UI sits up to a whole symbol away)
+    reach_ui = abs(phase_ui + skew_residual_ui) + 0.5 * dcd + float(np.max(np.abs(jitter_s[:n]))) / cfg.ui
+    margin = max(0, int(np.ceil(reach_ui)) - 1)
+    n_tail = int(np.ceil(pulse.size / osr)) + 1 + margin
+    n_pre = int(np.ceil(i0 / osr)) + 1 + margin
     vref = cfg.rx.vref_offset_v
     sigma = cfg.rx.noise_rms_v
     victim = SymbolStream(sim.pattern, rng, n_tail, n_pre)
@@ -155,6 +162,9 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
         # duty-cycle offset (odd symbols) and the forwarded clock's residual
         offs = (phase_ui + skew_residual_ui) + dcd * 0.5 * (2 * ((pos + k) & 1) - 1)
         idx = (n_tail + k) * osr + i0 + offs * osr + jitter_s[pos:pos + m] / cfg.dt
+        if not (idx.min() >= 0.0 and idx.max() <= y.size - 1):   # np.interp would clamp silently
+            raise AssertionError(f"sampling instant outside the chunk's waveform: idx {idx.min():.1f}..{idx.max():.1f} "
+                                 f"of {y.size} samples (phase {phase_ui:+.3f} UI)")
         s = np.interp(idx, np.arange(y.size), y) + rng.normal(0.0, sigma, m) if sigma > 0.0 \
             else np.interp(idx, np.arange(y.size), y)
         dec = np.where(s > vref, 1.0, -1.0)

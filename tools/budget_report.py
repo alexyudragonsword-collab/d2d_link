@@ -67,7 +67,8 @@ def report(cfg, res, clock) -> dict:
                    "xtalk_rms_mv": 1e3 * r.extras["xtalk_rms_v"],
                    "eye_height_mv": 1e3 * r.eye_height_v, "eye_width_ui": r.eye_width_ui,
                    "eye_height_margin_mv": r.eye_height_margin_mv, "eye_width_margin_ui": r.eye_width_margin_ui,
-                   "ber": r.ber, "passes": r.passes} for r in res.stat],
+                   "eye_width_clipped": bool(r.extras.get("eye_width_clipped", False)),
+                   "log10_ber": r.log10_ber, "ber": r.ber, "passes": r.passes} for r in res.stat],
     }
     return out
 
@@ -100,12 +101,13 @@ def to_markdown(rep: dict) -> str:
         lines.append("Off.")
     lines += ["", "## Lanes", "",
               "| logical | physical | skew [ps] | residual [UI] | aggressors | xtalk [mV] | eye height [mV] | "
-              "eye width [UI] | margin EH [mV] | margin EW [UI] | BER | pass |",
+              "eye width [UI] | margin EH [mV] | margin EW [UI] | log10 BER | pass |",
               "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"]
     for r in rep["lanes"]:
+        clipped = " (clipped)" if r["eye_width_clipped"] else ""
         lines.append(f"| {r['logical']} | {r['physical']} | {r['skew_ps']:.2f} | {r['skew_residual_ui']:+.4f} | "
-                     f"{r['aggressors']} | {r['xtalk_rms_mv']:.2f} | {r['eye_height_mv']:.1f} | {r['eye_width_ui']:.3f} | "
-                     f"{r['eye_height_margin_mv']:+.1f} | {r['eye_width_margin_ui']:+.3f} | {r['ber']:.1e} | "
+                     f"{r['aggressors']} | {r['xtalk_rms_mv']:.2f} | {r['eye_height_mv']:.1f} | {r['eye_width_ui']:.3f}{clipped} | "
+                     f"{r['eye_height_margin_mv']:+.1f} | {r['eye_width_margin_ui']:+.3f} | {r['log10_ber']:.1f} | "
                      f"{'yes' if r['passes'] else 'no'} |")
     return "\n".join(lines) + "\n"
 

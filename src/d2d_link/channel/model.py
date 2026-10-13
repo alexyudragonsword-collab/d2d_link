@@ -141,12 +141,16 @@ class LinkResponse:
 
     @property
     def main_index(self) -> int:
-        """Sample of the pulse peak. A flat-topped pulse (a short, clean line
-        has a 1-UI plateau) takes the plateau's centre, not its first sample:
-        the eye is centred there, and the bathtub is read +-0.5 UI around it."""
+        """The symbol's reference sample: the midpoint of the pulse's
+        half-amplitude span. A peaked pulse puts it close to the peak; a
+        flat-topped pulse (a short, clean line has a 1-UI plateau, tilted a
+        little by the driver's pole and rippled by the band edge) puts it at
+        the plateau's centre, where the peak sample itself wandered to either
+        end in earlier versions and the +-0.5 UI bathtub window saw half an
+        eye. The eye centre is still searched for around it."""
         p = np.abs(self.pulse.y)
-        top = np.flatnonzero(p >= (1.0 - 1e-9) * p.max())
-        return int(round(float(top.mean())))
+        above = np.flatnonzero(p >= 0.5 * p.max())
+        return int(round(0.5 * float(above[0] + above[-1])))
 
     @property
     def main_amplitude(self) -> float:

@@ -111,7 +111,7 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
         _f("sim.pattern", "Pattern", "enum", options=["prbs15", "prbs31", "random"]),
         _f("sim.chunk_symbols", "Time-engine block [symbols]", "int"),
         _f("sim.jitter_block", "Jitter synthesis block [edges]", "int"),
-        _f("sim.stat_enumerate_cursors", "ISI cursors enumerated", "int"),
+        _f("sim.stat_isi_bin_v", "ISI distribution bin [uV]", "float", scale=1e-6),
         _f("sim.stat_phase_points", "Bathtub phases per UI", "int"),
         _f("sim.stat_jitter_sigmas", "Jitter quadrature reach [sigma]", "float"),
         _f("sim.engine", "Engine", "enum", options=["statistical", "time", "both"]),

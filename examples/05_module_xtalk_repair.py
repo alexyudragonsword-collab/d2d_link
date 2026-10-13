@@ -30,11 +30,11 @@ def report(res, title):
     print(f"  {lm.active_width}/{lm.requested_width} lanes active, repair {lm.mode}, failed {list(lm.failed)}"
           f"{', UNREPAIRED ' + str(list(lm.unrepaired)) if lm.unrepaired else ''}; link {'PASS' if res.passes else 'FAIL'}")
     print(f"  {'logical':>7s} {'physical':>8s} {'skew [ps]':>9s} {'residual [UI]':>13s} {'aggressors':>10s} "
-          f"{'xtalk [mV]':>10s} {'eye height [mV]':>16s} {'eye width [UI]':>14s} {'BER':>10s}")
+          f"{'xtalk [mV]':>10s} {'eye height [mV]':>16s} {'eye width [UI]':>14s} {'log10 BER':>10s}")
     for r, phys in zip(res.stat, [p for p in lm.logical_to_physical if p not in lm.unrepaired]):
         print(f"  {r.lane:7d} {phys:8d} {res.skew_ps[phys]:9.2f} {r.skew_residual_ui:13.4f} "
               f"{r.extras['n_aggressors']:10d} {1e3 * r.extras['xtalk_rms_v']:10.2f} {1e3 * r.eye_height_v:16.1f} "
-              f"{r.eye_width_ui:14.3f} {r.ber:10.1e}")
+              f"{r.eye_width_ui:14.3f} {r.log10_ber:10.1f}")
     w = res.worst
     print(f"  worst lane {w.lane}: eye {1e3 * w.eye_height_v:.1f} mV / {w.eye_width_ui:.3f} UI vs targets "
           f"{res.targets['eye_height_mv'][0]:g} mV / {res.targets['eye_width_ui'][0]:g} UI "

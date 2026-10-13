@@ -45,7 +45,7 @@ def digest(a) -> str:
 
 def stat_values(r) -> dict:
     out = {k: repr(float(getattr(r, k))) for k in
-           ("ber", "phase_ui", "eye_height_v", "eye_width_ui", "sigma_jitter_s", "main_cursor_v")}
+           ("log10_ber", "ber", "phase_ui", "eye_height_v", "eye_width_ui", "sigma_jitter_s", "main_cursor_v")}
     out["bathtub"] = digest(r.bathtub_ber)
     out["cursors"] = digest(r.cursors_v)
     out["cursors.n"] = int(r.cursors_v.size)

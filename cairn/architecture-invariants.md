@@ -32,16 +32,18 @@ authoring_mode: ai_generated
 
 ## 3 统计引擎是主引擎
 
-- 为什么:1e-27 = 1e27 个 bit 里 1 个错;时域永远到不了。统计引擎用解析高斯尾(`erfc`)+ 枚举 ISI 组合,不走 FFT 卷积
-  (FFT 卷积在峰值 1e-16 以下没有精度)。
+- 为什么:1e-27 = 1e27 个 bit 里 1 个错;时域永远到不了。统计引擎用电压网格上精确的 ISI 分布 + log 域解析高斯尾
+  (`log_ndtr`),不走 FFT 卷积(FFT 卷积在峰值 1e-16 以下没有精度),也不走线性域 `erfc`(1e-308 以下下溢成 0.0,
+  段 0 体检发现它让最差 lane 永远是 lane 0)。
 - 怎么守:`tests/test_engines.py` 三个工作点(噪声主导、抖动主导、混合)时域 / 统计在 0.5–2× 内;`run_link` 默认只跑统计。
 - 边界:2× 判据只对 LTI + 高斯成立;串扰(M2 起)按独立 ±1 干扰项进入,仍在该范围内;驱动器非线性不在模型里。
   体检(2026-10-13)指出测试只在 ~1e-4 查过 2×、1e-6 只在示例 03、1e-9 没跑过 —— 段 4 补。
 
 ## 4 多 lane 从第一天就在
 
-- 怎么守:`tests/test_lanes.py` —— `lane_map` 三种修复模式;`lanes.count = 1` 的结果与 x4 模块的 lane 0 逐位相同;残余 skew 把
-  lane 推离眼中心;两个 bundled 配置(x16 降宽、x64 备用 lane)跑通。
+- 怎么守:`tests/test_lanes.py` —— `lane_map` 三种修复模式;`lanes.count = 1` 的结果与 x4 模块的 lane 0 逐位相同;无跟踪器时
+  残余 skew 把 lane 推离眼中心、最差 lane 按裕度取到它;有跟踪器时残余 skew 为 0、两 lane 相同;两个 bundled 配置(x16 降宽、
+  x64 备用 lane)跑通。
 - 里程碑 2:lane 间 FEXT 串扰(`channel.xtalk`)按**物理**邻接取邻 lane,死 lane 与闲置备用 lane 静默,修复后的重映射改变邻接
   (`tests/test_xtalk.py`);单 lane 的结果不受串扰设置影响。
 

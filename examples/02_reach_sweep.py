@@ -25,7 +25,7 @@ reach = survey("reach_mm", cfg.package.kind)
 print(f"{cfg.package.kind} package, {cfg.data_rate_gtps:g} GT/s; survey reach {reach.value:g} {reach.unit} "
       f"(source: {reach.source}; {reach.cite})")
 print(f"{'length [mm]':>11s} {'IL@Nyq [dB]':>12s} {'eye height [mV]':>16s} {'eye width [UI]':>15s} "
-      f"{'BER at centre':>14s} {'margin EH [mV]':>15s} {'pass':>5s}")
+      f"{'log10 BER':>14s} {'margin EH [mV]':>15s} {'pass':>5s}")
 last_pass = None
 rows = []
 for L in lengths:
@@ -36,7 +36,7 @@ for L in lengths:
         last_pass = L
     rows.append((L, s.extras["insertion_loss_nyquist_db"], s.eye_height_v, s.eye_width_ui, s.ber, ok))
     print(f"{L:11.0f} {s.extras['insertion_loss_nyquist_db']:12.2f} {1e3 * s.eye_height_v:16.1f} "
-          f"{s.eye_width_ui:15.3f} {s.ber:14.2e} {s.eye_height_margin_mv:15.1f} {'yes' if ok else 'no':>5s}")
+          f"{s.eye_width_ui:15.3f} {s.log10_ber:14.1f} {s.eye_height_margin_mv:15.1f} {'yes' if ok else 'no':>5s}")
 
 targets = run_statistical(cfg).targets
 eh_t, ber_t = targets["eye_height_mv"], targets["ber"]

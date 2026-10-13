@@ -361,7 +361,7 @@ class SimConfig:
     pattern: Literal["prbs15", "prbs31", "random"] = "prbs31"
     chunk_symbols: int = 65_536        # time engine block size
     jitter_block: int = 1 << 18        # edges per phase-noise synthesis block (sets the band's low edge)
-    stat_enumerate_cursors: int = 12   # ISI cursors enumerated exactly; the rest become variance
+    stat_isi_bin_v: float = 5.0e-5     # voltage bin of the exact ISI distribution [V]
     stat_phase_points: int = 64        # bathtub phases per UI
     stat_jitter_sigmas: float = 12.0   # jitter quadrature reach [sigma]; 1e-27 needs 10.8
     engine: Literal["statistical", "time", "both"] = "statistical"
@@ -372,8 +372,7 @@ class SimConfig:
         _require(self.chunk_symbols >= 64, f"sim.chunk_symbols must be >= 64, got {self.chunk_symbols}")
         _require(self.jitter_block >= 64 and self.jitter_block & (self.jitter_block - 1) == 0,
                  f"sim.jitter_block must be a power of two >= 64, got {self.jitter_block}")
-        _require(0 <= self.stat_enumerate_cursors <= 20,
-                 f"sim.stat_enumerate_cursors must be in [0, 20], got {self.stat_enumerate_cursors}")
+        _finite_pos(self.stat_isi_bin_v, "sim.stat_isi_bin_v")
         _require(self.stat_phase_points >= 8, "sim.stat_phase_points must be >= 8")
         _require(math.isfinite(self.stat_jitter_sigmas) and self.stat_jitter_sigmas >= 1.0,
                  "sim.stat_jitter_sigmas must be >= 1")

@@ -8,8 +8,8 @@ from scipy.special import erfcinv
 
 from conftest import PROFILE
 from d2d_link.channel.model import LinkResponse
-from d2d_link.config import ChannelConfig, ClockingConfig, LinkConfig, RxConfig, SimConfig
-from d2d_link.engine.statistical import (StatisticalEngine, isi_model, jitter_quadrature, qfunc,
+from d2d_link.config import ChannelConfig, ClockingConfig, LinkConfig, RxConfig, SimConfig, load_config
+from d2d_link.engine.statistical import (StatisticalEngine, isi_model, jitter_quadrature, log10_tail, qfunc,
                                          run_statistical, tail_probability)
 from d2d_link.vendor.halo.waveform import Waveform
 
@@ -57,17 +57,65 @@ def test_jitter_only_closed_form():
 
 def test_single_postcursor_closed_form():
     m, c, s = 0.2, 0.05, 0.03
-    model = isi_model(np.array([m, c]), 0, n_enum=4)
+    model = isi_model(np.array([m, c]), 0, bin_v=0.0125)        # the cursor is a whole number of bins
+    assert model.n_cursors == 1 and model.sigma_isi_v == pytest.approx(c)
     p = tail_probability(model, s, 0.0)
     assert p == pytest.approx(0.5 * (qfunc((m - c) / s) + qfunc((m + c) / s)), rel=1e-9)
+    # a fractional shift keeps the mean and the total probability exactly
+    frac = isi_model(np.array([m, 0.0123, -0.0045]), 0, bin_v=1e-3)
+    assert frac.pmf.sum() == pytest.approx(1.0, abs=1e-12) and float(frac.pmf @ frac.grid_v) == pytest.approx(0.0, abs=1e-15)
 
 
-def test_enumeration_vs_variance_agree_when_cursors_are_small():
-    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0), rx=RxConfig(noise_rms_v=0.04),
-                     sim=SimConfig(stat_enumerate_cursors=16, stat_phase_points=32))
-    a = run_statistical(cfg).ber
-    b = run_statistical(dataclasses.replace(cfg, sim=dataclasses.replace(cfg.sim, stat_enumerate_cursors=10))).ber
-    assert a == pytest.approx(b, rel=0.05)
+def test_isi_grid_converges_with_hundreds_of_crosstalk_cursors():
+    """The case that broke the old 'enumerate the largest M' model: the middle
+    lane of the x5 coupled module sees 349 cursors and its eye width moved
+    0.613 / 0.671 / 0.683 UI with M = 8 / 12 / 16. On the voltage grid the
+    only knob is the bin, and halving it must not move the eye."""
+    from conftest import REPO
+    from d2d_link.channel import link_response
+    from d2d_link.clock.forwarded import ForwardedClock
+    from d2d_link.engine.lanes import aggressors_of, lane_map, physical_skews_ps
+
+    cfg = load_config(REPO / "configs" / "standard_32g_x5_coupled.yaml")
+    cfg = dataclasses.replace(cfg, sim=dataclasses.replace(cfg.sim, stat_phase_points=16))
+    resp, clock = link_response(cfg), ForwardedClock(cfg)
+    aggr = tuple((d, sk) for d, sk, _ in aggressors_of(cfg, lane_map(cfg), 2, physical_skews_ps(cfg)))
+    out = {}
+    for b in (1e-4, 5e-5):
+        c = dataclasses.replace(cfg, sim=dataclasses.replace(cfg.sim, stat_isi_bin_v=b))
+        out[b] = StatisticalEngine(c, resp, clock, aggr).run(2)
+    coarse, fine = out[1e-4], out[5e-5]
+    assert fine.extras["n_cursors"] > 300 and fine.extras["isi_bins"] > coarse.extras["isi_bins"]
+    assert abs(fine.eye_width_ui - coarse.eye_width_ui) < 0.002
+    assert abs(fine.eye_height_v - coarse.eye_height_v) < 1e-3
+    assert fine.eye_width_ui == pytest.approx(0.685, abs=0.01)      # 0.6849 on the 64-point grid; 0.671 with 12 cursors enumerated
+
+
+def test_tails_live_in_the_log_domain():
+    """1e-27 is 10.8 sigma; a lane's BER at its own eye centre is far below
+    1e-308 and used to underflow to exactly 0.0 for every lane."""
+    m = isi_model(np.array([0.2, 0.01]), 0, bin_v=1e-3)
+    lt = log10_tail(m, 0.003, -0.1)                 # 100 sigma away
+    assert np.isfinite(lt) and lt < -2000 and tail_probability(m, 0.003, -0.1) == 0.0
+    assert log10_tail(m, 0.003, np.array([0.0, 0.1])).shape == (2,)
+    cfg = LinkConfig(clocking=ClockingConfig(pll_profile=PROFILE, data_path_rj_s=200e-15, clock_path_rj_s=200e-15),
+                     sim=SimConfig(stat_phase_points=16))
+    r = run_statistical(cfg)
+    assert np.isfinite(r.log10_ber) and r.log10_ber < -300 and r.ber == 0.0
+    assert np.all(np.isfinite(r.bathtub_log10_ber)) and r.bathtub_log10_ber.max() == pytest.approx(np.log10(0.5), abs=0.01)
+    assert "10^" in r.summary()
+
+
+def test_eye_width_is_capped_at_one_ui():
+    """A 1 mm line without a driver pole rings at the band edge (Gibbs) and
+    the bathtub read 1.026 UI; a symbol's eye cannot be wider than the
+    symbol, so the width is clipped and the clipping is flagged."""
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=1.0), rx=RxConfig(noise_rms_v=3e-3), sim=SimConfig(stat_phase_points=32))
+    r = run_statistical(cfg)
+    assert r.eye_width_ui == 1.0 and r.extras["eye_width_clipped"] and r.extras["eye_width_raw_ui"] > 1.0
+    assert "(clipped)" in r.summary()
+    ok = run_statistical(dataclasses.replace(cfg, channel=ChannelConfig(length_mm=25.0)))
+    assert ok.eye_width_ui < 1.0 and not ok.extras["eye_width_clipped"] and "(clipped)" not in ok.summary()
 
 
 def test_reaches_1e_minus_27_with_a_finite_eye():
@@ -126,7 +174,6 @@ def test_bathtub_window_follows_a_flat_topped_eye():
     assert r.eye_width_ui > 0.9 and r.bathtub_phase_ui[0] <= -1.0 + 1e-12
     assert r.bathtub_ber[-1] == pytest.approx(0.5)                    # one UI on: the neighbour's cursor
     # the milestone-1 link keeps its +-0.5 UI window and its numbers
-    from d2d_link.config import load_config
     from conftest import REPO
 
     r1 = run_statistical(load_config(REPO / "configs" / "standard_32g_x1.yaml"))

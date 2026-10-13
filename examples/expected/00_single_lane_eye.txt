@@ -11,11 +11,11 @@ jitter budget at the sampler (RMS, closed form):
   total residual                                            : 295.3 fs = 0.0095 UI
 
 statistical engine [~s]:
-  sampling phase -0.0198 UI from the pulse peak (eye centre), BER there 0.00e+00
+  sampling phase -0.0198 UI from the pulse's reference sample (eye centre), BER there 10^-436.0
   eye height at BER 1e-27: 209.8 mV  vs target 40 mV (source: survey) -> margin +169.8 mV
   eye width  at BER 1e-27: 0.772 UI  vs target 0.75 UI (source: survey) -> margin +0.022 UI
-  BER target 1e-27 (source: survey); 12 of 69 ISI cursors enumerated, the rest 0.66 mV RMS
+  BER target 1e-27 (source: survey); 69 ISI cursors, 12.42 mV RMS, exact distribution on 1315 bins of 50 uV
   verdict: PASS
 
-time engine [~s]: 0 errors in 400000 symbols (statistics predict 0.0e+00); sampled eye opening 260.1 mV; jitter the sampler saw 295.0 fs RMS
+time engine [~s]: 0 errors in 400000 symbols (statistics predict 10^-430.4); sampled eye opening 260.1 mV; jitter the sampler saw 295.0 fs RMS
 wrote examples/output/00_single_lane_eye.png

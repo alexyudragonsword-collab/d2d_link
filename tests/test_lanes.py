@@ -40,6 +40,10 @@ def test_skews_explicit_random_and_residual():
     assert physical_skews_ps(cfg).tolist() == [1.0, -2.0, 0.0]
     assert residual_skew_ui(cfg, 1.0) == pytest.approx(-0.5e-12 / cfg.ui)
     assert residual_skew_ui(dataclasses.replace(cfg, lanes=LaneConfig(count=3)), 7.0) == 0.0
+    # a per-lane tracker follows a static offset exactly: nothing is left but the PI step
+    tracked = dataclasses.replace(cfg, clocking=ClockingConfig(track_bw_hz=2e6, pi_step_ui=1 / 32))
+    assert residual_skew_ui(tracked, 1.0) == 0.0 and residual_skew_ui(cfg, 1.0, tracked=True) == 0.0
+    assert residual_skew_ui(tracked, 1.0, tracked=False) == pytest.approx(-0.5e-12 / cfg.ui)
     r = LinkConfig(lanes=LaneConfig(count=8, skew_sigma_ps=2.0, skew_seed=3))
     a, b = physical_skews_ps(r), physical_skews_ps(r)
     assert np.array_equal(a, b) and a.std() > 0.5
@@ -63,14 +67,30 @@ def test_residual_skew_moves_the_lane_off_centre():
     assert res.stat[1].eye_height_v < res.stat[0].eye_height_v
 
 
-@pytest.mark.xfail(strict=True, reason="phase 1 of the plan: worst lane is ranked by BER, which is 0.0 "
-                                       "for every lane at 1e-27, so lane 0 always wins")
 def test_worst_lane_is_the_one_with_the_smallest_margin():
+    """Every lane's BER at its own eye centre is below float resolution at a
+    1e-27 target; ranking by it picked lane 0 every time (phase-0 finding)."""
     sim = SimConfig(stat_phase_points=16)
     ck = ClockingConfig(pll_profile=PROFILE, data_path_rj_s=200e-15, clock_path_rj_s=200e-15)
     res = run_link(LinkConfig(lanes=LaneConfig(count=2, skew_ps=(0.0, 6.0), deskew_step_ps=20.0),
                               clocking=ck, sim=sim))
-    assert res.worst.lane == 1
+    assert res.worst.lane == 1 and res.worst.margin < res.stat[0].margin
+    assert res.stat[0].ber == 0.0 == res.stat[1].ber                 # the number that could not rank them
+    assert res.log10_ber_worst == max(r.log10_ber for r in res.stat) and res.ber_worst == 0.0
+    assert res.eye_height_min_v == res.stat[1].eye_height_v
+
+
+def test_tracked_lanes_keep_no_static_skew():
+    """With a per-lane tracker the deskew residual is DC to the loop and is
+    followed exactly; the two lanes are then identical but for the PI step,
+    which both carry (earlier versions counted the residual and the step)."""
+    sim = SimConfig(stat_phase_points=16)
+    ck = ClockingConfig(pll_profile=PROFILE, data_path_rj_s=200e-15, clock_path_rj_s=200e-15,
+                        track_bw_hz=2e6, pi_step_ui=1 / 64)
+    res = run_link(LinkConfig(lanes=LaneConfig(count=2, skew_ps=(0.0, 6.0), deskew_step_ps=20.0),
+                              clocking=ck, sim=sim))
+    assert res.stat[1].skew_residual_ui == 0.0 and res.stat[1].phase_ui == res.stat[0].phase_ui
+    assert res.stat[1].eye_height_v == res.stat[0].eye_height_v and res.stat[1].extras["quantisation_ui"] == 1 / 64
 
 
 def test_bundled_repair_configs():
