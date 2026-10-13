@@ -4,6 +4,27 @@
 
 ---
 
+## [0.10.0] — 2026-10-13 — 性能轮(数字会变的那次;变化全部 ≤ 3.5e-7 UI / 2.4e-8 V)
+
+### 变更
+- **眼边求根贴细网格**:先在抖动核的细网格上二分到一格(这些相位的 ISI 模型浴盆已经建过,只花尾的钱),再做一步离网格的 Illinois,
+  末了在几个 1e-3 UI 宽的括号里按 log 线性取边。x1 的边与 24 步求根同到 1e-7 UI;每 lane 省 ~1.8 s。无抖动(网格步 > base/4)时仍跑到 1e-5 UI 的完整 Illinois:一格里可能藏着几百个数量级的悬崖(段 3 的 1.026 UI 伪影)。
+- **`half_eye` 用 Illinois 代替 60 步二分**:在 g(h) = √(−log₁₀ tail) 上做安全的 regula falsi(高斯尾在 log 域对 h 是二次的,g 近似线性),
+  约 6 次求值到 0.1 µV;旧二分 60 次。
+- **亚 bin 光标合成一个 3 抽头核**再与分布卷一次(核可交换;x1 的 130 个光标约 45 % 走这条路,`_shift_add` 调用 59.9k → 33.3k)。
+- 用时:x1 每 lane 4.2 → 2.5 s;x5 耦合模块 80 → 40 s;x16 模块 64 s;示例 05 / 07 约 15 min → 231 / 313 s。
+- **`data/` 进包**:规范表、模型预设与随库的时钟剖面搬到 `src/d2d_link/data/`,`pyproject` 声明为 package data;配置里仍写 `data/clock_profiles/x.yaml`,
+  `resolve_data_file` 先找包内、再找仓库根、再找工作目录(`spec.SURVEY_FILE` / `PRESETS_FILE` 指向包内)。`pip install` 后不再依赖仓库路径(段 8 GUI 的前置)。
+  文档里的 `grep` 命令路径同步;新测试 `test_data_ships_inside_the_package`。
+- 指纹(`fp_p7` → `fp_perf`):872 / 3074 项变,全部由两处求根解释 —— eye_width ≤ 3.5e-7 UI、eye_height ≤ 2.4e-8 V、phase ≤ 1.6e-7 UI、
+  log10 BER ≤ 1e-4(对 −296);光标 / 主光标 / σ_ISI 的 1e-9 级变化是在新相位上读出来的;时域的 4 个 BER、样本与眼迹随相位变。
+  任何打印到 0.1 mV / 0.001 UI 的数字都不动;示例期望输出只变一行(示例 08 带状线的最差 lane 0 → 1:两 lane 裕度并列到 1e-7 UI)。
+
+### 没做(记入 ROADMAP / `cairn/engines.md`)
+- 尾按模型批量算(各模型网格不同,需按段 logsumexp;约 0.5 s/lane);攻击 lane 的 PRBS 播种**不改**:按物理编号是对的(见 engines.md)。
+
+---
+
 ## [0.9.0] — 2026-10-13 — 段 7:收端机制(默认值保持旧行为;现有配置指纹逐位相同)
 
 ### 新增

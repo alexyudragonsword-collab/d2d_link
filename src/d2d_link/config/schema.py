@@ -8,7 +8,7 @@ value fails here with its name, not deep inside an engine as a NaN.
 
 Numbers that come from the UCIe specification are *not* hard-coded here: the
 ``TargetConfig`` fields default to ``None``, which means "the value in
-``data/spec/ucie_survey.yaml`` for this package and rate" (invariant #5: every
+``src/d2d_link/data/spec/ucie_survey.yaml`` for this package and rate" (invariant #5: every
 such number carries its ``source``). Setting a field overrides it.
 """
 
@@ -42,7 +42,7 @@ def _finite_pos(value: float, name: str) -> None:
 # package / channel
 # ---------------------------------------------------------------------------
 
-#: Per-package *model* presets (``data/spec/model_presets.yaml``, every entry
+#: Per-package *model* presets (``src/d2d_link/data/spec/model_presets.yaml``, every entry
 #: ``source: model``): the analytic line's loss parameters and characteristic
 #: impedance, the routing stack-up, and the behavioural crosstalk level, used
 #: where ``ChannelConfig`` leaves a parameter ``None``. The line's L and C are

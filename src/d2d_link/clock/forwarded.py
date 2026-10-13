@@ -69,15 +69,24 @@ from .profile import ClockProfile
 TWOPI = 2.0 * np.pi
 
 
+PACKAGE_DIR = Path(__file__).resolve().parents[1]      # src/d2d_link -- the bundled data lives in data/ below it
+
+
 def resolve_data_file(path: str, repo_root: Path | None = None) -> Path:
-    """A repo-relative data path (``data/clock_profiles/x.yaml``) made absolute
-    against the checkout; an absolute path is returned as it is."""
+    """A data path as a config writes it (``data/clock_profiles/x.yaml``)
+    made absolute: an absolute path as it is; otherwise the bundled copy
+    inside the installed package (``d2d_link/data/...``, package data since
+    the performance round, so a ``pip install`` works away from the
+    checkout), then the checkout root (``repo_root``, default the one this
+    file sits in), then the working directory."""
     p = Path(path)
     if p.is_absolute():
         return p
-    root = repo_root or Path(__file__).resolve().parents[3]
-    cand = root / p
-    return cand if cand.exists() else p
+    root = repo_root or PACKAGE_DIR.parents[1]
+    for cand in (PACKAGE_DIR / p, root / p, Path.cwd() / p):
+        if cand.exists():
+            return cand
+    return p
 
 
 @dataclass(frozen=True)

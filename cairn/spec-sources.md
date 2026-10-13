@@ -13,7 +13,7 @@ authoring_mode: ai_generated
 
 ## 当前结论
 
-- 全部 15 条都是 `source: survey`,见 `data/spec/ucie_survey.yaml`;没有一条读过规范原文。`grep -c "source: survey" data/spec/ucie_survey.yaml` = 15
+- 全部 15 条都是 `source: survey`,见 `src/d2d_link/data/spec/ucie_survey.yaml`;没有一条读过规范原文。`grep -c "source: survey" src/d2d_link/data/spec/ucie_survey.yaml` = 15
   (文件头注释不再含该字串,测试断言这条命令的计数)。
 - 综述来源是公开材料的记忆与转述(Das Sharma 2022 的 UCIe 综述、Consortium 白皮书、Hot Chips 34 概览),**数值本身未经核对**,
   每条 note 都写了"未核实"。最不可靠的三条:收端眼高 40 mV、眼宽 0.75 UI(眼罩表的速率档与封装归属不明)、1e-15 的 retry 口径。
@@ -31,7 +31,7 @@ authoring_mode: ai_generated
 - 规范数字不进代码:`TargetConfig` 字段默认 None,运行时按 package 解析成 `(value, source)`,结果行打印 `source: xxx`。
   配置里显式写的值标 `source: config`,是配置自己的主张。
 - `PACKAGE_RLGC` 是模型参数,不是规范数字,不进这张表;reach / pitch / 模块宽度进表。
-- 段 2 起模型参数有自己的表 `data/spec/model_presets.yaml`(18 条,全部 `source: model`,带 cite 与 note):R_dc、R_skin、tanδ、G、Z0、
+- 段 2 起模型参数有自己的表 `src/d2d_link/data/spec/model_presets.yaml`(18 条,全部 `source: model`,带 cite 与 note):R_dc、R_skin、tanδ、G、Z0、
   w、h、ε_r、行为级 FEXT 电平,两种封装各一套。L、C 由 Z0 与 Hammerstad ε_eff(w, h, ε_r)推出 —— 之前 `PACKAGE_RLGC` 自带的 L、C 隐含
   ε_eff 3.94 / 5.75,与叠层的 ε_r 3.5 / 3.3 矛盾(体检 #3)。`grep -c "source: model"` = 18;`tests/test_spec_sources.py` 守着两张表互不混放。
 - 敏感性:`tools/budget_report.py --sensitivity` 对每条估计 ±20%(眼罩目标 ±10 mV / ±0.05 UI)重跑,表里标出翻转结论的参数。

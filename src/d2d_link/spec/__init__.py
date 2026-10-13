@@ -1,7 +1,7 @@
 """Specification numbers with their provenance (invariant #5).
 
 Every number the UCIe specification owns -- rates, BER target, bump pitch,
-reach, module width, eye mask -- lives in ``data/spec/ucie_survey.yaml``, one
+reach, module width, eye mask -- lives in ``src/d2d_link/data/spec/ucie_survey.yaml``, one
 entry each, with ``source: survey`` (from public summaries; unverified) or
 ``source: spec`` (from the specification text, with a quote). Code takes
 them through :func:`survey` by key and carries the source along; nothing
@@ -11,7 +11,7 @@ unverified number at once.
 The numbers the specification does *not* own but a simulation still needs --
 the package trace's resistance and loss tangent, the stack-up geometry, the
 behavioural crosstalk level -- are model estimates and live in
-``data/spec/model_presets.yaml`` with ``source: model``, read through
+``src/d2d_link/data/spec/model_presets.yaml`` with ``source: model``, read through
 :func:`preset`. ``grep "source: model"`` lists every estimate; the budget
 report's ``--sensitivity`` perturbs each one to show which estimates decide a
 verdict.
@@ -24,9 +24,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-REPO = Path(__file__).resolve().parents[3]
-SURVEY_FILE = REPO / "data" / "spec" / "ucie_survey.yaml"
-PRESETS_FILE = REPO / "data" / "spec" / "model_presets.yaml"
+# the tables ship inside the package (src/d2d_link/data/spec, package data):
+# an installed d2d_link finds them without the checkout
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+SURVEY_FILE = DATA_DIR / "spec" / "ucie_survey.yaml"
+PRESETS_FILE = DATA_DIR / "spec" / "model_presets.yaml"
 SOURCES = ("survey", "spec", "model")
 
 
@@ -97,7 +99,7 @@ def _presets() -> dict[str, SpecNumber]:
 
 
 def preset(key: str, package: str) -> SpecNumber:
-    """The model estimate ``<package>.<key>`` (``data/spec/model_presets.yaml``)."""
+    """The model estimate ``<package>.<key>`` (``src/d2d_link/data/spec/model_presets.yaml``)."""
     table = _presets()
     full = f"{package}.{key}"
     if full not in table:

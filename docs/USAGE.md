@@ -54,8 +54,8 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 ## 规范数字(铁律 5)
 
 ```bash
-grep "source: survey" data/spec/ucie_survey.yaml     # 所有未核实的规范数字
-grep "source: model"  data/spec/model_presets.yaml   # 所有模型估计数(走线损耗、叠层、行为级串扰)
+grep "source: survey" src/d2d_link/data/spec/ucie_survey.yaml     # 所有未核实的规范数字
+grep "source: model"  src/d2d_link/data/spec/model_presets.yaml   # 所有模型估计数(走线损耗、叠层、行为级串扰)
 python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity   # 哪些估计 ±20% 会翻转结论
 ```
 

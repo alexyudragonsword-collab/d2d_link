@@ -115,3 +115,21 @@ def test_bundled_configs_stay_inside_the_survey_envelope():
         assert cfg.channel.length_mm <= spec.survey("reach_mm", kind).value + 1e-9, p.name
         assert cfg.lanes.count <= spec.survey("module_width_lanes", kind).value, p.name
         assert cfg.data_rate_gtps in [float(r) for r in spec.survey("data_rates_gtps").value], p.name
+
+
+def test_data_ships_inside_the_package(tmp_path, monkeypatch):
+    """The tables and the bundled clock profiles are package data
+    (``src/d2d_link/data``): an installed d2d_link finds them away from the
+    checkout, and a config's ``data/clock_profiles/x.yaml`` still resolves."""
+    from d2d_link.clock.forwarded import PACKAGE_DIR, resolve_data_file
+
+    assert spec.SURVEY_FILE.is_file() and spec.PRESETS_FILE.is_file()
+    assert spec.SURVEY_FILE.is_relative_to(PACKAGE_DIR / "data")
+    monkeypatch.chdir(tmp_path)                       # no data/ in the working directory
+    p = resolve_data_file("data/clock_profiles/bench_markulic16_sspll_40m_10p24g.yaml")
+    assert p.is_file() and p.is_relative_to(PACKAGE_DIR)
+    assert resolve_data_file(str(tmp_path / "x.yaml")) == tmp_path / "x.yaml"
+    import tomllib
+
+    pyproject = tomllib.loads((PACKAGE_DIR.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
+    assert "data/clock_profiles/*.yaml" in pyproject["tool"]["setuptools"]["package-data"]["d2d_link"]

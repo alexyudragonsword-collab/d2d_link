@@ -21,7 +21,7 @@ python tools/run_examples.py --smoke
 | 可能改示例输出的改动 | 全尺寸 `python tools/run_examples.py --jobs 2 --save new/`,`python tools/example_drift.py compare new/`,改文档后 `accept new/` |
 | `src/d2d_link/vendor/` | 不要原地改;从上游重新拷贝并更新 header 的完整 SHA,跑 `tools/vendor_check.py --strict --fail-on-skip --siblings ...` |
 | 新配置字段 | schema 加字段 + `__post_init__` 校验 + `config/form.py::SECTIONS` 加一行(测试要求双向一致) |
-| 规范数字 | 只改 `data/spec/ucie_survey.yaml`;没有原文就 `source: survey` + 出处 + "未核实" |
+| 规范数字 | 只改 `src/d2d_link/data/spec/ucie_survey.yaml`;没有原文就 `source: survey` + 出处 + "未核实" |
 
 ## 约定
 

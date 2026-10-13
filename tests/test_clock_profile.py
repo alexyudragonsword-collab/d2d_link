@@ -3,12 +3,13 @@
 import numpy as np
 import pytest
 
-from conftest import PROFILE, REPO
+from conftest import PROFILE
+from d2d_link.clock.forwarded import resolve_data_file
 from d2d_link.clock.profile import ClockProfile
 
 
 def test_load_shipped_profile():
-    p = ClockProfile.load(REPO / PROFILE)
+    p = ClockProfile.load(resolve_data_file(PROFILE))
     assert p.f0_hz == pytest.approx(10.24e9, rel=1e-3)
     assert p.f_hz[0] == pytest.approx(100.0) and p.f_hz[-1] == pytest.approx(p.f0_hz / 2, rel=1e-6)
     assert "pllsim" in p.source
@@ -30,7 +31,7 @@ def test_rms_jitter_matches_flat_integral():
 
 
 def test_shift_and_scale():
-    p = ClockProfile.load(REPO / PROFILE)
+    p = ClockProfile.load(resolve_data_file(PROFILE))
     assert p.shifted(20.0).rms_jitter_s(1e3, 1e9) == pytest.approx(10 * p.rms_jitter_s(1e3, 1e9), rel=1e-9)
     assert p.scaled_to_rms(200e-15, 1e3).rms_jitter_s(1e3) == pytest.approx(200e-15, rel=1e-9)
     assert p.shifted(0.0) is p
@@ -49,6 +50,6 @@ def test_invalid_profiles_raise(tmp_path):
 
 
 def test_save_roundtrip(tmp_path):
-    p = ClockProfile.load(REPO / PROFILE)
+    p = ClockProfile.load(resolve_data_file(PROFILE))
     q = ClockProfile.load(p.save(tmp_path / "copy.yaml"))
     assert np.allclose(q.l_dbc_hz, p.l_dbc_hz) and q.spurs == p.spurs

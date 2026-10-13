@@ -78,11 +78,11 @@ Markulic 2016 SSPLL 剖面(带内 186 fs),数据 / 时钟路径各 200 fs 白抖
 
 ## 规范数字
 
-本库拿不到 UCIe 规范原文。速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 15 条,全部在 `data/spec/ucie_survey.yaml`,
+本库拿不到 UCIe 规范原文。速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 15 条,全部在 `src/d2d_link/data/spec/ucie_survey.yaml`,
 每条 `source: survey` 并注明综述出处与"未核实";引擎只按 key 取,结果行打印 `source: xxx`。
 
 ```bash
-grep "source: survey" data/spec/ucie_survey.yaml
+grep "source: survey" src/d2d_link/data/spec/ucie_survey.yaml
 ```
 
 ## 布局
@@ -93,7 +93,7 @@ grep "source: survey" data/spec/ucie_survey.yaml
 | `src/d2d_link/clock/` | 剖面读取、**前向时钟模型**(发端 PLL、本地 PLL、树、跟踪器;闭式预算 + 逐符号合成) |
 | `src/d2d_link/channel/` | 解析 RLGC 走线 / Touchstone → 脉冲响应;FEXT / NEXT 串扰脉冲;收端前端与噪声整形(段 7) |
 | `src/d2d_link/engine/` | 统计引擎(主)、时域引擎(校核)、lane 映射与修复、链路判定 |
-| `src/d2d_link/spec/` | 规范数字表的读取 |
+| `src/d2d_link/spec/`、`src/d2d_link/data/` | 规范数字表的读取;规范表、模型预设与随库的时钟剖面(package data,配置里仍写 `data/...`) |
 | `src/d2d_link/vendor/` | Halo_Serdes 的 S 参数读法 / RLGC / 响应转换,pll_simulator 的相噪合成与积分;完整 SHA 钉住,`tools/vendor_check.py` 守 |
 | `tools/` | `fingerprint.py`、`example_drift.py`、`run_examples.py`、`vendor_check.py`、`budget_report.py` |
 | `cairn/` | 项目知识:铁律论证、前向时钟、双引擎、串扰、收端、规范来源、坑;`LOG.md` 每轮数字与被推翻的判断 |

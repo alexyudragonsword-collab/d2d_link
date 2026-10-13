@@ -147,10 +147,22 @@ def isi_model(cursors: np.ndarray, i_main: int, bin_v: float, extra: np.ndarray 
     if extra is not None and np.asarray(extra).size:
         c = np.concatenate([c, np.asarray(extra, dtype=np.float64)])
     c = c[np.argsort(-np.abs(c), kind="stable")]
+    shifts = np.abs(c) / bin_v
+    big = shifts >= 1.0
     p = np.ones(1)
-    for ck in c:
-        if ck != 0.0:
-            p = _shift_add(p, ck / bin_v)
+    for sk in shifts[big]:
+        p = _shift_add(p, sk)
+    small = shifts[(~big) & (shifts > 0.0)]
+    if small.size:
+        # a cursor below one bin is the 3-tap kernel [f/2, 1-f, f/2] (the two
+        # half-weight copies share the centre bin, the fractions go one bin
+        # out); the kernels commute, so the whole tail of small cursors is
+        # one kernel, built once from tiny arrays, and one convolution --
+        # 90 of the 130 cursors of a 25 mm line go this way (perf round)
+        kern = np.ones(1)
+        for f in small:
+            kern = np.convolve(kern, np.array([0.5 * f, 1.0 - f, 0.5 * f]))
+        p = np.convolve(p, kern)
     half = (p.size - 1) // 2
     grid = (np.arange(p.size) - half) * bin_v
     return IsiModel(float(cursors[i_main]), grid, p, float(bin_v), int(c.size), float(math.sqrt(np.sum(c ** 2))))
@@ -396,15 +408,51 @@ class StatisticalEngine:
             return self._log10_mix([log10_tail(self.model_at(ph), self.sigma_n, v) for ph, _ in phases], weights)
 
         lo, hi = 0.0, abs(self.model_at(phase_ui).main) * 1.5 + 10 * self.sigma_n
-        if log_tail(lo) > lt:
+        f_lo = log_tail(lo)
+        if f_lo > lt:
             return 0.0
-        for _ in range(60):
-            mid = 0.5 * (lo + hi)
-            if log_tail(mid) > lt:
-                hi = mid
+        return self._solve_half_eye(log_tail, lo, hi, f_lo, lt)
+
+    @staticmethod
+    def _solve_half_eye(log_tail, lo: float, hi: float, f_lo: float, lt: float, tol_v: float = 1e-7,
+                        max_steps: int = 40) -> float:
+        """The h in [lo, hi] with log_tail(h) = lt, log_tail increasing from
+        f_lo <= lt at lo to ~0 at hi. A Gaussian tail is quadratic in h in
+        log, so g(h) = sqrt(-log_tail(h)) is close to linear and a
+        safeguarded regula falsi (Illinois) on g reaches 0.1 uV in ~6
+        evaluations where the phase 1-6 bisection spent 60 (and stopped at
+        an arbitrary 2^-60 of the range). Each evaluation is one tail per
+        jitter node; ISI leaves g slightly curved, which the safeguard
+        absorbs. 0.1 uV is far inside the ISI bin (50 uV) and the eye
+        height's print precision (0.1 mV)."""
+        def g(v: float) -> float:
+            return math.sqrt(max(-v, 0.0))
+
+        target = g(lt)
+        a, b = lo, hi
+        ga = g(f_lo) - target                 # > 0 (deeper than the target) at the inside
+        gb = g(log_tail(hi)) - target         # <= 0 at the outside
+        if gb > 0.0:
+            return hi
+        side = 0
+        for _ in range(max_steps):
+            if b - a <= tol_v:
+                break
+            c = (a * gb - b * ga) / (gb - ga)
+            if not (a < c < b):
+                c = 0.5 * (a + b)
+            gc = g(log_tail(c)) - target
+            if gc > 0.0:
+                a, ga = c, gc
+                if side == -1:
+                    gb *= 0.5
+                side = -1
             else:
-                lo = mid
-        return lo
+                b, gb = c, gc
+                if side == +1:
+                    ga *= 0.5
+                side = +1
+        return a
 
     def bathtub(self, lo: float = -0.5, hi: float = 0.5) -> tuple[np.ndarray, np.ndarray]:
         """``(phases, log10 BER)`` on ``sim.stat_phase_points`` phases per UI."""
@@ -435,25 +483,60 @@ class StatisticalEngine:
             phases, ber = self.bathtub(lo, hi)
         return phases, ber
 
+    @property
+    def fine_step_ui(self) -> float:
+        """The jitter quadrature's grid step: every phase the bathtub's nodes
+        land on is a multiple of it, so an evaluation at such a phase finds
+        all its ISI models in the cache."""
+        return float(self.nodes[1] - self.nodes[0]) if self.nodes.size > 1 else 1.0 / self.cfg.sim.stat_phase_points
+
     def eye_edge(self, inside: float, outside: float, target: float, tol_ui: float = 1e-5,
-                 max_steps: int = 24) -> float:
+                 max_steps: int = 24, refine_steps: int = 1) -> float:
         """The phase between ``inside`` (BER <= target) and ``outside`` (BER >
-        target) where the BER crosses ``target``, found on the real bathtub
-        by a safeguarded regula falsi (Illinois) in log BER, which the curve
-        is close to linear in near its edge. Interpolating between two grid
-        points instead put the edge at the mercy of the outer point, which
-        can sit a hundred decades down where the number is set by the jitter
-        kernel's outermost nodes: the eye width then moved with the grid and
-        the kernel's reach (2e-3 UI on a 16-point grid). Each evaluation
-        builds the ISI models of ~100 jitter nodes, so the count matters."""
+        target) where the BER crosses ``target``, found on the real bathtub.
+        Interpolating between two bathtub grid points put the edge at the
+        mercy of the outer point, which can sit a hundred decades down where
+        the number is set by the jitter kernel's outermost nodes: the eye
+        width then moved with the grid and the kernel's reach (2e-3 UI on a
+        16-point grid; phase 3).
+
+        Two stages. First the bracket is closed to one step of the jitter
+        quadrature's fine grid by bisection *on that grid*: those phases'
+        ISI models are the ones the bathtub already built, so each
+        evaluation costs tails only. Then ``refine_steps`` safeguarded
+        regula-falsi (Illinois) steps in log BER off the grid, each building
+        the ~50 models of its jitter nodes (~0.15 s; phase 3 spent ~10 such
+        evaluations per lane, 1.8 s), and the edge is the log-linear
+        interpolation inside the final bracket, which is a few 1e-3 UI wide
+        with the curve close to linear in log BER across it: one refinement
+        reproduces the phase 3 edge to ~1e-6 UI, none to ~1e-4."""
         lt = math.log10(target)
         a, b = inside, outside
         fa = self.log10_error_probability(a) - lt
         fb = self.log10_error_probability(b) - lt
         if fa > 0.0 or fb <= 0.0:
             return 0.5 * (a + b)
-        side = 0
+        h = self.fine_step_ui
+        # bisection on the fine grid: the bracket is k steps wide, split at a grid phase
         for _ in range(max_steps):
+            k = int(round(abs(b - a) / h))
+            if k <= 1:
+                break
+            c = a + math.copysign((k // 2) * h, b - a)
+            fc = self.log10_error_probability(c) - lt
+            if fc <= 0.0:
+                a, fa = c, fc
+            else:
+                b, fb = c, fc
+        # a fine grid (jitter nodes at least four to a bathtub step) leaves a
+        # bracket the curve is near-linear in log across: refine_steps is
+        # enough. Without jitter the grid is the bathtub's own and a cliff of
+        # hundreds of decades can sit inside one cell (a flat-topped pulse's
+        # eye edge: 1.026 UI by interpolation against 0.994 by root finding):
+        # then the regula falsi runs to tol_ui as in phase 3
+        steps = refine_steps if h <= 0.25 / self.cfg.sim.stat_phase_points else max_steps
+        side = 0
+        for _ in range(steps):
             if abs(b - a) <= tol_ui:
                 break
             c = (a * fb - b * fa) / (fb - fa)

@@ -13,7 +13,7 @@ on:
       - "src/**"
       - "examples/**"
       - "configs/**"
-      - "data/**"
+      - "src/d2d_link/data/**"
       - "pyproject.toml"
       - "tools/**"
       - ".github/workflows/examples-full.yml"
@@ -23,7 +23,7 @@ on:
       - "src/**"
       - "examples/**"
       - "configs/**"
-      - "data/**"
+      - "src/d2d_link/data/**"
       - "pyproject.toml"
       - "tools/**"
   schedule:

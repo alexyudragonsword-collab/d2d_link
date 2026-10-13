@@ -1,7 +1,7 @@
 # Milestone 1 baseline: standard package, 32 GT/s, one lane, forwarded DDR clock.
 # Every number the examples and tests use for this link comes from here
 # (invariant #1). Targets are left unset: they resolve to the survey table in
-# data/spec/ucie_survey.yaml and print with their source.
+# src/d2d_link/data/spec/ucie_survey.yaml and print with their source.
 data_rate_gtps: 32.0
 package:
   kind: standard

@@ -1,7 +1,7 @@
 x5 module, standard package, 25 mm, 32 GT/s, coupled-line crosstalk estimate
    routing  eps_eff  FEXT adj [dB]  delay [ps]  mid eye [mV]  mid eye [UI] worst lane  verdict
 microstrip     2.54          -18.6       132.8         143.1         0.691          1     FAIL
- stripline     3.50 none (1st order)       156.0         211.8         0.761          0     PASS
+ stripline     3.50 none (1st order)       156.0         211.8         0.761          1     PASS
   the 32 GT/s verdict on the standard package is a routing assumption: a stripline of the same geometry passes
 
 near-end crosstalk from the return module on edge lanes [0, 4]: K_b = kappa/4 = -36.0 dB, two lobes 266 ps = 8.5 UI apart, peak 3.3 mV of 164.6 mV main
