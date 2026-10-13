@@ -108,19 +108,27 @@ def test_tails_live_in_the_log_domain():
 
 
 def test_eye_width_is_capped_at_one_ui():
-    """A 2 mm line with ideal (brick-wall) driver edges rings at the band edge
-    (Gibbs) and the bathtub reads 1.026 UI; a symbol's eye cannot be wider
-    than the symbol, so the width is clipped and the clipping is flagged.
-    (The default driver pole at twice Nyquist damps the ringing.)"""
+    """A symbol's eye cannot be wider than the symbol: an opening wider than
+    1 UI is clipped and flagged. The short unfiltered lines that read 1.008 to
+    1.026 UI in the health check turn out to have been the log interpolation
+    across the cliff beside the eye (0.994 UI with the edges found on the
+    real bathtub, phase 3), so the cap is exercised on a forced opening."""
     import math
     from d2d_link.config import TxConfig
 
     cfg = LinkConfig(channel=ChannelConfig(length_mm=2.0), rx=RxConfig(noise_rms_v=3e-3), tx=TxConfig(bw_hz=math.inf),
                      sim=SimConfig(stat_phase_points=32))
     r = run_statistical(cfg)
-    assert r.eye_width_ui == 1.0 and r.extras["eye_width_clipped"] and r.extras["eye_width_raw_ui"] > 1.0
-    assert not run_statistical(dataclasses.replace(cfg, tx=TxConfig())).extras["eye_width_clipped"]   # the default pole damps it
-    assert "(clipped)" in r.summary()
+    assert 0.98 < r.eye_width_ui < 1.0 and not r.extras["eye_width_clipped"]
+
+    class Wide(StatisticalEngine):
+        @staticmethod
+        def eye_region(phases, log10_ber, target, refine=None):
+            return (-0.62, 0.61)
+
+    w = Wide(cfg).run()
+    assert w.eye_width_ui == 1.0 and w.extras["eye_width_clipped"] and w.extras["eye_width_raw_ui"] == pytest.approx(1.23)
+    assert "(clipped)" in w.summary() and w.phase_ui == pytest.approx(-0.005)
     ok = run_statistical(dataclasses.replace(cfg, channel=ChannelConfig(length_mm=25.0)))
     assert ok.eye_width_ui < 1.0 and not ok.extras["eye_width_clipped"] and "(clipped)" not in ok.summary()
 
@@ -196,4 +204,23 @@ def test_bathtub_window_follows_the_eye_wherever_the_reference_sits():
     # the milestone-1 link keeps its +-0.5 UI window and its numbers
     r1 = run_statistical(load_config(REPO / "configs" / "standard_32g_x1.yaml"))
     assert r1.bathtub_phase_ui[0] == -0.5 and r1.bathtub_phase_ui[-1] == 0.5 and r1.bathtub_ber.size == 65
-    assert r1.eye_width_ui == pytest.approx(0.775, abs=0.001)
+    assert r1.eye_width_ui == pytest.approx(0.7741, abs=0.0005)
+
+
+def test_eye_width_does_not_depend_on_the_phase_grid():
+    """The eye's edges are found on the real bathtub (regula falsi), not
+    interpolated between grid points: 16 and 128 phases per UI must agree.
+    Log interpolation across the cliff beside the eye moved the width by
+    2e-3 UI on a 16-point grid with the jitter kernel's reach (phase 3)."""
+    from conftest import REPO
+
+    cfg = load_config(REPO / "configs" / "standard_32g_x1.yaml")
+    ew = {}
+    for pts in (16, 128):
+        r = run_statistical(dataclasses.replace(cfg, sim=dataclasses.replace(cfg.sim, stat_phase_points=pts)))
+        ew[pts] = (r.eye_width_ui, r.phase_ui, r.eye_height_v)
+    assert ew[16][0] == pytest.approx(ew[128][0], abs=2e-4)
+    assert ew[16][1] == pytest.approx(ew[128][1], abs=2e-4) and ew[16][2] == pytest.approx(ew[128][2], rel=1e-3)
+    eng = StatisticalEngine(cfg)
+    edge = eng.eye_edge(0.0, 0.5, 1e-27)
+    assert eng.log10_error_probability(edge - 1e-4) <= -27.0 <= eng.log10_error_probability(edge + 1e-4)

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 import typing
+import warnings
 from pathlib import Path
 from typing import Any, Union
 
@@ -44,12 +45,25 @@ def _coerce(tp: Any, value: Any, path: str) -> Any:
     return value
 
 
+#: keys an older config file may still use -> their current name (a
+#: DeprecationWarning is raised, the value is kept)
+RENAMED_KEYS: dict[tuple[str, str], str] = {("ClockingConfig", "local_pll_bw_hz"): "local_pll_fn_hz"}
+
+
 def _build(cls: type, data: dict[str, Any], path: str) -> Any:
     if not isinstance(data, dict):
         raise TypeError(f"{path}: expected mapping, got {type(data).__name__}")
     hints = typing.get_type_hints(cls)
     fields = {f.name: f for f in dataclasses.fields(cls)}
     kwargs: dict[str, Any] = {}
+    data = dict(data)
+    for (owner, old), new in RENAMED_KEYS.items():
+        if cls.__name__ == owner and old in data:
+            if new in data:
+                raise KeyError(f"{path}: both {old!r} and its new name {new!r} are set")
+            warnings.warn(f"{path}.{old} was renamed {new} (it is the loop's natural frequency, not its "
+                          f"-3 dB bandwidth); update the config", DeprecationWarning, stacklevel=4)
+            data[new] = data.pop(old)
     for key, value in data.items():
         if key not in fields:
             raise KeyError(f"{path}: unknown config key {key!r} (valid: {sorted(fields)})")

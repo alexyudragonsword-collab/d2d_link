@@ -23,7 +23,7 @@ clocking:
   clock_path_wander_s: 200.0e-15
   wander_corner_hz: 1.0e6
   local_pll_profile: data/clock_profiles/bench_wu19_spll_frac_52m_6p253g.yaml
-  local_pll_bw_hz: 1.0e6
+  local_pll_fn_hz: 1.0e6
   tree_delay_ps: 30.0
   tree_bw_hz: 20.0e9
   tree_rj_s: 100.0e-15

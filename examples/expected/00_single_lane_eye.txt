@@ -13,7 +13,7 @@ jitter budget at the sampler (RMS, closed form):
 statistical engine [~s]:
   sampling phase -0.0078 UI from the pulse's reference sample (eye centre), BER there 10^-455.9
   eye height at BER 1e-27: 215.6 mV  vs target 40 mV (source: survey) -> margin +175.6 mV
-  eye width  at BER 1e-27: 0.775 UI  vs target 0.75 UI (source: survey) -> margin +0.025 UI
+  eye width  at BER 1e-27: 0.774 UI  vs target 0.75 UI (source: survey) -> margin +0.024 UI
   BER target 1e-27 (source: survey); 68 ISI cursors, 11.83 mV RMS, exact distribution on 1241 bins of 50 uV
   verdict: PASS
 

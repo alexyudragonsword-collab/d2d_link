@@ -4,13 +4,13 @@ length [mm]  IL@Nyq [dB]  eye height [mV]  eye width [UI]      log10 BER  margin
          10        -1.12            287.6           0.792         -736.4           247.6   yes
          15        -1.68            263.0           0.787         -632.3           223.0   yes
          20        -2.24            238.9           0.782         -538.8           198.9   yes
-         25        -2.80            215.6           0.775         -455.9           175.6   yes
+         25        -2.80            215.6           0.774         -455.9           175.6   yes
          30        -3.36            193.1           0.765         -382.5           153.1   yes
          35        -3.92            171.4           0.753         -318.0           131.4   yes
-         40        -4.48            150.4           0.739         -261.7           110.4    no
+         40        -4.48            150.4           0.738         -261.7           110.4    no
          45        -5.04            130.2           0.720         -213.2            90.2    no
          50        -5.60            110.7           0.697         -171.6            70.7    no
-         55        -6.16             92.1           0.669         -136.3            52.1    no
+         55        -6.16             92.1           0.668         -136.3            52.1    no
          60        -6.72             74.3           0.632         -106.7            34.3    no
 
 model reach: 35 mm is the last length that clears eye height 40 mV (source: survey), eye width and BER 1e-27 (source: survey); survey reach 25 mm -> ratio 1.40x  (within 2x)

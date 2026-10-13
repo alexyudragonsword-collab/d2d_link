@@ -47,7 +47,7 @@ jobs:
           pip install -e ".[touchstone,plot,test]"
           pip list | grep -i -E "^(numpy|scipy) "
       - name: Run every example (full size)
-        run: python tools/run_examples.py --jobs 2 --timeout 1800 --save new
+        run: python tools/run_examples.py --jobs 2 --timeout 2400 --save new
       - name: Compare with examples/expected
         if: always()
         run: python tools/example_drift.py compare new

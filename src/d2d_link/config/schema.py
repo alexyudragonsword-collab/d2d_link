@@ -249,24 +249,39 @@ class ClockingConfig:
     track_bw_hz: Optional[float] = None   # per-lane phase tracker bandwidth; None = no tracker
     track_delay_ui: int = 0               # tracker loop latency [UI]; 0 = the zero-latency abstraction
     pi_step_ui: float = 0.0               # phase-interpolator step the tracker's output is quantised to [UI]
-    dcd_ui: float = 0.0                   # DDR duty-cycle error: odd/even sampling offset [UI]
+    dcd_ui: float = 0.0                   # receiver-side DDR duty-cycle error: odd/even sampling offset [UI]
+    tx_dcd_ui: float = 0.0                # Tx PLL duty-cycle error, common to data and forwarded clock [UI]:
+                                          # cancels at a receiver that samples on the forwarded clock's own
+                                          # edges, shows in full once a local PLL regenerates a 50 % clock
     # receiver local PLL, locked to the forwarded clock (never free-running):
     # output phase = H_loop * forwarded + (1 - H_loop) * own noise
     local_pll_profile: Optional[str] = None   # its phase-noise profile; None and local_pll_rj_s = 0 -> no local PLL
     local_pll_f0_hz: Optional[float] = None
     local_pll_shift_db: float = 0.0
     local_pll_rj_s: float = 0.0               # white part of the local PLL's own jitter [s RMS]
-    local_pll_bw_hz: Optional[float] = None   # loop natural frequency; required with a local PLL
+    local_pll_fn_hz: Optional[float] = None   # loop natural frequency f_n = omega_n / 2 pi; required with a
+                                              # local PLL (the -3 dB bandwidth is 2.48 f_n at zeta = 1;
+                                              # ForwardedClock.local_pll_bw_3db_hz reports it)
     local_pll_damping: float = 1.0            # type-II second-order loop damping zeta
     # low-frequency wander the two paths pick up separately (supply, thermal):
-    # first-order shaped noise of the given RMS with corner wander_corner_hz
+    # first-order shaped noise of the given RMS with corner wander_corner_hz,
+    # the RMS taken over [wander_floor_hz, edge rate / 2]; None -> the lowest
+    # frequency the synthesis block can represent, 1 / (sim.jitter_block UI)
     data_path_wander_s: float = 0.0
     clock_path_wander_s: float = 0.0
     wander_corner_hz: float = 1.0e6
+    wander_floor_hz: Optional[float] = None
 
     @property
     def has_local_pll(self) -> bool:
         return self.local_pll_profile is not None or self.local_pll_rj_s > 0.0
+
+    @property
+    def sampling_dcd_ui(self) -> float:
+        """The odd/even sampling offset the sampler sees: the receiver's own
+        duty-cycle error, plus the Tx PLL's once a local PLL has regenerated
+        the clock and so stopped the forwarded edges from carrying it along."""
+        return self.dcd_ui + (self.tx_dcd_ui if self.has_local_pll else 0.0)
 
     def __post_init__(self):
         _require_in(self.scheme, {"forwarded_ddr"}, "clocking.scheme")
@@ -280,16 +295,18 @@ class ClockingConfig:
         _finite_pos(self.local_pll_damping, "clocking.local_pll_damping")
         if self.local_pll_f0_hz is not None:
             _finite_pos(self.local_pll_f0_hz, "clocking.local_pll_f0_hz")
-        if self.local_pll_bw_hz is not None:
-            _finite_pos(self.local_pll_bw_hz, "clocking.local_pll_bw_hz")
+        if self.local_pll_fn_hz is not None:
+            _finite_pos(self.local_pll_fn_hz, "clocking.local_pll_fn_hz")
+        if self.wander_floor_hz is not None:
+            _finite_pos(self.wander_floor_hz, "clocking.wander_floor_hz")
         if self.has_local_pll:
-            _require(self.local_pll_bw_hz is not None,
-                     "clocking.local_pll_bw_hz is required with a local PLL: it is locked to the "
+            _require(self.local_pll_fn_hz is not None,
+                     "clocking.local_pll_fn_hz is required with a local PLL: it is locked to the "
                      "forwarded clock, never free-running (invariant #2)")
         _require(0.0 <= self.correlation <= 1.0,
                  f"clocking.correlation must be in [0, 1], got {self.correlation!r}")
         for name in ("pll_rj_s", "data_path_rj_s", "clock_path_rj_s", "tree_rj_s",
-                     "tree_delay_ps", "dcd_ui"):
+                     "tree_delay_ps", "dcd_ui", "tx_dcd_ui"):
             _finite_nonneg(getattr(self, name), f"clocking.{name}")
         _require(math.isfinite(self.pll_shift_db), "clocking.pll_shift_db must be finite")
         if self.pll_f0_hz is not None:

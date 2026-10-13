@@ -39,7 +39,7 @@ def _ratio(cfg, min_errors=25):
 
 def test_local_pll_jitter_dominated():
     cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0),
-                     clocking=ClockingConfig(pll_profile=PROFILE, local_pll_profile=LOCAL, local_pll_bw_hz=2e5,
+                     clocking=ClockingConfig(pll_profile=PROFILE, local_pll_profile=LOCAL, local_pll_fn_hz=2e5,
                                              local_pll_shift_db=30.0, pll_shift_db=30.0),
                      rx=RxConfig(noise_rms_v=0.02), sim=SIM)
     r, s, t = _ratio(cfg)

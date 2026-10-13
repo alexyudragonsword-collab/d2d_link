@@ -57,7 +57,7 @@ def point(name, c, n_symbols):
 results = []
 # 1. the local PLL: both profiles raised 24 dB so coloured clock noise makes the errors
 c = dataclasses.replace(one, clocking=dataclasses.replace(one.clocking, pll_shift_db=24.0, local_pll_shift_db=24.0,
-                                                          local_pll_bw_hz=2e5, track_bw_hz=None, pi_step_ui=0.0,
+                                                          local_pll_fn_hz=2e5, track_bw_hz=None, pi_step_ui=0.0,
                                                           data_path_wander_s=0.0, clock_path_wander_s=0.0))
 c = dataclasses.replace(c, rx=dataclasses.replace(c.rx, noise_rms_v=noise_for_ber(c, 1e-5)))
 results.append(point("local PLL, coloured clock noise", c, 4_000_000))

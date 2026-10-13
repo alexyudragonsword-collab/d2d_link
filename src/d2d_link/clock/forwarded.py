@@ -12,7 +12,7 @@ receiver's optional local PLL, its clock tree and a per-lane phase tracker::
     t_pll      = h_pll * t_in + (1 - h_pll) * l                           (local PLL locked to t_in)
     t_rx[k]    = (h_tree * t_pll)[k - tau] + n_t[k]                       (tree: delay + first-order lowpass)
     delta[k]   = t_data[k] - t_rx[k]
-    theta[k]   = theta[k-1] + alpha (delta[k - d] - theta[k-1])           (tracker: bandwidth f_track, latency d)
+    theta[k]   = theta[k-1] + alpha (delta[k - d] - theta[k-1-d])         (tracker: bandwidth f_track, latency d)
     eps[k]     = delta[k] - Q(theta[k])                                   (Q: phase-interpolator step)
 
 ``c`` is the PLL's timing jitter in seconds (profile or white), ``c'`` an
@@ -22,21 +22,35 @@ the two paths' PLL noise is not common -- separate PLLs would be rho = 0),
 the clock path and the receive tree, ``w_d``, ``w_k`` the paths' slow wander
 (first-order shaped), ``l`` the receiver's local PLL noise (profile or
 white). The local PLL is a type-II second-order loop of natural frequency
-``local_pll_bw_hz``: below it the forwarded phase passes and the local noise
-is suppressed, above it the reverse -- the classic clock-recovery trade-off,
-with the forwarded clock carrying the *same* noise as the data. With rho = 1,
-an ideal tree, no local PLL and no path noise the difference is identically
-zero: there is no shortcut that could make the forwarded clock "an
-independent clock" with the same RMS, and a local PLL is never free-running.
+``local_pll_fn_hz`` (its -3 dB bandwidth is 2.48x that at zeta = 1,
+:meth:`ForwardedClock.local_pll_bw_3db_hz`): below it the forwarded phase
+passes and the local noise is suppressed, above it the reverse -- the
+classic clock-recovery trade-off, with the forwarded clock carrying the
+*same* noise as the data. With rho = 1, an ideal tree, no local PLL and no
+path noise the difference is identically zero: there is no shortcut that
+could make the forwarded clock "an independent clock" with the same RMS,
+and a local PLL is never free-running.
 
 The tracker is the behavioural stand-in for a per-lane phase interpolator
 loop: first-order on the difference, zero-latency by default so that with
-``track_bw_hz`` -> infinity it removes everything; ``track_delay_ui`` adds
-the loop latency a real one has (at which point a very fast loop becomes a
-differentiator) and ``pi_step_ui`` quantises its output. Everything but the
-quantiser is linear, so the statistical engine gets the residual in closed
-form (:meth:`ForwardedClock.budget`) from the same transfer functions the
+``track_bw_hz`` -> infinity it removes everything; ``track_delay_ui`` is
+the loop latency a real one has, in the feedback path too (the loop
+corrects on the error it measured d UI ago), so a fast loop with latency
+peaks and then goes unstable -- the constructor rejects an unstable pair
+rather than synthesising a divergent tracker -- and ``pi_step_ui``
+quantises its output. Everything but the quantiser is linear, so the
+statistical engine gets the residual in closed form
+(:meth:`ForwardedClock.budget`) from the same transfer functions the
 synthesiser applies, on the same FFT grid.
+
+A profile's spurs are deterministic sinusoidal phase terms, not noise: a
+Tx PLL spur rides on data and forwarded clock alike and leaks through the
+same ``|E (1 - rho G)|`` as the continuous common noise; a local PLL spur
+leaks through ``|E H_tree (1 - H_pll)|``. The closed form carries them as
+amplitudes (``JitterBudget.spur_s`` is their RMS, ``spur_amplitudes_s``
+the list the statistical engine turns into arcsine-distributed sampling
+offsets); the synthesiser adds the sinusoids with a phase continuous across
+blocks.
 """
 
 from __future__ import annotations
@@ -79,12 +93,18 @@ class JitterBudget:
     tree_s: float             # n_t after the tracker
     f_lo_hz: float            # lowest offset in the band (1 / (block UI))
     f_hi_hz: float            # the edge-rate Nyquist
+    spur_s: float = 0.0       # the profiles' spurs after the same leaks (RMS of sinusoids: sum A^2/2)
 
     @property
-    def total_s(self) -> float:
+    def gaussian_s(self) -> float:
+        """The Gaussian part of the residual (everything but the spurs)."""
         return math.sqrt(self.common_leak_s ** 2 + self.local_pll_s ** 2 + self.data_path_s ** 2
                          + self.data_wander_s ** 2 + self.clock_path_s ** 2 + self.clock_wander_s ** 2
                          + self.tree_s ** 2)
+
+    @property
+    def total_s(self) -> float:
+        return math.sqrt(self.gaussian_s ** 2 + self.spur_s ** 2)
 
 
 class ForwardedClock:
@@ -107,6 +127,12 @@ class ForwardedClock:
         self.alpha = self.tracker_alpha(ck.track_bw_hz, self.ui)
         self.delay = int(ck.track_delay_ui)
         self.tau = ck.tree_delay_ps * 1e-12
+        margin = self.tracker_stability_margin(self.alpha, self.delay)
+        if margin <= 0.0:
+            raise ValueError(f"clocking: the tracker loop (track_bw_hz {ck.track_bw_hz!r}, alpha {self.alpha:.3g}, "
+                             f"track_delay_ui {self.delay}) is unstable: with the latency in its feedback path a "
+                             f"loop this fast diverges; lower track_bw_hz or track_delay_ui")
+        self.block_step_ratio: float = float("nan")   # set by synthesize(): boundary step / inner step RMS
 
     # ------------------------------------------------------------- pieces
     @staticmethod
@@ -119,6 +145,20 @@ class ForwardedClock:
         if math.isinf(track_bw_hz):
             return 1.0
         return 1.0 - math.exp(-TWOPI * track_bw_hz * ui)
+
+    @staticmethod
+    def tracker_stability_margin(alpha: float, delay: int) -> float:
+        """``1 - max |pole|`` of the tracker's closed loop
+        1 - z^-1 + alpha z^-(d+1): positive is stable. The zero-latency loop
+        has its single pole at 1 - alpha; with latency the characteristic
+        polynomial z^(d+1) - z^d + alpha pushes poles outward as alpha grows."""
+        if alpha <= 0.0:
+            return 1.0
+        if delay == 0:
+            return 1.0 - abs(1.0 - alpha) if alpha < 2.0 else -1.0
+        poly = np.zeros(delay + 2)
+        poly[0], poly[1], poly[-1] = 1.0, -1.0, alpha
+        return float(1.0 - np.max(np.abs(np.roots(poly))))
 
     def white_psd(self, sigma_s: float) -> float:
         """One-sided PSD [s^2/Hz] of a white per-edge sequence of RMS ``sigma_s``."""
@@ -140,19 +180,26 @@ class ForwardedClock:
         return self._profile_plus_white(self.local_profile, self.cfg.clocking.local_pll_rj_s,
                                         np.asarray(f, dtype=np.float64))
 
+    @property
+    def wander_floor_hz(self) -> float:
+        """The low edge of the band the wander RMS is defined over: the
+        config's ``wander_floor_hz``, else the lowest frequency the synthesis
+        block represents (fs / block, the same edge the closed form starts at)."""
+        floor = self.cfg.clocking.wander_floor_hz
+        return float(floor) if floor is not None else self.fs / self.cfg.sim.jitter_block
+
     def wander_psd(self, sigma_s: float, f: np.ndarray) -> np.ndarray:
-        """First-order shaped noise, S0 / (1 + (f/fc)^2), normalised to RMS
-        ``sigma_s`` over the block's grid (so synthesis and closed form agree
-        on the RMS whatever the corner)."""
+        """First-order shaped noise, S0 / (1 + (f/fc)^2), with S0 set so the
+        analytic integral over [wander_floor_hz, fs/2] is ``sigma_s``^2 --
+        a physical band, not the simulation grid (the grid sum differs from
+        the integral by about half a bin at each end)."""
         f = np.asarray(f, dtype=np.float64)
         if sigma_s <= 0.0:
             return np.zeros_like(f)
         fc = self.cfg.clocking.wander_corner_hz
-        shape = 1.0 / (1.0 + (f / fc) ** 2)
-        grid = self.fft_grid()
-        df = grid[1] - grid[0] if grid.size > 1 else self.fs / 2
-        s0 = sigma_s ** 2 / float(np.sum(1.0 / (1.0 + (grid / fc) ** 2)) * df)
-        return s0 * shape
+        band = fc * (math.atan(0.5 * self.fs / fc) - math.atan(self.wander_floor_hz / fc))
+        s0 = sigma_s ** 2 / band
+        return s0 / (1.0 + (f / fc) ** 2)
 
     def h_tree(self, f: np.ndarray) -> np.ndarray:
         """Clock tree: first-order lowpass (or flat) times the delay."""
@@ -169,10 +216,19 @@ class ForwardedClock:
         ck = self.cfg.clocking
         if not ck.has_local_pll:
             return np.ones_like(f, dtype=complex)
-        wn = TWOPI * ck.local_pll_bw_hz
+        wn = TWOPI * ck.local_pll_fn_hz
         z = ck.local_pll_damping
         s = 1j * TWOPI * f
         return (2.0 * z * wn * s + wn ** 2) / (s ** 2 + 2.0 * z * wn * s + wn ** 2)
+
+    def local_pll_bw_3db_hz(self) -> float | None:
+        """The local PLL's -3 dB bandwidth: f_n sqrt(1 + 2 zeta^2 + sqrt((1 + 2 zeta^2)^2 + 1))
+        for the type-II second-order loop (2.48 f_n at zeta = 1); None without one."""
+        ck = self.cfg.clocking
+        if not ck.has_local_pll:
+            return None
+        a = 1.0 + 2.0 * ck.local_pll_damping ** 2
+        return ck.local_pll_fn_hz * math.sqrt(a + math.sqrt(a * a + 1.0))
 
     def g_clock(self, f: np.ndarray) -> np.ndarray:
         """Forwarded-clock input to sampler clock: local PLL then tree."""
@@ -180,13 +236,55 @@ class ForwardedClock:
 
     def e_track(self, f: np.ndarray) -> np.ndarray:
         """1 - L(z) of the tracker at z = exp(j 2 pi f UI): what it leaves.
-        L(z) = alpha z^-d / (1 - (1 - alpha) z^-1) with the loop latency d."""
+        L(z) = alpha z^-d / (1 - z^-1 + alpha z^-(d+1)) for the loop
+        theta[k] = theta[k-1] + alpha (delta[k-d] - theta[k-1-d]); at d = 0
+        this is the first-order alpha / (1 - (1 - alpha) z^-1)."""
         a = self.alpha
         f = np.asarray(f, dtype=np.float64)
         if a == 0.0:
             return np.ones_like(f, dtype=complex)
         z_inv = np.exp(-1j * TWOPI * f * self.ui)
-        return 1.0 - a * z_inv ** self.delay / (1.0 - (1.0 - a) * z_inv)
+        if self.delay == 0:
+            return 1.0 - a / (1.0 - (1.0 - a) * z_inv)
+        return 1.0 - a * z_inv ** self.delay / (1.0 - z_inv + a * z_inv ** (self.delay + 1))
+
+    def _tracker_coefficients(self) -> tuple[np.ndarray, np.ndarray]:
+        """``(b, a)`` of L(z) for ``scipy.signal.lfilter``."""
+        al, d = self.alpha, self.delay
+        b = np.concatenate([np.zeros(d), [al]])
+        a = np.zeros(d + 2)
+        a[0], a[1] = 1.0, -1.0
+        a[d + 1] += al
+        return b, a[: max(2, d + 2)] if d > 0 else np.array([1.0, -(1.0 - al)])
+
+    # -------------------------------------------------------------- spurs
+    def spur_terms(self, f: np.ndarray | None = None) -> list[tuple[float, float]]:
+        """``(offset_hz, residual peak amplitude [s])`` of every deterministic
+        sinusoidal term at the sampler: each Tx PLL spur through
+        ``|E (1 - rho G)|`` (its common part) and, for rho < 1, a second
+        sinusoid through ``|E sqrt(1 - rho^2) G|`` (the clock path's own
+        copy, independent phase); each local PLL spur through
+        ``|E H_tree (1 - H_pll)|``."""
+        out: list[tuple[float, float]] = []
+        for prof, kind in ((self.profile, "tx"), (self.local_profile, "local")):
+            if prof is None or not prof.spurs:
+                continue
+            for fs_hz, amp_s in prof.spur_amplitudes_s():
+                fa = np.array([fs_hz])
+                e = abs(complex(self.e_track(fa)[0]))
+                if kind == "tx":
+                    g = complex(self.g_clock(fa)[0])
+                    out.append((fs_hz, amp_s * e * abs(1.0 - self.rho * g)))
+                    if self.rho < 1.0:
+                        out.append((fs_hz, amp_s * e * math.sqrt(1.0 - self.rho ** 2) * abs(g)))
+                else:
+                    h = complex((self.h_tree(fa) * (1.0 - self.h_pll(fa)))[0])
+                    out.append((fs_hz, amp_s * e * abs(h)))
+        return [(f0, a) for f0, a in out if a > 0.0]
+
+    def spur_amplitudes_s(self) -> list[float]:
+        """The residual spur amplitudes [s] (peak), for the arcsine kernels."""
+        return [a for _, a in self.spur_terms()]
 
     # -------------------------------------------------------- closed form
     def fft_grid(self, n: int | None = None) -> np.ndarray:
@@ -221,7 +319,8 @@ class ForwardedClock:
             clock_path_s=math.sqrt(eg_sum * self.white_psd(ck.clock_path_rj_s)),
             clock_wander_s=rms(g2 * self.wander_psd(ck.clock_path_wander_s, f)) if ck.clock_path_wander_s > 0.0 else 0.0,
             tree_s=math.sqrt(e_sum * self.white_psd(ck.tree_rj_s)),
-            f_lo_hz=float(f[0]), f_hi_hz=float(f[-1]))
+            f_lo_hz=float(f[0]), f_hi_hz=float(f[-1]),
+            spur_s=math.sqrt(sum(0.5 * a * a for _, a in self.spur_terms())))
 
     def residual_sigma_s(self) -> float:
         return self.budget().total_s
@@ -259,21 +358,34 @@ class ForwardedClock:
         block = self.cfg.sim.jitter_block
         out = np.empty((n_lanes, n_edges))
         a = self.alpha
-        b_coef = np.concatenate([np.zeros(self.delay), [a]])
-        a_coef = [1.0, -(1.0 - a)]
-        zi = np.zeros((n_lanes, max(len(b_coef), 2) - 1)) if a > 0.0 else None
+        b_coef, a_coef = self._tracker_coefficients()
+        zi = np.zeros((n_lanes, max(len(b_coef), len(a_coef)) - 1)) if a > 0.0 else None
         step_s = ck.pi_step_ui * self.ui
+        # the spurs' starting phases: drawn once per run (only when there are
+        # any, so a spur-free profile keeps its noise realisation bit for bit)
+        tx_spurs = self.profile.spur_amplitudes_s() if self.profile is not None else []
+        lo_spurs = self.local_profile.spur_amplitudes_s() if self.local_profile is not None else []
+        ph_c = rng.uniform(0.0, TWOPI, len(tx_spurs)) if tx_spurs else None
+        ph_c2 = rng.uniform(0.0, TWOPI, len(tx_spurs)) if tx_spurs and self.rho < 1.0 else None
+        ph_l = rng.uniform(0.0, TWOPI, len(lo_spurs)) if lo_spurs else None
         pos = 0
         while pos < n_edges:
             n = min(block, n_edges - pos)
             n_fft = block if n < block else n   # a short tail keeps the block's grid
-            c = self._pll_block(n_fft, rng)
-            clk = c if self.rho == 1.0 else self.rho * c + math.sqrt(1.0 - self.rho ** 2) * self._pll_block(n_fft, rng)
+            c = self._pll_block(n_fft, rng) + self._sinusoids(tx_spurs, ph_c, pos, n_fft)
+            if self.rho == 1.0:
+                clk = c
+            else:
+                clk = (self.rho * c + math.sqrt(1.0 - self.rho ** 2)
+                       * (self._pll_block(n_fft, rng) + self._sinusoids(tx_spurs, ph_c2, pos, n_fft)))
             if ck.clock_path_rj_s > 0.0:
                 clk = clk + rng.normal(0.0, ck.clock_path_rj_s, n_fft)
             if ck.clock_path_wander_s > 0.0:
                 clk = clk + self._wander_block(ck.clock_path_wander_s, n_fft, rng)
-            clk = self._through_clock_path(clk, self._local_block(n_fft, rng))
+            local = self._local_block(n_fft, rng)
+            if local is not None and lo_spurs:
+                local = local + self._sinusoids(lo_spurs, ph_l, pos, n_fft)
+            clk = self._through_clock_path(clk, local)
             if ck.tree_rj_s > 0.0:
                 clk = clk + rng.normal(0.0, ck.tree_rj_s, n_fft)
             for lane in range(n_lanes):
@@ -290,7 +402,29 @@ class ForwardedClock:
                     delta = delta - theta
                 out[lane, pos:pos + n] = delta
             pos += n
+        self.block_step_ratio = self._block_step_ratio(out[0], block)
         return out
+
+    @staticmethod
+    def _block_step_ratio(x: np.ndarray, block: int) -> float:
+        """RMS of the residual's step across block boundaries over the RMS of
+        its step inside blocks: ~1 means the block-wise synthesis leaves no
+        seam; NaN with a single block."""
+        if x.size <= block or x.size < 2:
+            return float("nan")
+        steps = np.diff(x)
+        inner = float(np.sqrt(np.mean(steps ** 2)))
+        at = np.arange(block, x.size, block) - 1
+        seam = float(np.sqrt(np.mean(steps[at] ** 2)))
+        return seam / inner if inner > 0.0 else float("nan")
+
+    def _sinusoids(self, spurs: list[tuple[float, float]], phases: np.ndarray | None, k0: int, n: int) -> np.ndarray:
+        """Sum of the spurs' sinusoids over edges k0 .. k0 + n - 1 (phase
+        continuous across blocks because k is the global edge index)."""
+        if not spurs or phases is None:
+            return np.zeros(n)
+        k = np.arange(k0, k0 + n, dtype=np.float64) * self.ui
+        return sum(a * np.cos(TWOPI * f0 * k + ph) for (f0, a), ph in zip(spurs, phases))
 
     def _pll_block(self, n: int, rng: np.random.Generator) -> np.ndarray:
         """One realisation of the Tx PLL timing jitter [s] over ``n`` edges."""
@@ -339,7 +473,7 @@ def residual_vs_local_pll_bw(cfg: LinkConfig, bandwidths_hz) -> list[JitterBudge
 
     out = []
     for bw in bandwidths_hz:
-        c = dataclasses.replace(cfg, clocking=dataclasses.replace(cfg.clocking, local_pll_bw_hz=float(bw)))
+        c = dataclasses.replace(cfg, clocking=dataclasses.replace(cfg.clocking, local_pll_fn_hz=float(bw)))
         out.append(ForwardedClock(c).budget())
     return out
 

@@ -131,7 +131,7 @@ def main(argv=None) -> int:
     ap.add_argument("only", nargs="*", help="number prefixes to run (default: all)")
     ap.add_argument("--smoke", action="store_true", help="cap n_symbols (see --cap)")
     ap.add_argument("--cap", type=int, default=20_000, help="n_symbols cap with --smoke")
-    ap.add_argument("--timeout", type=float, default=900.0, help="seconds per example")
+    ap.add_argument("--timeout", type=float, default=2400.0, help="seconds per example (the x64 module and the rate sweep take ~15 min)")
     ap.add_argument("--jobs", type=int, default=1, help="examples run at once")
     ap.add_argument("--save", type=Path, default=None,
                     help="directory to keep each example's stdout in (<name>.txt)")

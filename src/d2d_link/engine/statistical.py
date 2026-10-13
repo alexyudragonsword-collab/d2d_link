@@ -166,10 +166,15 @@ def tail_probability(m: IsiModel, sigma_noise: float, v: float) -> float:
 
 
 def jitter_quadrature(sigma_ui: float, phase_points: int, n_sigmas: float,
-                      uniform_width_ui: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
+                      uniform_width_ui: float = 0.0,
+                      sinusoid_amplitudes_ui: tuple[float, ...] = ()) -> tuple[np.ndarray, np.ndarray]:
     """Offsets [UI] and weights for E[f(phase + delta)], delta ~ N(0, sigma)
     convolved with a uniform of width ``uniform_width_ui`` (the phase
-    interpolator's quantisation step; 0 = none).
+    interpolator's quantisation step; 0 = none) and with one arcsine density
+    per entry of ``sinusoid_amplitudes_ui`` (a spur: a sinusoid of that peak
+    amplitude sampled at a uniformly random phase lands on [-A, A] with
+    density 1 / (pi sqrt(A^2 - x^2)); its bin masses are exact, asin
+    differences, so the integrable edge singularities cost nothing).
 
     A trapezoid on a uniform grid rather than Gauss-Hermite: the integrand is
     the bathtub, a near step at the eye's edge, and a few Hermite nodes
@@ -178,19 +183,40 @@ def jitter_quadrature(sigma_ui: float, phase_points: int, n_sigmas: float,
     on one fine grid and the ISI models are shared; the range is
     ``n_sigmas`` on each side, which must reach the target BER's tail
     (1e-27 is 10.8 sigma)."""
-    if sigma_ui <= 0.0 and uniform_width_ui <= 0.0:
-        return np.zeros(1), np.ones(1)
     base = 1.0 / phase_points
-    finest = min([v for v in (sigma_ui / 4.0, uniform_width_ui / 8.0) if v > 0.0])
+    # a spur far smaller than the Gaussian (or than the grid can resolve) is
+    # not worth an arcsine kernel of its own: its A^2/2 joins the variance --
+    # a profile's femtosecond spurs would otherwise force a grid a thousand
+    # times finer than the eye needs
+    explicit = tuple(float(a) for a in sinusoid_amplitudes_ui if a >= max(0.5 * sigma_ui, base / 64.0))
+    absorbed = sum(0.5 * float(a) ** 2 for a in sinusoid_amplitudes_ui if 0.0 < a < max(0.5 * sigma_ui, base / 64.0))
+    sigma_ui = math.sqrt(sigma_ui ** 2 + absorbed)
+    spurs = explicit
+    if sigma_ui <= 0.0 and uniform_width_ui <= 0.0 and not spurs:
+        return np.zeros(1), np.ones(1)
+    # the grid is never finer than base / 256: a kernel narrower than that
+    # is a delta on the bathtub's scale, and the node count stays bounded
+    finest = max(min([v for v in (sigma_ui / 4.0, uniform_width_ui / 8.0, *(a / 8.0 for a in spurs)) if v > 0.0]),
+                 base / 256.0)
     q = max(1, int(math.ceil(base / finest)))
     h = base / q
-    j = int(math.ceil((n_sigmas * sigma_ui + 0.5 * uniform_width_ui) / h))
+    j = int(math.ceil((n_sigmas * sigma_ui + 0.5 * uniform_width_ui + sum(spurs)) / h)) + 2
     x = np.arange(-j, j + 1) * h
     w = np.exp(-0.5 * (x / sigma_ui) ** 2) if sigma_ui > 0.0 else (x == 0.0).astype(float)
+
+    def centred(a, kern):
+        full = np.convolve(a, kern)              # both odd-length and centred: keep the middle
+        off = (full.size - a.size) // 2
+        return full[off:off + a.size]
+
     if uniform_width_ui > 0.0:
         m = int(round(0.5 * uniform_width_ui / h))
-        box = np.ones(2 * m + 1)
-        w = np.convolve(w, box, mode="same")
+        w = centred(w, np.ones(2 * m + 1))
+    for amp in spurs:
+        m = int(math.ceil(amp / h)) + 1
+        xa = np.arange(-m, m + 1) * h
+        edges = np.clip(np.concatenate([xa - 0.5 * h, [xa[-1] + 0.5 * h]]) / amp, -1.0, 1.0)
+        w = centred(w, np.diff(np.arcsin(edges)) / math.pi)
     return x, w / w.sum()
 
 
@@ -267,10 +293,11 @@ class StatisticalEngine:
         self.clock = clock if clock is not None else ForwardedClock(cfg)
         self.aggressors = tuple(aggressors)
         self.budget = self.clock.budget()
-        self.sigma_j_ui = self.budget.total_s / cfg.ui
+        self.sigma_j_ui = self.budget.gaussian_s / cfg.ui          # the Gaussian part; spurs are arcsine terms
+        self.spurs_ui = tuple(a / cfg.ui for a in self.clock.spur_amplitudes_s())
         self.quant_ui = cfg.clocking.pi_step_ui if self.clock.alpha > 0.0 else 0.0
         self.nodes, self.weights = jitter_quadrature(self.sigma_j_ui, cfg.sim.stat_phase_points,
-                                                     cfg.sim.stat_jitter_sigmas, self.quant_ui)
+                                                     cfg.sim.stat_jitter_sigmas, self.quant_ui, self.spurs_ui)
         self.bin_v = cfg.sim.stat_isi_bin_v
         self.sigma_n = cfg.rx.noise_rms_v
         self.vref = cfg.rx.vref_offset_v
@@ -291,7 +318,7 @@ class StatisticalEngine:
     def sampling_phases(self, phase_ui: float) -> list[tuple[float, float]]:
         """``(phase, weight)`` pairs the sampler really lands on: the jitter
         quadrature's offsets, split again by the DDR duty-cycle error."""
-        dcd = self.cfg.clocking.dcd_ui
+        dcd = self.cfg.clocking.sampling_dcd_ui
         offs = (-0.5 * dcd, 0.5 * dcd) if dcd > 0.0 else (0.0,)
         out = []
         for x, w in zip(self.nodes, self.weights):
@@ -380,15 +407,54 @@ class StatisticalEngine:
             phases, ber = self.bathtub(lo, hi)
         return phases, ber
 
+    def eye_edge(self, inside: float, outside: float, target: float, tol_ui: float = 1e-5,
+                 max_steps: int = 24) -> float:
+        """The phase between ``inside`` (BER <= target) and ``outside`` (BER >
+        target) where the BER crosses ``target``, found on the real bathtub
+        by a safeguarded regula falsi (Illinois) in log BER, which the curve
+        is close to linear in near its edge. Interpolating between two grid
+        points instead put the edge at the mercy of the outer point, which
+        can sit a hundred decades down where the number is set by the jitter
+        kernel's outermost nodes: the eye width then moved with the grid and
+        the kernel's reach (2e-3 UI on a 16-point grid). Each evaluation
+        builds the ISI models of ~100 jitter nodes, so the count matters."""
+        lt = math.log10(target)
+        a, b = inside, outside
+        fa = self.log10_error_probability(a) - lt
+        fb = self.log10_error_probability(b) - lt
+        if fa > 0.0 or fb <= 0.0:
+            return 0.5 * (a + b)
+        side = 0
+        for _ in range(max_steps):
+            if abs(b - a) <= tol_ui:
+                break
+            c = (a * fb - b * fa) / (fb - fa)
+            if not (min(a, b) < c < max(a, b)):
+                c = 0.5 * (a + b)
+            fc = self.log10_error_probability(c) - lt
+            if fc <= 0.0:
+                a, fa = c, fc
+                if side == -1:
+                    fb *= 0.5
+                side = -1
+            else:
+                b, fb = c, fc
+                if side == +1:
+                    fa *= 0.5
+                side = +1
+        return (a * fb - b * fa) / (fb - fa) if fb != fa else 0.5 * (a + b)
+
     @staticmethod
-    def eye_region(phases: np.ndarray, log10_ber: np.ndarray, target: float) -> tuple[float, float] | None:
+    def eye_region(phases: np.ndarray, log10_ber: np.ndarray, target: float,
+                   refine=None) -> tuple[float, float] | None:
         """The widest contiguous opening with BER <= target on the bathtub
-        (given as log10), edges interpolated in log BER; ties go to the
-        opening centred nearest zero; None when the eye is closed at the
-        target. The BER is *not* periodic in the phase -- it is the error
-        rate of deciding *this* symbol, 0.5 one UI away where the neighbour's
-        cursor is sampled -- so there is one opening, around this symbol's
-        main cursor."""
+        (given as log10); ties go to the opening centred nearest zero; None
+        when the eye is closed at the target. The edges are interpolated in
+        log BER between the bracketing grid points, or, with ``refine`` (an
+        :meth:`eye_edge`-like callable), bisected on the real curve. The BER
+        is *not* periodic in the phase -- it is the error rate of deciding
+        *this* symbol, 0.5 one UI away where the neighbour's cursor is
+        sampled -- so there is one opening, around this symbol's main cursor."""
         n = log10_ber.size
         lt = math.log10(target)
         lb = np.asarray(log10_ber, dtype=np.float64)
@@ -405,8 +471,12 @@ class StatisticalEngine:
             j = i
             while j + 1 < n and ok[j + 1]:
                 j += 1
-            left = phases[i] if i == 0 else np.interp(lt, [lb[i], lb[i - 1]], [phases[i], phases[i - 1]])
-            right = phases[j] if j == n - 1 else np.interp(lt, [lb[j], lb[j + 1]], [phases[j], phases[j + 1]])
+            if refine is not None:
+                left = phases[i] if i == 0 else refine(float(phases[i]), float(phases[i - 1]), target)
+                right = phases[j] if j == n - 1 else refine(float(phases[j]), float(phases[j + 1]), target)
+            else:
+                left = phases[i] if i == 0 else np.interp(lt, [lb[i], lb[i - 1]], [phases[i], phases[i - 1]])
+                right = phases[j] if j == n - 1 else np.interp(lt, [lb[j], lb[j + 1]], [phases[j], phases[j + 1]])
             key = (-round(float(right - left), 12), abs(0.5 * float(left + right)))
             if best is None or key < best[0]:
                 best = (key, float(left), float(right))
@@ -420,7 +490,7 @@ class StatisticalEngine:
         target_ber = targets["ber"][0]
         phases, ber = self.bathtub_around_the_eye(target_ber)
         i_min = int(np.argmin(ber))
-        region = self.eye_region(phases, ber, target_ber)
+        region = self.eye_region(phases, ber, target_ber, refine=self.eye_edge)
         if region is not None:
             left, right = region
             ew_raw = right - left
@@ -457,6 +527,7 @@ class StatisticalEngine:
                     "xtalk_rms_v": float(math.sqrt(sum(float(np.sum(self.resp.xtalk_cursors(d, phase, sk) ** 2))
                                                       for d, sk in self.aggressors))),
                     "quantisation_ui": self.quant_ui, "log10_ber_min": float(ber[i_min]),
+                    "spur_rms_s": self.budget.spur_s, "n_spurs": len(self.spurs_ui),
                     "phase_min_ui": float(phases[i_min]),
                     "eye_width_raw_ui": float(ew_raw), "eye_width_clipped": bool(clipped),
                     "insertion_loss_nyquist_db": self.resp.channel.insertion_loss_db(cfg.f_nyquist)})

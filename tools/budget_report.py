@@ -43,6 +43,7 @@ def budget_rows(cfg, clock) -> list[tuple[str, float]]:
             ("clock path white jitter", b.clock_path_s),
             ("clock path wander", b.clock_wander_s),
             ("receive tree jitter", b.tree_s),
+            ("profile spurs after the same leaks (sinusoids)", b.spur_s),
             ("phase-interpolator quantisation (uniform)", clock.quantisation_sigma_s())]
     return rows
 
@@ -64,6 +65,8 @@ def report(cfg, res, clock) -> dict:
                  "insertion_loss_nyquist_db": res.stat[0].extras["insertion_loss_nyquist_db"] if res.stat else None,
                  "tx_pll_rms_fs": 1e15 * clock.pll_rms_s(),
                  "local_pll_rms_fs": 1e15 * clock.local_pll_rms_s(),
+                 "local_pll_fn_hz": cfg.clocking.local_pll_fn_hz, "local_pll_bw_3db_hz": clock.local_pll_bw_3db_hz(),
+                 "spur_terms": [{"f_hz": f0, "amplitude_fs": 1e15 * a} for f0, a in clock.spur_terms()],
                  "verdict": "PASS" if res.passes else "FAIL"},
         "jitter_budget": [{"term": name, "fs": 1e15 * v, "ui": v / ui} for name, v in rows]
                          + [{"term": "total (power sum)", "fs": 1e15 * total, "ui": total / ui}],

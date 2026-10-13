@@ -118,7 +118,7 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
         jitter_s = clock.synthesize(n, np.random.default_rng([sim.seed, 0xC10C]), 1)[0]
     pulse = resp.pulse.y
     i0 = resp.main_index
-    dcd = cfg.clocking.dcd_ui
+    dcd = cfg.clocking.sampling_dcd_ui
     # past symbols whose postcursors reach the chunk, and future ones whose
     # precursors do, each with one more UI of slack; a sampling instant that
     # the phase, the skew, the duty-cycle offset and the jitter carry further
@@ -193,7 +193,8 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
     return TimeResult(lane=lane, ber=n_err / n, n_errors=n_err, n_symbols=n, phase_ui=phase_ui + skew_residual_ui,
                       eye_height_sampled_v=eye_s, jitter_rms_s=float(np.std(jitter_s[:n])),
                       error_bursts=n_bursts, eye_time_ui=eye_t, eye_traces=traces, samples=s_all, sample_bits=b_all,
-                      extras={"main_cursor_v": resp.main_amplitude, "n_aggressors": len(xt)})
+                      extras={"main_cursor_v": resp.main_amplitude, "n_aggressors": len(xt),
+                              "block_step_ratio": clock.block_step_ratio})
 
 
 __all__ = ["run_time", "TimeResult", "SymbolStream", "shifted_pulse"]

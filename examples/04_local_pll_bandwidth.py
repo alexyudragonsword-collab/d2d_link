@@ -42,16 +42,18 @@ ck = base.clocking
 fc = ForwardedClock(base)
 print(f"Tx PLL {ck.pll_profile.split('/')[-1]}: {1e15 * fc.pll_rms_s():.1f} fs in band; "
       f"local PLL {ck.local_pll_profile.split('/')[-1]}: {1e15 * fc.local_pll_rms_s():.1f} fs; "
-      f"configured loop {ck.local_pll_bw_hz / 1e6:g} MHz, damping {ck.local_pll_damping:g}")
+      f"loop natural frequency {ck.local_pll_fn_hz / 1e6:g} MHz (-3 dB {fc.local_pll_bw_3db_hz() / 1e6:.2f} MHz), "
+      f"damping {ck.local_pll_damping:g}")
 
 ideal = dataclasses.replace(ck, tree_delay_ps=0.0, tree_bw_hz=None, tree_rj_s=0.0, data_path_rj_s=0.0,
                             clock_path_rj_s=0.0, data_path_wander_s=0.0, clock_path_wander_s=0.0,
                             track_bw_hz=None, pi_step_ui=0.0)
-lo = ForwardedClock(dataclasses.replace(base, clocking=dataclasses.replace(ideal, local_pll_bw_hz=1e3))).budget()
-hi = ForwardedClock(dataclasses.replace(base, clocking=dataclasses.replace(ideal, local_pll_bw_hz=1e13))).budget()
+lo = ForwardedClock(dataclasses.replace(base, clocking=dataclasses.replace(ideal, local_pll_fn_hz=1e3))).budget()
+hi = ForwardedClock(dataclasses.replace(base, clocking=dataclasses.replace(ideal, local_pll_fn_hz=1e13))).budget()
 print(f"loop -> 0 (1 kHz), ideal tree, no path noise: residual {1e15 * lo.total_s:.1f} fs "
-      f"= sqrt({1e15 * fc.pll_rms_s():.1f}^2 + {1e15 * fc.local_pll_rms_s():.1f}^2) "
-      f"= {1e15 * math.hypot(fc.pll_rms_s(), fc.local_pll_rms_s()):.1f} fs (two independent clocks)")
+      f"= sqrt({1e15 * fc.pll_rms_s():.1f}^2 + {1e15 * fc.local_pll_rms_s():.1f}^2 + spurs {1e15 * lo.spur_s:.1f}^2) "
+      f"= {1e15 * math.sqrt(fc.pll_rms_s() ** 2 + fc.local_pll_rms_s() ** 2 + lo.spur_s ** 2):.1f} fs "
+      f"(two independent clocks; the local PLL's spurs pass a loop this narrow)")
 print(f"loop -> inf (10 THz): residual {1e15 * hi.total_s:.3f} fs")
 
 bws = [1e4, 3e4, 1e5, 3e5, 1e6, 3e6, 1e7, 3e7, 1e8, 3e8, 1e9]
@@ -61,7 +63,7 @@ print(f"{'loop bw [Hz]':>12s} {'Tx leak [fs]':>13s} {'local [fs]':>11s} {'wander
       f"{'eye width [UI]':>15s} {'eye height [mV]':>16s}")
 rows = []
 for bw, b in zip(bws, residual_vs_local_pll_bw(base, bws)):
-    c = dataclasses.replace(base, clocking=dataclasses.replace(ck, local_pll_bw_hz=bw))
+    c = dataclasses.replace(base, clocking=dataclasses.replace(ck, local_pll_fn_hz=bw))
     s = run_statistical(c)
     wander = math.hypot(b.data_wander_s, b.clock_wander_s)
     rows.append((bw, b, s))
@@ -70,7 +72,7 @@ for bw, b in zip(bws, residual_vs_local_pll_bw(base, bws)):
 
 print("\nthe trade-off: 300 fs of white jitter on the clock path before the local PLL, ideal tree, no wander:")
 cp = dataclasses.replace(ideal, clock_path_rj_s=300e-15)
-sw = [(bw, ForwardedClock(dataclasses.replace(base, clocking=dataclasses.replace(cp, local_pll_bw_hz=bw))).budget())
+sw = [(bw, ForwardedClock(dataclasses.replace(base, clocking=dataclasses.replace(cp, local_pll_fn_hz=bw))).budget())
       for bw in np.logspace(4, 10, 31)]
 best = min(sw, key=lambda t: t[1].total_s)
 print(f"{'loop bw [Hz]':>12s} {'Tx leak [fs]':>13s} {'local [fs]':>11s} {'clock path [fs]':>16s} {'total [fs]':>11s}")

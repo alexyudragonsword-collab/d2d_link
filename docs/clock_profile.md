@@ -24,3 +24,11 @@ source: "pllsim preset ..., pllsim 0.9.6, commit ..."
 
 vendored 的 `synth_from_psd` / `integrate_pn` 来自 pll_simulator@00e48a2f(`src/d2d_link/vendor/pllsim/`),
 `tools/vendor_check.py` 守着与上游逐字节一致。
+
+## 杂散(spurs)
+
+`spurs: [{f_hz, dbc}]` 从 0.6.0 起**被两个引擎使用**(此前只读入不用):每条单边带 `dbc` 的杂散是峰值 2·10^(dbc/20) rad 的正弦相位调制,
+除以 2π·f0 得到秒。发端 PLL 的杂散对数据与前向时钟共模,经 |E_track·(1 − ρG)| 泄漏(ρ < 1 时另有一项经 |E·√(1−ρ²)·G|,相位独立);
+本地 PLL 的杂散经 |E·H_tree·(1 − H_pll)|。闭式里是正弦幅度(`JitterBudget.spur_s` = √(ΣA²/2)),统计引擎把它作反正弦分布的采样偏移核
+(远小于高斯 σ 的杂散并入方差),时域合成逐块加正弦并保持相位连续。`ForwardedClock.spur_terms()` 列出采样器处的每条残余幅度。
+

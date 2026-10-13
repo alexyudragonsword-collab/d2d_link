@@ -2,20 +2,20 @@
 standard package x16, 20 mm, lane 5 dead, width degradation
   8/16 lanes active, repair width_degrade, failed [5]; link PASS
   logical physical skew [ps] residual [UI] aggressors xtalk [mV]  eye height [mV] eye width [UI]  log10 BER
-        0        8     -1.08        0.0000          2       2.48            231.9          0.765     -505.1
-        1        9     -1.15        0.0000          3       3.26            226.6          0.756     -480.0
-        2       10     -2.71        0.0000          4       3.73            223.7          0.761     -465.8
-        3       11     -3.17        0.0000          4       3.39            224.5          0.757     -468.7
-        4       12     -5.45        0.0000          4       5.11            216.9          0.770     -440.8
-        5       13      0.22        0.0000          4       2.75            228.5          0.754     -484.8
-        6       14     -0.52        0.0000          3       3.43            226.1          0.758     -478.4
-        7       15     -1.52        0.0000          2       2.76            230.7          0.768     -500.2
-  worst lane 5: eye 228.5 mV / 0.754 UI vs targets 40 mV / 0.75 UI (source: survey); min eye height over lanes 216.9 mV
+        0        8     -1.08        0.0000          2       2.48            231.9          0.763     -505.0
+        1        9     -1.15        0.0000          3       3.26            226.5          0.755     -479.8
+        2       10     -2.71        0.0000          4       3.73            223.7          0.759     -465.5
+        3       11     -3.17        0.0000          4       3.39            224.5          0.756     -468.5
+        4       12     -5.45        0.0000          4       5.11            216.9          0.769     -440.5
+        5       13      0.22        0.0000          4       2.75            228.4          0.753     -484.6
+        6       14     -0.52        0.0000          3       3.43            226.1          0.757     -478.2
+        7       15     -1.52        0.0000          2       2.76            230.7          0.767     -500.1
+  worst lane 5: eye 228.4 mV / 0.753 UI vs targets 40 mV / 0.75 UI (source: survey); min eye height over lanes 216.9 mV
 
 advanced package x64, 2 mm, lanes [12, 40] dead, 4 spares: 64/64 active, link PASS
   52 logical lanes remapped (first: logical 12 -> physical 13); physical neighbours of the dead lanes are now edge lanes with one neighbour fewer
-  aggressors per lane: [0, 0, 2, 10, 52] lanes with 0..4 neighbours; eye height 243.0..282.9 mV, worst lane 54 (physical 56), eye width min 0.757 UI
+  aggressors per lane: [0, 0, 2, 10, 52] lanes with 0..4 neighbours; eye height 242.9..282.9 mV, worst lane 54 (physical 56), eye width min 0.755 UI
 
-crosstalk off on the x16 module: min eye height 238.9 mV (on: 216.9 mV), min eye width 0.772 UI (on: 0.754 UI)
-crosstalk at -20 dB instead of the preset -30 dB: min eye height 159.6 mV, min eye width 0.693 UI, link FAIL
+crosstalk off on the x16 module: min eye height 238.9 mV (on: 216.9 mV), min eye width 0.771 UI (on: 0.753 UI)
+crosstalk at -20 dB instead of the preset -30 dB: min eye height 159.6 mV, min eye width 0.692 UI, link FAIL
 wrote examples/output/05_module_xtalk_repair.png
