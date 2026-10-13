@@ -28,14 +28,14 @@ from d2d_link.spec import survey
 rates = survey("data_rates_gtps")
 print(f"data rates {rates.value} {rates.unit} (source: {rates.source})")
 
-base = load_config(CONFIGS / "standard_32g_x16_module.yaml")
-module = dataclasses.replace(base, lanes=dataclasses.replace(base.lanes, count=5, failed=(), repair="none",
-                                                             skew_sigma_ps=2.0),
-                             channel=dataclasses.replace(base.channel, xtalk="coupled"),
-                             sim=dataclasses.replace(base.sim, stat_phase_points=32))
-cases = {"standard": dataclasses.replace(module, channel=dataclasses.replace(module.channel, length_mm=25.0)),
+# the x5 module at the standard package's survey reach is a config file of its
+# own (ROADMAP P1 #2 reproduces from it); the advanced case is the same module
+# on the other package, at that package's survey reach
+module = load_config(CONFIGS / "standard_32g_x5_coupled.yaml")
+adv_reach = float(survey("reach_mm", "advanced").value)
+cases = {"standard": module,
          "advanced": dataclasses.replace(module, package=dataclasses.replace(module.package, kind="advanced"),
-                                         channel=dataclasses.replace(module.channel, length_mm=2.0),
+                                         channel=dataclasses.replace(module.channel, length_mm=adv_reach),
                                          clocking=dataclasses.replace(module.clocking, tree_delay_ps=15.0, tree_bw_hz=25e9))}
 
 results = {}

@@ -12,18 +12,22 @@ from d2d_link.engine.statistical import resolved_targets
 
 def test_every_entry_is_tagged_and_cited():
     table = spec.all_entries()
-    assert len(table) >= 10
+    assert len(table) == 15
     for key, e in table.items():
         assert e.source in spec.SOURCES, key
         assert e.cite, key
         if e.source == "survey":
-            assert "未核实" in e.note or e.note, key
+            assert "未核实" in e.note, f"{key}: a survey entry's note must say it is unverified"
 
 
 def test_grep_lists_every_unverified_number():
-    text = spec.SURVEY_FILE.read_text(encoding="utf-8")
-    n_grep = len(re.findall(r"^\s*source: survey\s*$", text, flags=re.M))
-    assert n_grep == len(spec.unverified())
+    """The command the docs promise -- ``grep -c "source: survey"`` on the
+    table -- must count exactly the unverified entries: no header comment
+    may contain the tag, and no entry may hide it elsewhere."""
+    import subprocess
+
+    out = subprocess.run(["grep", "-c", "source: survey", str(spec.SURVEY_FILE)], capture_output=True, text=True)
+    assert int(out.stdout.strip()) == len(spec.unverified()) == 15
 
 
 def test_spec_source_needs_a_quote():
@@ -66,3 +70,20 @@ def test_code_does_not_hardcode_the_table():
 
 def test_tag_format():
     assert spec.survey("tx_swing_vpp").tag().endswith("(source: survey)")
+
+
+def test_bundled_configs_stay_inside_the_survey_envelope():
+    """A config may repeat a survey number (the swing, a length at the reach,
+    a module width) only as the table has it: the swing equals the table's,
+    lengths do not exceed the package's reach, lane counts do not exceed the
+    module width. The literal is then a copy of the table, not a second
+    source."""
+    from d2d_link.config import load_config
+
+    for p in sorted((REPO / "configs").glob("*.yaml")):
+        cfg = load_config(p)
+        kind = cfg.package.kind
+        assert cfg.tx.swing_vpp == pytest.approx(spec.survey("tx_swing_vpp").value), p.name
+        assert cfg.channel.length_mm <= spec.survey("reach_mm", kind).value + 1e-9, p.name
+        assert cfg.lanes.count <= spec.survey("module_width_lanes", kind).value, p.name
+        assert cfg.data_rate_gtps in [float(r) for r in spec.survey("data_rates_gtps").value], p.name

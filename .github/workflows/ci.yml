@@ -1,11 +1,17 @@
 name: ci
 
-# lint + tests + every example at smoke size + vendor drift, on every push / PR.
+# lint + tests (four Pythons, the declared dependency floor, and no optional
+# extras) + every example at smoke size + vendor drift + the numerical
+# fingerprint, on every push / PR.
 on:
   push:
     branches: ["**"]
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -16,6 +22,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
       - run: pip install ruff
       - run: ruff check src/ tests/ examples/ tools/
 
@@ -25,18 +32,41 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.10 is the floor requires-python declares; 3.12 the current default
-        python: ["3.10", "3.12"]
+        # 3.10 is the floor requires-python declares; 3.13 is what the
+        # maintainer develops on; the two between must not drift
+        python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+          cache: pip
       - name: Install
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[touchstone,plot,test]"
       - name: Tests
+        run: pytest -q
+
+  # The declared minimums, not the newest: pyproject promises numpy>=1.26,
+  # scipy>=1.11, pyyaml>=6.0, and nothing else ever runs at those versions
+  # (the vendored jitter.py carries a trapz/trapezoid shim for numpy 1.x that
+  # the newest numpy never exercises).
+  test-floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: Install the declared minimums
+        run: |
+          python -m pip install --upgrade pip
+          pip install "numpy==1.26.*" "scipy==1.11.*" "pyyaml==6.0.*" "pytest>=7" "ruff>=0.4"
+          pip install --no-deps -e .
+      - name: "Tests at the floor (no optional extras; Touchstone and plots skip)"
         run: pytest -q
 
   examples:
@@ -51,12 +81,63 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
       - name: Install
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[touchstone,plot,test]"
       - name: Run every example (smoke size)
         run: python tools/run_examples.py --smoke
+
+  # Invariant #6: a change that is not meant to move a number must not move
+  # one. On a pull request the base commit and the head are fingerprinted on
+  # the same runner (bit-exact means the same machine and library versions)
+  # and compared; any difference fails unless the PR carries the label
+  # `numbers-move`, in which case the diff is kept as an artifact for the
+  # CHANGELOG to explain. On a push the fingerprint is only recorded and kept.
+  fingerprint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[touchstone,plot,test]"
+      - name: Record the head
+        run: python tools/fingerprint.py record head.json
+      - name: Record the base (pull requests)
+        if: github.event_name == 'pull_request'
+        run: |
+          git worktree add ../base ${{ github.event.pull_request.base.sha }}
+          pip install --no-deps -e ../base
+          (cd ../base && python tools/fingerprint.py record ../d2d_link/base.json)
+          pip install --no-deps -e .
+      - name: Compare
+        if: github.event_name == 'pull_request'
+        run: |
+          python tools/fingerprint.py compare base.json head.json > diff.txt || moved=1
+          cat diff.txt
+          if [ "${moved:-0}" = "1" ] && ! echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q numbers-move; then
+            echo "::error::numbers moved without the numbers-move label; explain them in CHANGELOG and label the PR"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fingerprint
+          path: |
+            head.json
+            base.json
+            diff.txt
+          if-no-files-found: ignore
+          retention-days: 30
 
   # Vendor drift: src/d2d_link/vendor must still match the pinned Halo_Serdes
   # and pll_simulator commits (polar_tx's vendor_check method). The siblings

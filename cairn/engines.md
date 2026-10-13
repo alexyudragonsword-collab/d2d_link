@@ -5,7 +5,7 @@ summary: "统计引擎(主)与时域引擎(校核)各自怎么算、为什么能
 tags: [statistical, time-domain, ber]
 contains: [decision, lesson]
 created: "2026-10-12"
-updated: "2026-10-12"
+updated: "2026-10-13"
 related: [architecture-invariants.md, forwarded-clock.md]
 authoring_mode: ai_generated
 ---
@@ -32,7 +32,7 @@ authoring_mode: ai_generated
 |---|---|---|---|
 | 噪声主导,50 mV | 7.09e-4 | 6.48e-4(259 / 4e5) | 0.91 |
 | 抖动主导,两路 3 ps、无跟踪 | 1.17e-4 | 1.00e-4(100 / 1e6) | 0.85 |
-| 噪声 40 mV | 4.13e-5 | 2.25e-5(9 / 4e5) | 0.54(9 个误码的散布) |
+| 混合:噪声 45 mV + 两路 2 ps、无跟踪 | — | ≥ 25 误码 | 0.5–2× 内(`test_mixed_noise_and_jitter_within_2x`;早期 40 mV 的 9 误码点 0.54 已换掉) |
 
 示例 03(2e7 符号):噪声主导 1e-6 处 1.23(24 误码)、抖动主导 1e-6 处 1.22(16 误码)、混合 1e-5 处 0.87(17 误码 / 2e6)。
 

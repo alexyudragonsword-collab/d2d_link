@@ -13,5 +13,5 @@ length [mm]  IL@Nyq [dB]  eye height [mV]  eye width [UI]  BER at centre  margin
          55        -6.49             79.8           0.643      3.83e-102            39.8    no
          60        -7.08             60.8           0.594       1.32e-77            20.8    no
 
-model reach: 30 mm is the last length that clears eye height 40 mV (source: survey), eye width and BER 1e-27; survey reach 25 mm -> ratio 1.20x  (within 2x)
+model reach: 30 mm is the last length that clears eye height 40 mV (source: survey), eye width and BER 1e-27 (source: survey); survey reach 25 mm -> ratio 1.20x  (within 2x)
 wrote examples/output/02_reach_sweep.png

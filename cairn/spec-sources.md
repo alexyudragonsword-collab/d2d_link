@@ -5,7 +5,7 @@ summary: "规范数字的来源状态:哪些是综述、各自待核实什么、
 tags: [spec, ucie, sources]
 contains: [decision]
 created: "2026-10-12"
-updated: "2026-10-12"
+updated: "2026-10-13"
 related: [architecture-invariants.md]
 authoring_mode: ai_generated
 ---
@@ -13,7 +13,8 @@ authoring_mode: ai_generated
 
 ## 当前结论
 
-- 全部 16 条都是 `source: survey`,见 `data/spec/ucie_survey.yaml`;没有一条读过规范原文。`grep "source: survey" data/spec/ucie_survey.yaml`。
+- 全部 15 条都是 `source: survey`,见 `data/spec/ucie_survey.yaml`;没有一条读过规范原文。`grep -c "source: survey" data/spec/ucie_survey.yaml` = 15
+  (文件头注释不再含该字串,测试断言这条命令的计数)。
 - 综述来源是公开材料的记忆与转述(Das Sharma 2022 的 UCIe 综述、Consortium 白皮书、Hot Chips 34 概览),**数值本身未经核对**,
   每条 note 都写了"未核实"。最不可靠的三条:收端眼高 40 mV、眼宽 0.75 UI(眼罩表的速率档与封装归属不明)、1e-15 的 retry 口径。
 - 升级流程:用户把原文贴进 `cairn/Reference/`(只追加)→ 对应条目改 `source: spec`、加 `quote` 与 `section` → `tests/test_spec_sources.py`

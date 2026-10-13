@@ -1,8 +1,8 @@
 # UCIe 规范数字表 —— 本库用到的每一个"规范数字"都在这里,一条一个,带来源标签。
 #
-#   source: survey  未拿到规范原文;数字来自公开综述 / 论文 / 会议报告,按 cite 所示,
-#                   并一律视为"未核实"。grep "source: survey" 一次列全。
-#   source: spec    来自规范原文;必须附 quote(原文摘录)与 section。
+#   survey  未拿到规范原文;数字来自公开综述 / 论文 / 会议报告,按 cite 所示,并一律视为"未核实"。
+#           文件头不含标签字串,所以用 grep 数这个标签(见 README)恰好得到未核实条目数。
+#   spec    来自规范原文;必须附 quote(原文摘录)与 section。
 #
 # 原文贴进 cairn/Reference/ 之后,把对应条目改成 source: spec 并补 quote。
 # 任何代码都不得直接写这些数字(tests/test_spec_sources.py 守着):只能通过

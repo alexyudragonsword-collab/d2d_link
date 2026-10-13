@@ -4,6 +4,33 @@
 
 ---
 
+## [0.3.1] — 2026-10-13 — 段 0:卫生轮(体检后;指纹逐位相同)
+
+### 修复
+- 文档与数字:规范表是 **15** 条(此前 ROADMAP / CHANGELOG / LOG / spec-sources 都写 16);README 里"PLL 的 186 fs 一分不到采样器"改为
+  "经前向时钟抵消,59.4 fs 经树的延时 / 带宽泄漏";"同一模块在 −30 dB 下能过"改为点明示例 05 与 07 是不同模块;`cairn/engines.md` 一行过期的
+  测试点、`architecture-invariants.md` §3 "串扰不在本轮"、三篇专题的 `updated`;`tools/run_examples.py` docstring 的 Halo 残留;
+  CHANGELOG 0.3.0 的 `test_coupled` 计数。
+- 示例 02 第 47 行 `and/or` 写法永远打印字面量 `1e-27`:改为打印解析出的目标与来源(输出多了 `(source: survey)`,期望输出刷新)。
+- `data/spec/ucie_survey.yaml` 文件头不再含标签字串:`grep -c "source: survey"` 恰好 = 15;测试断言的就是这条命令。
+- ROADMAP:P1 #2 的复现步骤现在可跑(`configs/standard_32g_x5_coupled.yaml`,示例 07 改为加载它;先进封装的长度取规范表的 reach),
+  编号连续,体检挂起的模型问题按分段方案登记在 P2 #0。
+
+### 删除
+- 死代码:`StatisticalEngine.eye_width / eye_edges`、`with_phase`、`core.prbs.prbs_bits`。
+
+### 守卫(+4 测试,137 → 141;其中 1 项 xfail)
+- 规范表:条目数 = 15、每条 survey 的 note 必含"未核实"、`grep -c` 计数;bundled 配置落在规范表包络内(摆幅等于表值、长度 ≤ reach、
+  lane 数 ≤ 模块宽度、速率在速率档内)。
+- 铁律 1:`config/`、`tools/`、`examples/` 里不得给字段赋规范数字(`data_rate_gtps=`、`swing_vpp=0.4`、`length_mm=25.0/2.0`、`1e-27`、眼罩);
+  schema 里的两个默认值(32.0、0.4)显式放行,段 5 从表解析后移除放行。
+- 最差 lane 按裕度取的测试先以 `xfail(strict)` 登记(段 1 修实现);"reach 与综述 2× 内"进测试套件。
+
+### CI
+- 测试矩阵 3.10 / 3.11 / 3.12 / 3.13;`test-floor` 作业钉 numpy 1.26 / scipy 1.11 / pyyaml 6.0 且不装可选依赖;
+  `fingerprint` 作业:PR 上同一 runner 记录 base 与 head 并比对,有差异且无 `numbers-move` 标签即红,push 时只记录并存 artifact;
+  pip 缓存、`concurrency` 取消;examples-full 的路径过滤加 `tools/**`。
+
 ## [0.3.0] — 2026-10-13 — 里程碑 3:串扰的耦合线估计、速率档扫描、时序预算报表
 
 ### 新增
@@ -16,7 +43,7 @@
 - **示例 07**:规范表全部速率档(4–32 GT/s,source: survey)× 标准 25 mm / 先进 2 mm,x5 模块中间 lane,耦合串扰。
 - 统计引擎:浴盆窗口**自适应** —— 目标 BER 处的开眼区碰到 ±0.5 UI 窗口边缘时向该侧再扩 0.5 UI(每侧最多一次)。平顶脉冲(短线、低速)
   的"峰值"落在平顶末端、整只眼在一侧,原来只读到半只眼(先进封装 4 GT/s 眼宽 0.516 → 0.982 UI)。未触边的配置逐位不变。
-- 测试 +9(`test_coupled` 8、ρ < 1 多块平均 1、自适应窗口 1;127 → 137)。
+- 测试 +10(`test_coupled` 7、ρ < 1 多块平均 1、自适应窗口 1、示例数 1;127 → 137)。
 
 ### 数字
 - 耦合线估计:标准封装 25 mm、115 µm 间距、h 30 µm → 最近邻 **−18.6 dB** @ 16 GHz(10 mm 时 −26.6);先进封装 2 mm、40 µm、h 4 µm → −56.9 dB。
@@ -66,7 +93,7 @@
 ### 新增
 - **配置层**(`config/`):frozen `LinkConfig`(封装、速率、lane、时钟方案、发端、收端、仿真、目标),严格键的 YAML 加载与
   dotted 覆盖,`form.py::SECTIONS` 按 Halo 的方式声明全部表单字段(GUI 不做,字段声明留着,测试保证与 schema 双向一致)。
-- **规范数字表**(`data/spec/ucie_survey.yaml` + `spec/`):16 条,全部 `source: survey`,每条带出处与"未核实";引擎按 key 取,
+- **规范数字表**(`data/spec/ucie_survey.yaml` + `spec/`):15 条,全部 `source: survey`,每条带出处与"未核实";引擎按 key 取,
   结果打印 `source: xxx`。`grep "source: survey"` 一次列全。
 - **前向时钟模型**(`clock/forwarded.py`,铁律 2):数据与前向时钟共享发端 PLL 的定时抖动(pllsim 剖面或白噪),`correlation`、
   数据 / 时钟 / 树三路独立白抖动、树延时与带宽、逐 lane 一阶零延迟相位跟踪器;闭式预算与逐符号合成同一张 FFT 网格。

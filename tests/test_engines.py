@@ -57,3 +57,20 @@ def test_both_engines_through_run_link():
     (ratio,) = res.consistency_ratios()
     assert 0.5 < ratio < 2.0
     assert "time lane 0" in res.summary()
+
+
+def test_reach_is_within_2x_of_the_survey():
+    """The brief's acceptance: the last length that clears the targets on the
+    milestone-1 link is within 2x of the package's survey reach (example 02
+    prints 30 mm against 25 mm; this pins it on a coarse grid)."""
+    from d2d_link.spec import survey
+
+    cfg = load_config(REPO / "configs" / "standard_32g_x1.yaml")
+    cfg = dataclasses.replace(cfg, sim=dataclasses.replace(cfg.sim, stat_phase_points=16))
+    reach = survey("reach_mm", cfg.package.kind).value
+    last_pass = None
+    for length in (10.0, 20.0, 30.0, 40.0, 60.0):
+        r = run_statistical(dataclasses.replace(cfg, channel=dataclasses.replace(cfg.channel, length_mm=length)))
+        if r.passes:
+            last_pass = length
+    assert last_pass is not None and 0.5 <= last_pass / reach <= 2.0, (last_pass, reach)

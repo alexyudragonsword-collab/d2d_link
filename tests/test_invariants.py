@@ -8,7 +8,15 @@ SRC = REPO / "src" / "d2d_link"
 ENGINE_DIRS = ("engine", "clock", "channel", "core")
 
 # rates, the BER target and the standard-package reach written as literals
-_SPEC_LITERALS = re.compile(r"\b(?:4|8|12|16|24|32)(?:\.0)?e9\b|\b1(?:\.0)?e-27\b|\b25\.0?\s*(?:mm|e-3)\b")
+_SPEC_LITERALS = re.compile(r"\b(?:4|8|12|16|24|32)(?:\.0)?e9\b|\b1(?:\.0)?e-27\b|\b25\.0?\s*(?:mm|e-3)\b|\b3\.2e10\b")
+# in the config layer, examples and tools: a spec number assigned to the field
+# that owns it (the table is the only place these may be written)
+_SPEC_ASSIGNMENTS = re.compile(
+    r"data_rate_gtps\s*=\s*[0-9]|swing_vpp\s*=\s*0\.4\b|length_mm\s*=\s*(?:25|2)\.0\b|"
+    r"\b1(?:\.0)?e-27\b|eye_height_mv\s*=\s*40|eye_width_ui\s*=\s*0\.75")
+# the two schema defaults that still carry a survey number; phase 5 of the
+# plan resolves them from the table and removes this allowance
+_ALLOWED = {("config/schema.py", "data_rate_gtps = 32"), ("config/schema.py", "swing_vpp = 0.4")}
 
 
 def code_only(source: str) -> str:
@@ -34,6 +42,18 @@ def test_law1_engines_hardcode_no_rate_ber_or_reach():
     hits = [(p.relative_to(REPO), m.group(0)) for p, s in _sources(ENGINE_DIRS)
             for m in _SPEC_LITERALS.finditer(s)]
     assert not hits, f"spec numbers must come from the config / survey table, found {hits}"
+
+
+def test_law1_config_tools_examples_assign_no_spec_number():
+    files = [*sorted((SRC / "config").rglob("*.py")), *sorted((REPO / "tools").glob("*.py")),
+             *sorted((REPO / "examples").glob("*.py"))]
+    hits = []
+    for p in files:
+        for m in _SPEC_ASSIGNMENTS.finditer(code_only(p.read_text(encoding="utf-8"))):
+            key = (p.relative_to(SRC).as_posix() if SRC in p.parents else p.name, re.sub(r"\s+", " ", m.group(0)).replace(".0", ""))
+            if key not in _ALLOWED:
+                hits.append((p.relative_to(REPO).as_posix(), m.group(0)))
+    assert not hits, f"spec numbers assigned outside the table: {hits}"
 
 
 def test_law1_engines_take_the_config_not_loose_numbers():

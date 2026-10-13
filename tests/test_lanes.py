@@ -61,7 +61,16 @@ def test_residual_skew_moves_the_lane_off_centre():
                               clocking=ck, sim=sim))
     assert res.stat[1].skew_residual_ui == pytest.approx(6e-12 / res.cfg.ui)
     assert res.stat[1].eye_height_v < res.stat[0].eye_height_v
-    assert res.worst.lane == 1 or res.stat[1].eye_height_v < res.stat[0].eye_height_v
+
+
+@pytest.mark.xfail(strict=True, reason="phase 1 of the plan: worst lane is ranked by BER, which is 0.0 "
+                                       "for every lane at 1e-27, so lane 0 always wins")
+def test_worst_lane_is_the_one_with_the_smallest_margin():
+    sim = SimConfig(stat_phase_points=16)
+    ck = ClockingConfig(pll_profile=PROFILE, data_path_rj_s=200e-15, clock_path_rj_s=200e-15)
+    res = run_link(LinkConfig(lanes=LaneConfig(count=2, skew_ps=(0.0, 6.0), deskew_step_ps=20.0),
+                              clocking=ck, sim=sim))
+    assert res.worst.lane == 1
 
 
 def test_bundled_repair_configs():

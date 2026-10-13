@@ -1,0 +1,41 @@
+# Example 07's module: a five-lane slice of the standard-package x16 module at
+# the package's survey reach (25 mm) with the coupled-line crosstalk estimate.
+# The middle lane sees two neighbours on each side; the reach is what the
+# rate sweep and ROADMAP P1 #2 talk about.
+data_rate_gtps: 32.0
+package:
+  kind: standard
+channel:
+  kind: analytic
+  length_mm: 25.0
+  xtalk: coupled            # pitch from the survey table, stack-up from the package preset
+lanes:
+  count: 5
+  skew_sigma_ps: 2.0
+  skew_seed: 7
+  deskew_step_ps: 1.95
+clocking:
+  scheme: forwarded_ddr
+  pll_profile: data/clock_profiles/bench_markulic16_sspll_40m_10p24g.yaml
+  data_path_rj_s: 200.0e-15
+  clock_path_rj_s: 200.0e-15
+  data_path_wander_s: 200.0e-15
+  clock_path_wander_s: 200.0e-15
+  wander_corner_hz: 1.0e6
+  local_pll_profile: data/clock_profiles/bench_wu19_spll_frac_52m_6p253g.yaml
+  local_pll_bw_hz: 1.0e6
+  tree_delay_ps: 30.0
+  tree_bw_hz: 20.0e9
+  tree_rj_s: 100.0e-15
+  track_bw_hz: 2.0e6
+  track_delay_ui: 4
+  pi_step_ui: 0.0156
+tx:
+  swing_vpp: 0.4
+  bw_hz: 60.0e9
+rx:
+  noise_rms_v: 3.0e-3
+sim:
+  n_symbols: 100000
+  stat_phase_points: 32
+  engine: statistical

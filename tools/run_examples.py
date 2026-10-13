@@ -2,7 +2,7 @@
 
 Adapted from Halo_Serdes tools/run_examples.py (package path re-homed).
 
-``tests/test_examples_api.py`` only checks that each example compiles and
+``tests/test_examples.py`` only checks that each example compiles and
 that what it imports exists. That misses everything that happens at run
 time: a renamed config field, a changed result key, a shape that no longer
 lines up, a plot call on an array that became None. This runs them.
@@ -16,11 +16,11 @@ sizes (slow; the numbers the docs quote).
 
 Each example runs in its own interpreter with a non-interactive matplotlib
 backend and writes its figures where it always does (``examples/output``,
-ignored by git). An example that needs an optional backend that is not
-installed (``pyibisami`` and the like) is reported as skipped, not failed.
+ignored by git). An example that needs an optional extra that is not
+installed (``scikit-rf`` or ``matplotlib``) is reported as skipped, not failed.
 
     python tools/run_examples.py --smoke                  # all of them
-    python tools/run_examples.py --smoke 05 22            # by number prefix
+    python tools/run_examples.py --smoke 05 07            # by number prefix
     python tools/run_examples.py --jobs 3 --save out/     # full size, outputs kept
 
 ``--save DIR`` keeps each example's stdout as ``DIR/<name>.txt``: the numbers

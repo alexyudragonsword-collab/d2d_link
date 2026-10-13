@@ -5,7 +5,7 @@ summary: "前向时钟模型的方程、带宽/相关度/树延时三个极限�
 tags: [forwarded-clock, jitter, core-mechanism]
 contains: [decision, lesson]
 created: "2026-10-12"
-updated: "2026-10-12"
+updated: "2026-10-13"
 related: [architecture-invariants.md, engines.md]
 authoring_mode: ai_generated
 ---

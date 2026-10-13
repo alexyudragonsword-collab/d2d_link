@@ -5,7 +5,7 @@ summary: "开工前读:本库已经付过代价的坑。"
 tags: [pitfalls]
 contains: [lesson]
 created: "2026-10-12"
-updated: "2026-10-12"
+updated: "2026-10-13"
 related: [engines.md, forwarded-clock.md]
 authoring_mode: ai_generated
 ---

@@ -43,8 +43,4 @@ class PatternSource:
         return 2.0 * buf[nb:].astype(np.float64) - 1.0
 
 
-def prbs_bits(kind: str, n: int, seed: int = 1) -> np.ndarray:
-    return PatternSource(kind, np.random.default_rng(seed)).next(n)
-
-
-__all__ = ["PatternSource", "prbs_bits"]
+__all__ = ["PatternSource"]

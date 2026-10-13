@@ -28,7 +28,6 @@ the same tail sums.
 
 from __future__ import annotations
 
-import dataclasses
 import math
 from dataclasses import dataclass, field
 
@@ -303,29 +302,6 @@ class StatisticalEngine:
             i = j + 1
         return (best[1], best[2]) if best else None
 
-    @staticmethod
-    def eye_width(phases: np.ndarray, ber: np.ndarray, target: float, i_center: int) -> float:
-        left, right = StatisticalEngine.eye_edges(phases, ber, target, i_center)
-        return right - left
-
-    @staticmethod
-    def eye_edges(phases: np.ndarray, ber: np.ndarray, target: float, i_center: int) -> tuple[float, float]:
-        """Edges of the contiguous region around ``i_center`` with BER <= target,
-        interpolated in log BER; ``(p, p)`` when the eye is closed there."""
-        if ber[i_center] > target:
-            return float(phases[i_center]), float(phases[i_center])
-        lt = np.log10(np.maximum(target, 1e-300))
-        lb = np.log10(np.maximum(ber, 1e-300))
-        i = i_center
-        while i > 0 and ber[i - 1] <= target:
-            i -= 1
-        left = phases[i] if i == 0 else np.interp(lt, [lb[i], lb[i - 1]], [phases[i], phases[i - 1]])
-        j = i_center
-        while j < ber.size - 1 and ber[j + 1] <= target:
-            j += 1
-        right = phases[j] if j == ber.size - 1 else np.interp(lt, [lb[j], lb[j + 1]], [phases[j], phases[j + 1]])
-        return float(left), float(right)
-
     # ------------------------------------------------------------ run
     def run(self, lane: int = 0, skew_residual_ui: float = 0.0) -> StatResult:
         cfg = self.cfg
@@ -373,10 +349,6 @@ def run_statistical(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int
                     skew_residual_ui: float = 0.0, clock: ForwardedClock | None = None,
                     aggressors: tuple = ()) -> StatResult:
     return StatisticalEngine(cfg, resp, clock, aggressors).run(lane, skew_residual_ui)
-
-
-def with_phase(cfg: LinkConfig, phase_ui: float) -> LinkConfig:
-    return dataclasses.replace(cfg, rx=dataclasses.replace(cfg.rx, sampling_phase_ui=phase_ui))
 
 
 __all__ = ["run_statistical", "StatisticalEngine", "StatResult", "IsiModel", "isi_model",

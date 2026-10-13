@@ -5,7 +5,7 @@ summary: "六条铁律为什么存在、靠哪个测试执行、边界在哪。"
 tags: [invariants, architecture]
 contains: [decision]
 created: "2026-10-12"
-updated: "2026-10-12"
+updated: "2026-10-13"
 related: [forwarded-clock.md, engines.md, spec-sources.md]
 authoring_mode: ai_generated
 ---
@@ -35,7 +35,8 @@ authoring_mode: ai_generated
 - 为什么:1e-27 = 1e27 个 bit 里 1 个错;时域永远到不了。统计引擎用解析高斯尾(`erfc`)+ 枚举 ISI 组合,不走 FFT 卷积
   (FFT 卷积在峰值 1e-16 以下没有精度)。
 - 怎么守:`tests/test_engines.py` 三个工作点(噪声主导、抖动主导、混合)时域 / 统计在 0.5–2× 内;`run_link` 默认只跑统计。
-- 边界:非 LTI(驱动器非线性、串扰)不在本轮;将来加入时 2× 判据只对 LTI + 高斯成立。
+- 边界:2× 判据只对 LTI + 高斯成立;串扰(M2 起)按独立 ±1 干扰项进入,仍在该范围内;驱动器非线性不在模型里。
+  体检(2026-10-13)指出测试只在 ~1e-4 查过 2×、1e-6 只在示例 03、1e-9 没跑过 —— 段 4 补。
 
 ## 4 多 lane 从第一天就在
 

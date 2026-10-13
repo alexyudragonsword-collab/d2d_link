@@ -38,13 +38,14 @@ for L in lengths:
     print(f"{L:11.0f} {s.extras['insertion_loss_nyquist_db']:12.2f} {1e3 * s.eye_height_v:16.1f} "
           f"{s.eye_width_ui:15.3f} {s.ber:14.2e} {s.eye_height_margin_mv:15.1f} {'yes' if ok else 'no':>5s}")
 
-eh_t = run_statistical(cfg).targets["eye_height_mv"]
+targets = run_statistical(cfg).targets
+eh_t, ber_t = targets["eye_height_mv"], targets["ber"]
 if last_pass is None:
     print("\nno length passes")
 else:
     ratio = last_pass / reach.value
     print(f"\nmodel reach: {last_pass:.0f} mm is the last length that clears eye height "
-          f"{eh_t[0]:g} mV (source: {eh_t[1]}), eye width and BER {rows[0][4] and cfg.target.ber or 1e-27:.0e}; "
+          f"{eh_t[0]:g} mV (source: {eh_t[1]}), eye width and BER {ber_t[0]:.0e} (source: {ber_t[1]}); "
           f"survey reach {reach.value:g} mm -> ratio {ratio:.2f}x"
           + ("  (within 2x)" if 0.5 <= ratio <= 2.0 else "  (MORE THAN 2x APART: see cairn/LOG.md)"))
 
