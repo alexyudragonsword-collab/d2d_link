@@ -80,12 +80,53 @@ def test_invalid_values_fail_at_construction(bad):
 
 
 def test_rlgc_preset_and_override():
-    assert LinkConfig().rlgc() == PACKAGE_RLGC["standard"]
+    r0 = LinkConfig().rlgc()
+    assert {k: r0[k] for k in PACKAGE_RLGC["standard"]} == PACKAGE_RLGC["standard"]
     cfg = LinkConfig(channel=ChannelConfig(loss_tangent=0.02))
     r = cfg.rlgc()
     assert r["loss_tangent"] == 0.02 and r["r_skin"] == PACKAGE_RLGC["standard"]["r_skin"]
     adv = apply_overrides(LinkConfig(), {"package.kind": "advanced"}).rlgc()
-    assert adv == PACKAGE_RLGC["advanced"]
+    assert {k: adv[k] for k in PACKAGE_RLGC["advanced"]} == PACKAGE_RLGC["advanced"]
+
+
+def test_rlgc_l_and_c_come_from_the_stackup():
+    """One geometry drives everything: Z0 = sqrt(L/C) is the preset, c^2 L C is
+    the Hammerstad eps_eff of the stack-up (the same number the coupled-line
+    crosstalk estimate uses), and an explicit L or C still wins."""
+    import math
+    from d2d_link.config.schema import C0, eps_eff_microstrip
+
+    for kind in ("standard", "advanced"):
+        cfg = apply_overrides(LinkConfig(), {"package.kind": kind})
+        r, st = cfg.rlgc(), cfg.stackup()
+        assert math.sqrt(r["l_h_m"] / r["c_f_m"]) == pytest.approx(r["z0_ohm"]) == pytest.approx(50.0)
+        assert C0 ** 2 * r["l_h_m"] * r["c_f_m"] == pytest.approx(st["eps_eff"]) == pytest.approx(r["eps_eff"])
+        assert st["eps_eff"] == pytest.approx(eps_eff_microstrip(st["eps_r"], st["trace_width_um"], st["dielectric_height_um"]))
+        assert 1.0 < st["eps_eff"] < st["eps_r"]
+    assert LinkConfig().stackup()["eps_eff"] == pytest.approx(2.537, abs=0.001)
+    assert apply_overrides(LinkConfig(), {"package.kind": "advanced"}).stackup()["eps_eff"] == pytest.approx(2.38, abs=0.001)
+    z = LinkConfig(channel=ChannelConfig(z0_ohm=60.0)).rlgc()
+    assert math.sqrt(z["l_h_m"] / z["c_f_m"]) == pytest.approx(60.0)
+    e = LinkConfig(channel=ChannelConfig(l_h_m=4e-7)).rlgc()
+    assert e["l_h_m"] == 4e-7 and e["c_f_m"] == pytest.approx(LinkConfig().rlgc()["c_f_m"])
+    tall = LinkConfig(channel=ChannelConfig(eps_r=4.0)).rlgc()
+    assert tall["c_f_m"] > LinkConfig().rlgc()["c_f_m"]                 # more dielectric: slower line
+
+
+def test_tx_bandwidth_default_and_ideal():
+    import math
+    import numpy as np
+    from d2d_link.channel.model import tx_response
+    from d2d_link.config import TxConfig
+
+    cfg = LinkConfig()
+    assert cfg.tx.bw_hz is None and cfg.tx_bw_hz == pytest.approx(2.0 * cfg.f_nyquist)
+    f = np.array([0.0, cfg.tx_bw_hz])
+    assert abs(tx_response(cfg, f)[1]) == pytest.approx(1 / math.sqrt(2.0))
+    ideal = LinkConfig(tx=TxConfig(bw_hz=math.inf))
+    assert ideal.tx_bw_hz == math.inf and np.all(tx_response(ideal, f) == 1.0)
+    with pytest.raises(ValueError):
+        TxConfig(bw_hz=0.0)
 
 
 def test_form_declares_every_field_and_nothing_else():

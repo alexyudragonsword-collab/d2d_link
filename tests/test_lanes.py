@@ -64,7 +64,10 @@ def test_residual_skew_moves_the_lane_off_centre():
     res = run_link(LinkConfig(lanes=LaneConfig(count=2, skew_ps=(0.0, 6.0), deskew_step_ps=20.0),
                               clocking=ck, sim=sim))
     assert res.stat[1].skew_residual_ui == pytest.approx(6e-12 / res.cfg.ui)
-    assert res.stat[1].eye_height_v < res.stat[0].eye_height_v
+    # off centre, the lane has only the symmetric opening around its sampling
+    # instant (the eye height need not drop: a driver pole skews the pulse so
+    # the height peaks later than the width's centre)
+    assert res.stat[1].eye_width_ui < res.stat[0].eye_width_ui - 0.1 and res.stat[1].margin < res.stat[0].margin
 
 
 def test_worst_lane_is_the_one_with_the_smallest_margin():
@@ -77,7 +80,7 @@ def test_worst_lane_is_the_one_with_the_smallest_margin():
     assert res.worst.lane == 1 and res.worst.margin < res.stat[0].margin
     assert res.stat[0].ber == 0.0 == res.stat[1].ber                 # the number that could not rank them
     assert res.log10_ber_worst == max(r.log10_ber for r in res.stat) and res.ber_worst == 0.0
-    assert res.eye_height_min_v == res.stat[1].eye_height_v
+    assert res.eye_width_min_ui == res.stat[1].eye_width_ui
 
 
 def test_tracked_lanes_keep_no_static_skew():

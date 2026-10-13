@@ -2,9 +2,13 @@
 
 A first-order coupled-microstrip estimate, not a field solver: it turns the
 numbers a package is known by -- the bump pitch (survey table), the trace
-width, the dielectric height and permittivity (``PACKAGE_STACKUP``) -- into
-the far-end coupling level the behavioural ``fext`` mode otherwise takes as
-a dB figure. Three ingredients (Johnson & Graham's rules of thumb for
+width, the dielectric height and permittivity (``PACKAGE_STACKUP``, source:
+model) -- into the far-end coupling level the behavioural ``fext`` mode
+otherwise takes as a dB figure. The effective permittivity is the same
+Hammerstad value the channel's own L and C are derived from
+(``LinkConfig.rlgc``), so the data and the crosstalk travel at one speed. The
+coupled length is ``channel.coupled_length_mm`` when given (mandatory with a
+Touchstone channel), else the analytic line's ``length_mm``. Three ingredients (Johnson & Graham's rules of thumb for
 coupled traces, Hammerstad's microstrip effective permittivity):
 
 * the coupling fraction between two traces at centre spacing ``s`` over a
@@ -27,10 +31,8 @@ from __future__ import annotations
 
 import math
 
-from ..config.schema import LinkConfig
+from ..config.schema import C0, LinkConfig, eps_eff_microstrip
 from ..spec import survey
-
-C0 = 299_792_458.0
 
 
 def trace_pitch_um(cfg: LinkConfig) -> tuple[float, str]:
@@ -44,11 +46,6 @@ def trace_pitch_um(cfg: LinkConfig) -> tuple[float, str]:
     return pitch, row.source
 
 
-def eps_eff_microstrip(eps_r: float, w_um: float, h_um: float) -> float:
-    """Hammerstad's effective permittivity of a microstrip of width w over height h."""
-    return 0.5 * (eps_r + 1.0) + 0.5 * (eps_r - 1.0) / math.sqrt(1.0 + 12.0 * h_um / w_um)
-
-
 def coupling_fraction(spacing_um: float, h_um: float) -> float:
     return 1.0 / (1.0 + (spacing_um / h_um) ** 2)
 
@@ -56,11 +53,11 @@ def coupling_fraction(spacing_um: float, h_um: float) -> float:
 def fext_ratio_at(cfg: LinkConfig, spacing_um: float) -> float:
     """|X/H| at the Nyquist frequency for two lanes ``spacing_um`` apart."""
     st = cfg.stackup()
-    eps_eff = eps_eff_microstrip(st["eps_r"], st["trace_width_um"], st["dielectric_height_um"])
+    eps_eff = st["eps_eff"]
     mismatch = max(1.0 - eps_eff / st["eps_r"], 0.0)
     v = C0 / math.sqrt(eps_eff)
     kappa = coupling_fraction(spacing_um, st["dielectric_height_um"])
-    tau = kappa * mismatch * (cfg.channel.length_mm * 1e-3) / (2.0 * v)
+    tau = kappa * mismatch * (cfg.coupled_length_mm() * 1e-3) / (2.0 * v)
     return min(2.0 * math.pi * cfg.f_nyquist * tau, 1.0 / math.sqrt(2.0))
 
 
@@ -78,9 +75,13 @@ def describe(cfg: LinkConfig) -> dict:
     """The numbers behind the estimate, for printing."""
     pitch, src = trace_pitch_um(cfg)
     st = cfg.stackup()
-    eps_eff = eps_eff_microstrip(st["eps_r"], st["trace_width_um"], st["dielectric_height_um"])
+    eps_eff = st["eps_eff"]
     adj, sec = fext_db(cfg)
-    return {"pitch_um": pitch, "pitch_source": src, **st, "eps_eff": eps_eff,
+    ch = cfg.channel
+    explicit = {k for k in ("trace_width_um", "dielectric_height_um", "eps_r") if getattr(ch, k) is not None}
+    return {"pitch_um": pitch, "pitch_source": src, **st,
+            "stackup_source": "config" if explicit else "model",
+            "coupled_length_mm": cfg.coupled_length_mm(),
             "kappa_adjacent": coupling_fraction(pitch, st["dielectric_height_um"]),
             "mismatch": 1.0 - eps_eff / st["eps_r"], "fext_adjacent_db": adj, "fext_second_db": sec}
 

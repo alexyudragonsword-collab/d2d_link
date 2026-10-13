@@ -44,6 +44,22 @@ def test_coupling_falls_with_spacing_and_grows_with_length():
     assert r25 == pytest.approx(5.0 * r5, rel=1e-9)                     # linear in length below the cap
 
 
+def test_coupled_length_is_explicit_with_a_touchstone_channel():
+    """A Touchstone file carries no routed length; the estimate needs one."""
+    with pytest.raises(ValueError, match="coupled_length_mm"):
+        ChannelConfig(kind="touchstone", file="x.s4p", xtalk="coupled")
+    ok = ChannelConfig(kind="touchstone", file="x.s4p", xtalk="coupled", coupled_length_mm=12.0)
+    assert LinkConfig(channel=ok).coupled_length_mm() == 12.0
+    # on an analytic line the coupled length defaults to the line's length and may be shortened
+    cfg = LinkConfig(channel=COUPLED)
+    assert cfg.coupled_length_mm() == 25.0
+    half = LinkConfig(channel=dataclasses.replace(COUPLED, coupled_length_mm=12.5))
+    assert fext_ratio_at(half, 115.0) == pytest.approx(0.5 * fext_ratio_at(cfg, 115.0), rel=1e-9)
+    d = describe(half)
+    assert d["coupled_length_mm"] == 12.5 and d["stackup_source"] == "model" and d["eps_eff"] == pytest.approx(cfg.rlgc()["eps_eff"])
+    assert describe(LinkConfig(channel=dataclasses.replace(COUPLED, eps_r=3.0)))["stackup_source"] == "config"
+
+
 def test_homogeneous_dielectric_couples_no_fext():
     # eps_eff == eps_r (a stripline at this order): the odd and even modes travel together
     cfg = LinkConfig(channel=dataclasses.replace(COUPLED, trace_width_um=1e6, dielectric_height_um=1.0))
@@ -98,3 +114,30 @@ def test_budget_report_markdown_and_json(budget_tool, tmp_path):
     assert budget_tool.main([str(REPO / "configs" / "standard_32g_x1.yaml"), "-o", str(out),
                              "--json", str(tmp_path / "b.json")]) == 0
     assert out.exists() and (tmp_path / "b.json").exists()
+
+
+def test_sensitivity_report_names_the_deciding_guesses(budget_tool):
+    """Every model preset and survey number the verdict leans on is perturbed;
+    a target set just inside the nominal eye is flipped by the loss knobs."""
+    from d2d_link.config import TargetConfig
+
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0), clocking=ClockingConfig(pll_profile=PROFILE),
+                     sim=SimConfig(stat_phase_points=16),
+                     target=TargetConfig(eye_height_mv=215.0))              # 222 mV nominal: 20 % more skin loss (203) closes it
+    sens = budget_tool.sensitivity(cfg)
+    labels = {r["label"]: r for r in sens["rows"]}
+    assert {"rdc_ohm_m", "r_skin", "loss_tangent", "z0_ohm", "target.eye_height_mv", "target.eye_width_ui"} <= set(labels)
+    assert "trace_pitch_um" not in labels                                   # one lane: no crosstalk knobs
+    assert labels["r_skin"]["source"] == "model" and labels["target.eye_width_ui"]["source"] == "survey"
+    assert labels["target.eye_height_mv"]["source"] == "config"
+    assert sens["nominal"]["passes"] and labels["r_skin"]["flips"] and labels["target.eye_height_mv"]["flips"]
+    assert labels["r_skin"]["high"]["passes"] is False and labels["r_skin"]["low"]["passes"] is True
+    assert labels["z0_ohm"]["low"]["passes"] is False                      # 40 ohm into 50 ohm terminations: reflections
+    assert not labels["rdc_ohm_m"]["flips"]                                # DC resistance does not decide anything
+    md = budget_tool.sensitivity_markdown(sens)
+    assert "Verdict-deciding:" in md and "r_skin" in md
+    coupled = LinkConfig(channel=COUPLED, lanes=LaneConfig(count=3), sim=SimConfig(stat_phase_points=16))
+    knobs = {k["label"]: k for k in budget_tool.sensitivity_knobs(coupled)}
+    assert {"trace_pitch_um", "eps_r", "dielectric_height_um", "trace_width_um"} <= set(knobs)
+    assert knobs["trace_pitch_um"]["source"] == "survey" and knobs["eps_r"]["source"] == "model"
+

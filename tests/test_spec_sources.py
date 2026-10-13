@@ -20,6 +20,34 @@ def test_every_entry_is_tagged_and_cited():
             assert "未核实" in e.note, f"{key}: a survey entry's note must say it is unverified"
 
 
+def test_model_presets_are_tagged_and_grep_able():
+    """The numbers the spec does not own (trace loss, stack-up, behavioural
+    crosstalk) are estimates: every one carries ``source: model`` and the
+    grep the docs promise counts exactly the entries. The survey table may
+    not hold an estimate, nor the preset table a spec number."""
+    import subprocess
+
+    presets = spec.all_presets()
+    assert len(presets) == 18 and all(e.estimated and e.cite and e.note for e in presets.values())
+    out = subprocess.run(["grep", "-c", "source: model"], input=spec.PRESETS_FILE.read_text(encoding="utf-8"),
+                         capture_output=True, text=True)
+    assert int(out.stdout.strip()) == len(presets)
+    assert not any(e.estimated for e in spec.all_entries().values())
+    with pytest.raises(ValueError, match="does not belong"):
+        spec.load_survey(spec.PRESETS_FILE)
+    with pytest.raises(ValueError, match="does not belong"):
+        spec.load_survey(spec.SURVEY_FILE, allowed=("model",))
+    for pkg in ("standard", "advanced"):
+        assert spec.preset("z0_ohm", pkg).value == 50.0
+    with pytest.raises(KeyError):
+        spec.preset("nonexistent", "standard")
+    from d2d_link.config.schema import PACKAGE_RLGC, PACKAGE_STACKUP, PACKAGE_XTALK_DB
+    assert PACKAGE_RLGC["standard"]["r_skin"] == spec.preset("r_skin", "standard").value
+    assert PACKAGE_STACKUP["advanced"]["eps_r"] == spec.preset("eps_r", "advanced").value
+    assert PACKAGE_XTALK_DB["standard"] == spec.preset("xtalk_adjacent_db", "standard").value
+    assert "l_h_m" not in PACKAGE_RLGC["standard"] and "c_f_m" not in PACKAGE_RLGC["standard"]
+
+
 def test_grep_lists_every_unverified_number():
     """The command the docs promise -- ``grep -c "source: survey"`` on the
     table -- must count exactly the unverified entries: no header comment

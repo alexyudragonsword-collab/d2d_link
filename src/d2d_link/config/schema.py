@@ -42,42 +42,41 @@ def _finite_pos(value: float, name: str) -> None:
 # package / channel
 # ---------------------------------------------------------------------------
 
-#: Per-package RLGC presets for the analytic lossy line, used where
-#: ``ChannelConfig`` leaves a parameter ``None``. These are *model* numbers
-#: (a 50 ohm organic-substrate microstrip for the standard package, a short
-#: fine-pitch silicon-bridge / interposer line for the advanced one), not
-#: specification values; the reach and pitch figures the packages are known
-#: by live in data/spec/ucie_survey.yaml with their source tags.
-PACKAGE_RLGC: dict[str, dict[str, float]] = {
-    # ~1.1 dB/cm at 16 GHz (0.87 conductor + 0.27 dielectric), so 25 mm is
-    # about 3 dB at the 32 GT/s Nyquist -- the order of magnitude surveys quote
-    # for an organic package trace.
-    "standard": dict(rdc_ohm_m=10.0, r_skin=8.0e-3, l_h_m=3.3e-7, c_f_m=1.33e-10,
-                     loss_tangent=0.010, g_s_m=0.0),
-    # narrow (2-3 um) RDL lines: high DC resistance, dielectric loss of an
-    # oxide/polyimide stack, only ever a couple of millimetres long.
-    "advanced": dict(rdc_ohm_m=2.0e3, r_skin=2.5e-2, l_h_m=4.0e-7, c_f_m=1.6e-10,
-                     loss_tangent=0.004, g_s_m=0.0),
-}
+#: Per-package *model* presets (``data/spec/model_presets.yaml``, every entry
+#: ``source: model``): the analytic line's loss parameters and characteristic
+#: impedance, the routing stack-up, and the behavioural crosstalk level, used
+#: where ``ChannelConfig`` leaves a parameter ``None``. The line's L and C are
+#: not preset: ``LinkConfig.rlgc`` derives them from ``z0_ohm`` and the
+#: stack-up's effective permittivity (Hammerstad), so the channel's delay and
+#: the coupled-line crosstalk estimate travel at one speed. Earlier versions
+#: carried L and C as separate numbers whose implied eps_eff (3.94 / 5.75)
+#: contradicted the stack-up's eps_r (3.5 / 3.3). The reach and pitch figures
+#: the packages are known by live in ucie_survey.yaml with their own source.
+C0 = 299_792_458.0
+RLGC_PRESET_KEYS = ("rdc_ohm_m", "r_skin", "loss_tangent", "g_s_m", "z0_ohm")
+STACKUP_KEYS = ("trace_width_um", "dielectric_height_um", "eps_r")
 
 
-#: Per-package far-end crosstalk of the nearest neighbour lane, |X/H| at the
-#: Nyquist frequency in dB, used where ``ChannelConfig.xtalk_adjacent_db`` is
-#: None. Model estimates for coupled microstrip at the packages' bump pitches
-#: (data/spec/ucie_survey.yaml holds the pitches, not these), to be replaced
-#: by a measured coupled-line model when one is available.
-PACKAGE_XTALK_DB: dict[str, float] = {"standard": -30.0, "advanced": -24.0}
+def _load_presets():
+    from ..spec import preset_values
+
+    values = preset_values()
+    rlgc = {pkg: {k: float(v[k]) for k in RLGC_PRESET_KEYS} for pkg, v in values.items()}
+    stack = {pkg: {k: float(v[k]) for k in STACKUP_KEYS} for pkg, v in values.items()}
+    xt = {pkg: float(v["xtalk_adjacent_db"]) for pkg, v in values.items()}
+    return rlgc, stack, xt
 
 
-#: Per-package routing stack-up for the coupled-line crosstalk estimate
-#: (``ChannelConfig.xtalk == "coupled"``): trace width, dielectric height
-#: under the trace and its relative permittivity. Model estimates for an
-#: organic build-up layer (standard) and a thin RDL (advanced); the trace
-#: pitch itself defaults to the package's bump pitch from the survey table.
-PACKAGE_STACKUP: dict[str, dict[str, float]] = {
-    "standard": dict(trace_width_um=20.0, dielectric_height_um=30.0, eps_r=3.5),
-    "advanced": dict(trace_width_um=2.0, dielectric_height_um=4.0, eps_r=3.3),
-}
+PACKAGE_RLGC: dict[str, dict[str, float]]
+PACKAGE_STACKUP: dict[str, dict[str, float]]
+PACKAGE_XTALK_DB: dict[str, float]
+PACKAGE_RLGC, PACKAGE_STACKUP, PACKAGE_XTALK_DB = _load_presets()
+
+
+def eps_eff_microstrip(eps_r: float, w_um: float, h_um: float) -> float:
+    """Hammerstad's effective permittivity of a microstrip of width w over
+    height h -- the one speed the channel delay and the crosstalk estimate share."""
+    return 0.5 * (eps_r + 1.0) + 0.5 * (eps_r - 1.0) / math.sqrt(1.0 + 12.0 * h_um / w_um)
 
 
 @dataclass(frozen=True)
@@ -105,13 +104,15 @@ class ChannelConfig:
     zs_ohm: float = 50.0               # source termination
     zl_ohm: float = 50.0               # receiver termination
     n_freq: int = 2048                 # points on the uniform DC-inclusive grid
-    # analytic RLGC, None -> PACKAGE_RLGC[package.kind]
+    # analytic RLGC, None -> PACKAGE_RLGC[package.kind] (source: model); L and
+    # C default to the values z0_ohm and the stack-up's eps_eff imply
     rdc_ohm_m: Optional[float] = None
     r_skin: Optional[float] = None     # R(f) = rdc + r_skin sqrt(f)  [ohm/(m sqrt(Hz))]
-    l_h_m: Optional[float] = None
-    c_f_m: Optional[float] = None
+    l_h_m: Optional[float] = None      # explicit L overrides the geometry
+    c_f_m: Optional[float] = None      # explicit C overrides the geometry
     loss_tangent: Optional[float] = None
     g_s_m: Optional[float] = None
+    z0_ohm: Optional[float] = None     # characteristic impedance the geometry is fitted to; None -> preset
     # lane-to-lane crosstalk (needs lanes.count > 1 to do anything)
     #   fext    : behavioural level, xtalk_adjacent_db / xtalk_second_db (None -> package preset)
     #   coupled : the level estimated from the routing geometry below (coupled microstrip, first order)
@@ -119,9 +120,11 @@ class ChannelConfig:
     xtalk_adjacent_db: Optional[float] = None   # |X/H| at Nyquist, nearest neighbour; None -> package preset
     xtalk_second_db: Optional[float] = None     # second neighbour; None -> adjacent - 12 dB
     trace_pitch_um: Optional[float] = None      # centre-to-centre lane pitch; None -> the package's bump pitch (survey)
-    trace_width_um: Optional[float] = None      # None -> PACKAGE_STACKUP
+    trace_width_um: Optional[float] = None      # None -> PACKAGE_STACKUP (source: model)
     dielectric_height_um: Optional[float] = None
     eps_r: Optional[float] = None
+    coupled_length_mm: Optional[float] = None   # length the coupled estimate integrates over; None -> length_mm
+                                                # (required with a Touchstone channel, which has no length_mm)
 
     def __post_init__(self):
         _require_in(self.kind, {"analytic", "touchstone"}, "channel.kind")
@@ -130,10 +133,14 @@ class ChannelConfig:
             v = getattr(self, name)
             if v is not None:
                 _require(math.isfinite(v) and v < 0.0, f"channel.{name} must be a negative dB figure, got {v!r}")
-        for name in ("trace_pitch_um", "trace_width_um", "dielectric_height_um"):
+        for name in ("trace_pitch_um", "trace_width_um", "dielectric_height_um", "z0_ohm", "coupled_length_mm"):
             v = getattr(self, name)
             if v is not None:
                 _finite_pos(v, f"channel.{name}")
+        if self.xtalk == "coupled" and self.kind == "touchstone":
+            _require(self.coupled_length_mm is not None,
+                     "channel.xtalk 'coupled' with a Touchstone channel needs channel.coupled_length_mm: "
+                     "the file carries no routed length for the estimate to integrate over")
         if self.eps_r is not None:
             _require(math.isfinite(self.eps_r) and self.eps_r >= 1.0, f"channel.eps_r must be >= 1, got {self.eps_r!r}")
         _finite_nonneg(self.length_mm, "channel.length_mm")
@@ -303,12 +310,15 @@ class ClockingConfig:
 @dataclass(frozen=True)
 class TxConfig:
     swing_vpp: float = 0.4          # launched swing into a matched load [V pp]
-    bw_hz: Optional[float] = None   # driver first-order bandwidth; None = ideal
+    bw_hz: Optional[float] = None   # driver first-order bandwidth; None = twice the Nyquist frequency
+                                    # (the data rate in Hz); inf = ideal brick-wall edges (rings at the
+                                    # band edge: a short, clean line then reads an eye wider than 1 UI)
 
     def __post_init__(self):
         _finite_pos(self.swing_vpp, "tx.swing_vpp")
         if self.bw_hz is not None:
-            _finite_pos(self.bw_hz, "tx.bw_hz")
+            _require(self.bw_hz > 0.0 and not math.isnan(self.bw_hz),
+                     f"tx.bw_hz must be > 0 (inf allowed) or null, got {self.bw_hz!r}")
 
 
 @dataclass(frozen=True)
@@ -455,14 +465,38 @@ class LinkConfig:
         sec = self.channel.xtalk_second_db
         return adj, (adj - 12.0 if sec is None else sec)
 
+    @property
+    def tx_bw_hz(self) -> float:
+        """The driver bandwidth the engines use: ``tx.bw_hz``, or twice the
+        Nyquist frequency when the config leaves it unset."""
+        return self.tx.bw_hz if self.tx.bw_hz is not None else self.symbol_rate
+
     def stackup(self) -> dict[str, float]:
-        """Trace width, dielectric height and eps_r: explicit fields over the package preset."""
+        """Trace width, dielectric height and eps_r: explicit fields over the
+        package preset (source: model), plus the Hammerstad ``eps_eff``."""
         preset = PACKAGE_STACKUP[self.package.kind]
-        return {k: (getattr(self.channel, k) if getattr(self.channel, k) is not None else v)
-                for k, v in preset.items()}
+        st = {k: (getattr(self.channel, k) if getattr(self.channel, k) is not None else v)
+              for k, v in preset.items()}
+        st["eps_eff"] = eps_eff_microstrip(st["eps_r"], st["trace_width_um"], st["dielectric_height_um"])
+        return st
 
     def rlgc(self) -> dict[str, float]:
-        """The analytic line's RLGC: explicit channel fields over the package preset."""
+        """The analytic line's RLGC: explicit channel fields over the package
+        preset for R and the losses; L and C from ``z0_ohm`` and the
+        stack-up's ``eps_eff`` (L = Z0 sqrt(eps_eff) / c, C = sqrt(eps_eff) /
+        (Z0 c)) unless given explicitly. ``eps_eff`` and ``z0_ohm`` ride along."""
         preset = PACKAGE_RLGC[self.package.kind]
-        return {k: (getattr(self.channel, k) if getattr(self.channel, k) is not None else v)
-                for k, v in preset.items()}
+        out = {k: (getattr(self.channel, k) if getattr(self.channel, k) is not None else v)
+               for k, v in preset.items()}
+        eps_eff = self.stackup()["eps_eff"]
+        z0 = out["z0_ohm"]
+        n = math.sqrt(eps_eff)
+        out["l_h_m"] = self.channel.l_h_m if self.channel.l_h_m is not None else z0 * n / C0
+        out["c_f_m"] = self.channel.c_f_m if self.channel.c_f_m is not None else n / (z0 * C0)
+        out["eps_eff"] = eps_eff
+        return out
+
+    def coupled_length_mm(self) -> float:
+        """The length the coupled-line crosstalk estimate integrates over."""
+        c = self.channel
+        return c.coupled_length_mm if c.coupled_length_mm is not None else c.length_mm

@@ -43,7 +43,9 @@ for name, cfg in cases.items():
     reach = survey("reach_mm", cfg.package.kind)
     x = describe(cfg)
     print(f"\n{name} package at {cfg.channel.length_mm:g} mm (survey reach {reach.value:g} mm): pitch {x['pitch_um']:g} um "
-          f"(source: {x['pitch_source']}), FEXT estimate {x['fext_adjacent_db']:.1f} dB at Nyquist for 32 GT/s")
+          f"(source: {x['pitch_source']}), stack-up w {x['trace_width_um']:g} / h {x['dielectric_height_um']:g} um, "
+          f"eps_r {x['eps_r']:g} -> eps_eff {x['eps_eff']:.2f} (source: {x['stackup_source']}), "
+          f"FEXT estimate {x['fext_adjacent_db']:.1f} dB at Nyquist for 32 GT/s")
     print(f"{'GT/s':>5s} {'UI [ps]':>8s} {'IL@Nyq [dB]':>12s} {'FEXT [dB]':>10s} {'jitter [UI]':>12s} {'eye height [mV]':>16s} "
           f"{'eye width [UI]':>15s} {'log10 BER':>10s} {'pass':>5s}")
     rows = []

@@ -80,8 +80,10 @@ class ChannelModel:
 
 
 def tx_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
-    bw = cfg.tx.bw_hz
-    return np.ones_like(f, dtype=complex) if bw is None else 1.0 / (1.0 + 1j * f / bw)
+    """The driver's first-order pole at ``cfg.tx_bw_hz`` (twice the Nyquist
+    frequency unless the config says otherwise); ``inf`` is the ideal edge."""
+    bw = cfg.tx_bw_hz
+    return np.ones_like(f, dtype=complex) if not np.isfinite(bw) else 1.0 / (1.0 + 1j * f / bw)
 
 
 def ctle_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:

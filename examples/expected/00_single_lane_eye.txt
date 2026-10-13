@@ -1,6 +1,6 @@
 link: standard package, 32 GT/s, 25 mm, 1 lane, forwarded clock 16 GHz DDR
-channel: insertion loss -2.95 dB at Nyquist (16 GHz), main cursor 163.3 mV of 200 mV
-cursors at the peak [mV]: pre 1.23 2.34 8.09 | main 163.33 | post 8.35 2.42 1.29 0.83
+channel: insertion loss -2.80 dB at Nyquist (16 GHz), main cursor 164.6 mV of 200 mV; RLGC preset (source: model): Z0 50 ohm, eps_eff 2.54, tan d 0.01
+cursors at the peak [mV]: pre 1.18 2.23 7.48 | main 164.59 | post 8.22 2.37 1.26 0.81
 
 jitter budget at the sampler (RMS, closed form):
   Tx PLL in band 122.1 kHz .. 16 GHz : 186.2 fs  (what an independent clock would add)
@@ -11,11 +11,11 @@ jitter budget at the sampler (RMS, closed form):
   total residual                                            : 295.3 fs = 0.0095 UI
 
 statistical engine [~s]:
-  sampling phase -0.0198 UI from the pulse's reference sample (eye centre), BER there 10^-436.0
-  eye height at BER 1e-27: 209.8 mV  vs target 40 mV (source: survey) -> margin +169.8 mV
-  eye width  at BER 1e-27: 0.772 UI  vs target 0.75 UI (source: survey) -> margin +0.022 UI
-  BER target 1e-27 (source: survey); 69 ISI cursors, 12.42 mV RMS, exact distribution on 1315 bins of 50 uV
+  sampling phase -0.0078 UI from the pulse's reference sample (eye centre), BER there 10^-455.9
+  eye height at BER 1e-27: 215.6 mV  vs target 40 mV (source: survey) -> margin +175.6 mV
+  eye width  at BER 1e-27: 0.775 UI  vs target 0.75 UI (source: survey) -> margin +0.025 UI
+  BER target 1e-27 (source: survey); 68 ISI cursors, 11.83 mV RMS, exact distribution on 1241 bins of 50 uV
   verdict: PASS
 
-time engine [~s]: 0 errors in 400000 symbols (statistics predict 10^-430.4); sampled eye opening 260.1 mV; jitter the sampler saw 295.0 fs RMS
+time engine [~s]: 0 errors in 400000 symbols (statistics predict 10^-450.3); sampled eye opening 264.3 mV; jitter the sampler saw 295.0 fs RMS
 wrote examples/output/00_single_lane_eye.png

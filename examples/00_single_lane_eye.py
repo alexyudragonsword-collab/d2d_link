@@ -30,9 +30,11 @@ b = clock.budget()
 
 print(f"link: {cfg.package.kind} package, {cfg.data_rate_gtps:g} GT/s, {cfg.channel.length_mm:g} mm, "
       f"{cfg.lanes.count} lane, forwarded clock {cfg.forwarded_clock_hz / 1e9:g} GHz DDR")
+rl = cfg.rlgc()
 print(f"channel: insertion loss {resp.channel.insertion_loss_db(cfg.f_nyquist):.2f} dB at Nyquist "
       f"({cfg.f_nyquist / 1e9:g} GHz), main cursor {1e3 * resp.main_amplitude:.1f} mV of "
-      f"{1e3 * cfg.tx.swing_vpp / 2:.0f} mV")
+      f"{1e3 * cfg.tx.swing_vpp / 2:.0f} mV; RLGC preset (source: model): Z0 {rl['z0_ohm']:g} ohm, "
+      f"eps_eff {rl['eps_eff']:.2f}, tan d {rl['loss_tangent']:g}")
 c, i_main = resp.cursors(0.0)
 print("cursors at the peak [mV]: pre " + " ".join(f"{1e3 * x:.2f}" for x in c[max(0, i_main - 3):i_main])
       + f" | main {1e3 * c[i_main]:.2f} | post " + " ".join(f"{1e3 * x:.2f}" for x in c[i_main + 1:i_main + 5]))

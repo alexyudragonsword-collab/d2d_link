@@ -1,17 +1,17 @@
 standard package, 32 GT/s; survey reach 25 mm (source: survey; UCIe Consortium white paper (2022): standard package reach up to 25 mm)
 length [mm]  IL@Nyq [dB]  eye height [mV]  eye width [UI]      log10 BER  margin EH [mV]  pass
-          5        -0.59            310.9           0.793         -841.5           270.9   yes
-         10        -1.18            284.9           0.791         -723.8           244.9   yes
-         15        -1.77            259.1           0.786         -616.4           219.1   yes
-         20        -2.36            234.1           0.780         -520.5           194.1   yes
-         25        -2.95            209.8           0.772         -436.0           169.8   yes
-         30        -3.54            186.4           0.761         -361.7           146.4   yes
-         35        -4.13            163.9           0.747         -297.0           123.9    no
-         40        -4.72            142.3           0.729         -241.1           102.3    no
-         45        -5.31            121.5           0.707         -193.5            81.5    no
-         50        -5.90            101.6           0.680         -153.2            61.6    no
-         55        -6.49             82.5           0.646         -119.4            42.5    no
-         60        -7.08             64.2           0.601          -91.5            24.2    no
+          5        -0.56            312.3           0.794         -849.9           272.3   yes
+         10        -1.12            287.6           0.792         -736.4           247.6   yes
+         15        -1.68            263.0           0.787         -632.3           223.0   yes
+         20        -2.24            238.9           0.782         -538.8           198.9   yes
+         25        -2.80            215.6           0.775         -455.9           175.6   yes
+         30        -3.36            193.1           0.765         -382.5           153.1   yes
+         35        -3.92            171.4           0.753         -318.0           131.4   yes
+         40        -4.48            150.4           0.739         -261.7           110.4    no
+         45        -5.04            130.2           0.720         -213.2            90.2    no
+         50        -5.60            110.7           0.697         -171.6            70.7    no
+         55        -6.16             92.1           0.669         -136.3            52.1    no
+         60        -6.72             74.3           0.632         -106.7            34.3    no
 
-model reach: 30 mm is the last length that clears eye height 40 mV (source: survey), eye width and BER 1e-27 (source: survey); survey reach 25 mm -> ratio 1.20x  (within 2x)
+model reach: 35 mm is the last length that clears eye height 40 mV (source: survey), eye width and BER 1e-27 (source: survey); survey reach 25 mm -> ratio 1.40x  (within 2x)
 wrote examples/output/02_reach_sweep.png

@@ -3,6 +3,15 @@
     python tools/budget_report.py configs/standard_32g_x16_module.yaml
     python tools/budget_report.py configs/standard_32g_x1.yaml -o budget.md
     python tools/budget_report.py configs/standard_32g_x1.yaml --json budget.json
+    python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity
+
+``--sensitivity`` answers "which guesses decide the verdict": every model
+preset the config leans on (source: model -- trace resistance, loss tangent,
+Z0, stack-up geometry, behavioural crosstalk level) and every survey number
+it leans on (bump pitch for the coupled estimate; the eye-mask targets) is
+moved by +-20 % (targets by +-10 mV / +-0.05 UI) and the link rerun; the
+table lists the worst lane's margin on each side and marks the parameters
+whose perturbation flips PASS/FAIL.
 
 Everything comes from the config and the statistical engine (invariant #1,
 #3): the clock-path budget in fs and UI by origin (Tx PLL leak, local PLL,
@@ -60,7 +69,11 @@ def report(cfg, res, clock) -> dict:
                          + [{"term": "total (power sum)", "fs": 1e15 * total, "ui": total / ui}],
         "targets": {k: {"value": v, "source": src} for k, (v, src) in t.items()},
         "crosstalk": ({"mode": cfg.channel.xtalk, **describe(cfg)} if cfg.channel.xtalk == "coupled"
-                      else {"mode": cfg.channel.xtalk, "adjacent_db": cfg.xtalk_db()[0] if cfg.channel.xtalk != "none" else None}),
+                      else {"mode": cfg.channel.xtalk, "adjacent_db": cfg.xtalk_db()[0] if cfg.channel.xtalk != "none" else None,
+                            "adjacent_source": ("config" if cfg.channel.xtalk_adjacent_db is not None else "model")
+                            if cfg.channel.xtalk != "none" else None}),
+        "channel_model": ({"rlgc_source": "model", **{k: v for k, v in cfg.rlgc().items()}}
+                          if cfg.channel.kind == "analytic" else {"file": cfg.channel.file}),
         "lanes": [{"logical": r.lane, "physical": lm.logical_to_physical[r.lane],
                    "skew_ps": float(res.skew_ps[lm.logical_to_physical[r.lane]]),
                    "skew_residual_ui": r.skew_residual_ui, "aggressors": r.extras["n_aggressors"],
@@ -119,16 +132,114 @@ def build(cfg):
     return report(cfg, run_link(cfg), ForwardedClock(cfg))
 
 
+def sensitivity_knobs(cfg) -> list[dict]:
+    """The estimated and unverified numbers this config's verdict rests on:
+    ``(label, config path, nominal, source, step)`` for each. A parameter the
+    config sets explicitly is its own claim (source config) and still listed."""
+    from d2d_link.channel.coupled import trace_pitch_um
+    from d2d_link.config.schema import RLGC_PRESET_KEYS, STACKUP_KEYS
+
+    ch = cfg.channel
+    knobs = []
+    if ch.kind == "analytic":
+        r = cfg.rlgc()
+        for k in RLGC_PRESET_KEYS:
+            if r[k] != 0.0:
+                knobs.append(dict(label=k, path=f"channel.{k}", nominal=r[k],
+                                  source="config" if getattr(ch, k) is not None else "model", rel=0.2))
+    if ch.xtalk == "coupled" and cfg.lanes.count > 1:
+        st = cfg.stackup()
+        for k in STACKUP_KEYS:
+            knobs.append(dict(label=k, path=f"channel.{k}", nominal=st[k],
+                              source="config" if getattr(ch, k) is not None else "model", rel=0.2))
+        pitch, src = trace_pitch_um(cfg)
+        knobs.append(dict(label="trace_pitch_um", path="channel.trace_pitch_um", nominal=pitch, source=src, rel=0.2))
+    elif ch.xtalk == "fext" and cfg.lanes.count > 1:
+        adj = cfg.xtalk_db()[0]
+        knobs.append(dict(label="xtalk_adjacent_db", path="channel.xtalk_adjacent_db", nominal=adj,
+                          source="config" if ch.xtalk_adjacent_db is not None else "model", rel=0.2))
+    return knobs
+
+
+def sensitivity(cfg, eye_height_mv: float = 10.0, eye_width_ui: float = 0.05) -> dict:
+    """Rerun the link with each knob at (1 - rel) and (1 + rel) of its nominal
+    value; the eye-mask targets are moved by +-``eye_height_mv`` /
+    +-``eye_width_ui`` without a rerun (the margins are read off the nominal
+    result). Returns the nominal verdict and one row per knob."""
+    from d2d_link.config import apply_overrides
+    from d2d_link.engine import run_link
+    from d2d_link.engine.statistical import resolved_targets
+
+    def verdict(res):
+        worst = res.worst
+        return {"passes": bool(res.passes), "worst_lane": worst.lane, "margin": float(worst.margin),
+                "eye_height_mv": 1e3 * res.eye_height_min_v, "eye_width_ui": res.eye_width_min_ui}
+
+    base = run_link(cfg)
+    nominal = verdict(base)
+    rows = []
+    for k in sensitivity_knobs(cfg):
+        sides = {}
+        for sign, name in ((-1.0, "low"), (1.0, "high")):
+            value = k["nominal"] * (1.0 + sign * k["rel"])
+            res = run_link(apply_overrides(cfg, {k["path"]: value}))
+            sides[name] = {"value": value, **verdict(res)}
+        rows.append({**k, **sides, "flips": sides["low"]["passes"] != nominal["passes"]
+                     or sides["high"]["passes"] != nominal["passes"]})
+    # the eye-mask targets: tighter / looser by a fixed step, read off the nominal eyes
+    t = resolved_targets(cfg)
+    eh, ew = 1e3 * base.eye_height_min_v, base.eye_width_min_ui
+    for label, key, step, have in (("eye_height_mv", "eye_height_mv", eye_height_mv, eh),
+                                   ("eye_width_ui", "eye_width_ui", eye_width_ui, ew)):
+        nom, src = t[key]
+        low, high = nom - step, nom + step
+        ok_low, ok_high = base.lanes.link_up and have >= low, base.lanes.link_up and have >= high
+        other_ok = all(r.log10_ber <= math.log10(r.target_ber) for r in base.stat) and (
+            (ew >= t["eye_width_ui"][0]) if key == "eye_height_mv" else (eh >= t["eye_height_mv"][0]))
+        rows.append(dict(label=f"target.{label}", path=f"target.{label}", nominal=nom, source=src, rel=None,
+                         low={"value": low, "passes": bool(ok_low and other_ok), "worst_lane": base.worst.lane,
+                              "margin": (have - low) / low if low > 0 else float("nan")},
+                         high={"value": high, "passes": bool(ok_high and other_ok), "worst_lane": base.worst.lane,
+                               "margin": (have - high) / high},
+                         flips=bool((ok_low and other_ok) != nominal["passes"] or (ok_high and other_ok) != nominal["passes"])))
+    return {"nominal": nominal, "rows": rows}
+
+
+def sensitivity_markdown(sens: dict) -> str:
+    n = sens["nominal"]
+    lines = ["## Sensitivity", "",
+             f"Nominal: {'PASS' if n['passes'] else 'FAIL'}, worst lane {n['worst_lane']} margin {n['margin']:+.3f} "
+             f"(min eye {n['eye_height_mv']:.1f} mV / {n['eye_width_ui']:.3f} UI). Each estimate (source: model) and "
+             "unverified number (source: survey) moved -20 % / +20 % (targets -/+ 10 mV, 0.05 UI); "
+             "margin = min(eye height, eye width) relative to its target, worst lane.", "",
+             "| parameter | source | nominal | low -> verdict (margin) | high -> verdict (margin) | flips |",
+             "|---|---|---:|---|---|---|"]
+    for r in sens["rows"]:
+        lo, hi = r["low"], r["high"]
+        lines.append(f"| {r['label']} | {r['source']} | {r['nominal']:.4g} | {lo['value']:.4g} -> "
+                     f"{'PASS' if lo['passes'] else 'FAIL'} ({lo['margin']:+.3f}) | {hi['value']:.4g} -> "
+                     f"{'PASS' if hi['passes'] else 'FAIL'} ({hi['margin']:+.3f}) | {'**yes**' if r['flips'] else 'no'} |")
+    flips = [r["label"] for r in sens["rows"] if r["flips"]]
+    lines += ["", ("Verdict-deciding: " + ", ".join(flips)) if flips else "No single perturbation flips the verdict.", ""]
+    return "\n".join(lines)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("config", type=Path)
     ap.add_argument("-o", "--out", type=Path, help="Markdown file (default: stdout)")
     ap.add_argument("--json", type=Path, help="also write the report as JSON")
+    ap.add_argument("--sensitivity", action="store_true",
+                    help="also perturb every model / survey number by +-20 %% and report which flip the verdict")
     args = ap.parse_args(argv)
     from d2d_link.config import load_config
 
-    rep = build(load_config(args.config))
+    cfg = load_config(args.config)
+    rep = build(cfg)
     md = to_markdown(rep)
+    if args.sensitivity:
+        rep["sensitivity"] = sensitivity(cfg)
+        md += "\n" + sensitivity_markdown(rep["sensitivity"])
     if args.out:
         args.out.write_text(md, encoding="utf-8")
         print(f"wrote {args.out}")

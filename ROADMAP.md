@@ -10,26 +10,31 @@
 ## P1 — 结论的可信度
 
 1. **规范数字全部未核实**(铁律 5)。15 条 `source: survey`(`grep -c "source: survey" data/spec/ucie_survey.yaml`),
-   其中直接决定结论的两条是收端眼宽 0.75 UI 与眼高 40 mV:示例 02 的 reach(30 mm)由**眼宽**判定,35 mm 时眼高还有 163 mV、
-   眼宽 0.747 UI;如果眼罩表的 0.75 UI 不是 32 GT/s 标准封装的值,reach 结论整个要重算。原文贴进 `cairn/Reference/` 后改
+   其中直接决定结论的两条是收端眼宽 0.75 UI 与眼高 40 mV:示例 02 的 reach(35 mm,0.5.0)由**眼宽**判定,40 mm 时眼高还有 150 mV、
+   眼宽 0.739 UI;如果眼罩表的 0.75 UI 不是 32 GT/s 标准封装的值,reach 结论整个要重算。原文贴进 `cairn/Reference/` 后改
    `source: spec` 并重跑示例 02。
 
 2. **串扰的耦合线估计是一阶猜测,却决定了 32 GT/s 标准封装的结论**。`channel/coupled.py`:κ = 1/(1 + (s/h)²)、速度差 (1 − ε_eff/ε_r)、
    线性长度增长;h = 30 µm 微带、ε_r 3.5 全是 `PACKAGE_STACKUP` 的模型值。给出 −18.6 dB(示例 07),模块因此在 32 GT/s 不过;
    示例 05 的 x16 / 20 mm 模块在 M2 的行为级 −30 dB 预设下能过(另一个模块)。封装的耦合线 S 参数拿不到(用户确认),所以下一步是
-   带状线选项与 NEXT 的合成模型(段 6),以及把预设带上 `source: model` 并做敏感性报告(段 2)。
-   复现:`python tools/budget_report.py configs/standard_32g_x5_coupled.yaml`,看 "Crosstalk" 段。
+   带状线选项与 NEXT 的合成模型(段 6)。段 2 已把预设带上 `source: model`(`data/spec/model_presets.yaml`)并给了敏感性报告:
+   复现:`python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity`,看 "Sensitivity" 段里标 **yes** 的参数。
 
 ## P2 — 一致性与能力
 
-0. **体检(2026-10-13)挂起的模型问题**,按已批准的分段方案处理(段 1 已做,见 CHANGELOG 0.4.0):
-   段 2 —— `PACKAGE_RLGC` 隐含 ε_eff 3.94/5.75 与 `PACKAGE_STACKUP` 的 ε_r 3.5/3.3 矛盾;段 3 —— 剖面杂散未用、
+0. **体检(2026-10-13)挂起的模型问题**,按已批准的分段方案处理(段 1、2 已做,见 CHANGELOG 0.4.0 / 0.5.0):
+   段 3 —— 剖面杂散未用、
    跟踪器估计值不延迟、`local_pll_bw_hz` 实为 ω_n、漫游在仿真网格上归一;段 4 —— 铁律 3 只在 ~1e-4 被测,1e-6 只在示例 03,1e-9 没跑过;
    统计引擎每 lane 2.8 s(x1)/ 8 s(349 光标的串扰 lane),x64 模块约 10 min,`half_eye` 的 60 步二分与逐相位 `log_ndtr` 是热点。
 
-1. **树带宽只滤时钟相位,没有等效地滤数据边沿**;树延时在闭式里是精确的 e^{−jωτ},在合成里是块内循环卷绕(块长 2^18 UI,
+1. **先进封装的 RDL 线在低 GHz 是 RC 主导的,"Z0 = 50 Ω" 只是高频渐近值**(段 2 发现):预设 R_dc 2000 Ω/m + R_skin 给 2 GHz 处 R ≈ 3100 Ω/m,
+   与 ωL ≈ 3200 Ω/m 同量级;终端按 50 Ω 匹配时低速档出现反射与幅度损失(示例 07 先进 2 mm 4 GT/s 主光标 178 mV,8 GT/s 起 187 mV)。
+   需要决定:(a) 终端按实际 |Z0(f)| 匹配,或 (b) 用 RDL 的实测 / 场解 RLGC(拿不到),或 (c) 在 `--sensitivity` 里把 R_dc 列为低速档的决定参数。
+   复现:`python tools/budget_report.py` 对 `advanced_32g_x64_spare.yaml` 把 `data_rate_gtps` 改 4,看 lane 表眼高;对比 `channel.rdc_ohm_m: 200`。
+
+2. **树带宽只滤时钟相位,没有等效地滤数据边沿**;树延时在闭式里是精确的 e^{−jωτ},在合成里是块内循环卷绕(块长 2^18 UI,
    τ ≤ 100 ps ≈ 3 UI,影响可忽略,但没有量)。
-2. **Touchstone 路径只测了合成的无损 4 端口**(`tests/test_channel.py`);没有真实封装 S 参数文件。接口留着,数据没有。
+3. **Touchstone 路径只测了合成的无损 4 端口**(`tests/test_channel.py`);没有真实封装 S 参数文件。接口留着,数据没有。
 
 ## P3 — 能力扩展
 

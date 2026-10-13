@@ -52,8 +52,13 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 ## 规范数字(铁律 5)
 
 ```bash
-grep "source: survey" data/spec/ucie_survey.yaml     # 所有未核实的数字
+grep "source: survey" data/spec/ucie_survey.yaml     # 所有未核实的规范数字
+grep "source: model"  data/spec/model_presets.yaml   # 所有模型估计数(走线损耗、叠层、行为级串扰)
+python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity   # 哪些估计 ±20% 会翻转结论
 ```
+
+走线的 L、C 不是预设:由 `channel.z0_ohm`(预设 50 Ω)与叠层几何的 Hammerstad ε_eff 推出(`LinkConfig.rlgc()`),显式给
+`l_h_m` / `c_f_m` 时覆盖。发端带宽 `tx.bw_hz` 留空 = 2 × Nyquist,`inf` = 理想边沿。
 
 ## 工具
 

@@ -52,6 +52,10 @@ authoring_mode: ai_generated
 - 怎么守:`data/spec/ucie_survey.yaml` 每条带 `source`;`tests/test_spec_sources.py` 核对 `grep "source: survey"` 的行数等于
   未核实条目数,`source: spec` 必须带 `quote`,引擎代码里没有 1e-27 / 25.0 / 0.75 字面量。
 - 边界:综述来源本身的可靠性不在测试范围 —— 见 `spec-sources.md` 的逐条备注。
+- 延伸(段 2):规范不管、仿真又必须有的数(走线 R / tanδ / Z0、叠层 w / h / ε_r、行为级串扰电平)是**模型估计**,在
+  `data/spec/model_presets.yaml` 里每条 `source: model` + cite + note;`grep -c "source: model"` = 18。L、C 不在表里,由 Z0 与
+  Hammerstad ε_eff 推出,信道延时与串扰估计共用一个介电常数。`tools/budget_report.py --sensitivity` 把每条 ±20% 看结论翻不翻 ——
+  "哪些猜测决定结论"不再靠记忆。
 
 ## 6 数值指纹
 

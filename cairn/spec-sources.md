@@ -31,3 +31,7 @@ authoring_mode: ai_generated
 - 规范数字不进代码:`TargetConfig` 字段默认 None,运行时按 package 解析成 `(value, source)`,结果行打印 `source: xxx`。
   配置里显式写的值标 `source: config`,是配置自己的主张。
 - `PACKAGE_RLGC` 是模型参数,不是规范数字,不进这张表;reach / pitch / 模块宽度进表。
+- 段 2 起模型参数有自己的表 `data/spec/model_presets.yaml`(18 条,全部 `source: model`,带 cite 与 note):R_dc、R_skin、tanδ、G、Z0、
+  w、h、ε_r、行为级 FEXT 电平,两种封装各一套。L、C 由 Z0 与 Hammerstad ε_eff(w, h, ε_r)推出 —— 之前 `PACKAGE_RLGC` 自带的 L、C 隐含
+  ε_eff 3.94 / 5.75,与叠层的 ε_r 3.5 / 3.3 矛盾(体检 #3)。`grep -c "source: model"` = 18;`tests/test_spec_sources.py` 守着两张表互不混放。
+- 敏感性:`tools/budget_report.py --sensitivity` 对每条估计 ±20%(眼罩目标 ±10 mV / ±0.05 UI)重跑,表里标出翻转结论的参数。

@@ -7,6 +7,14 @@ entry each, with ``source: survey`` (from public summaries; unverified) or
 them through :func:`survey` by key and carries the source along; nothing
 hard-codes them. ``grep "source: survey"`` on the data file lists every
 unverified number at once.
+
+The numbers the specification does *not* own but a simulation still needs --
+the package trace's resistance and loss tangent, the stack-up geometry, the
+behavioural crosstalk level -- are model estimates and live in
+``data/spec/model_presets.yaml`` with ``source: model``, read through
+:func:`preset`. ``grep "source: model"`` lists every estimate; the budget
+report's ``--sensitivity`` perturbs each one to show which estimates decide a
+verdict.
 """
 
 from __future__ import annotations
@@ -18,7 +26,8 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[3]
 SURVEY_FILE = REPO / "data" / "spec" / "ucie_survey.yaml"
-SOURCES = ("survey", "spec")
+PRESETS_FILE = REPO / "data" / "spec" / "model_presets.yaml"
+SOURCES = ("survey", "spec", "model")
 
 
 @dataclass(frozen=True)
@@ -26,7 +35,7 @@ class SpecNumber:
     key: str
     value: Any
     unit: str
-    source: str          # "survey" | "spec"
+    source: str          # "survey" | "spec" | "model"
     cite: str
     note: str = ""
     quote: str = ""      # required when source == "spec"
@@ -44,12 +53,17 @@ class SpecNumber:
     def verified(self) -> bool:
         return self.source == "spec"
 
+    @property
+    def estimated(self) -> bool:
+        return self.source == "model"
+
     def tag(self) -> str:
         """``value unit (source: survey)`` -- how a result line should print it."""
         return f"{self.value} {self.unit} (source: {self.source})"
 
 
-def load_survey(path: Path | str = SURVEY_FILE) -> dict[str, SpecNumber]:
+def load_survey(path: Path | str = SURVEY_FILE, allowed: tuple[str, ...] = ("survey", "spec")) -> dict[str, SpecNumber]:
+    """Read a table of tagged numbers; every entry's source must be in ``allowed``."""
     import yaml
 
     with open(path, encoding="utf-8") as fh:
@@ -66,12 +80,43 @@ def load_survey(path: Path | str = SURVEY_FILE) -> dict[str, SpecNumber]:
                               source=str(e.get("source", "")), cite=str(e.get("cite", "")),
                               note=str(e.get("note", "")), quote=str(e.get("quote", "")),
                               section=str(e.get("section", "")))
+        if out[key].source not in allowed:
+            raise ValueError(f"spec entry {key!r} in {Path(path).name}: source {out[key].source!r} "
+                             f"does not belong in this table (allowed {allowed})")
     return out
 
 
 @lru_cache(maxsize=1)
 def _table() -> dict[str, SpecNumber]:
     return load_survey()
+
+
+@lru_cache(maxsize=1)
+def _presets() -> dict[str, SpecNumber]:
+    return load_survey(PRESETS_FILE, allowed=("model",))
+
+
+def preset(key: str, package: str) -> SpecNumber:
+    """The model estimate ``<package>.<key>`` (``data/spec/model_presets.yaml``)."""
+    table = _presets()
+    full = f"{package}.{key}"
+    if full not in table:
+        raise KeyError(f"no model preset {full!r} (have {sorted(table)})")
+    return table[full]
+
+
+def all_presets() -> dict[str, SpecNumber]:
+    return dict(_presets())
+
+
+def preset_values() -> dict[str, dict[str, float]]:
+    """``{package: {parameter: value}}`` -- the shape the config layer's
+    ``PACKAGE_*`` dictionaries are built from."""
+    out: dict[str, dict[str, float]] = {}
+    for full, e in _presets().items():
+        pkg, name = full.split(".", 1)
+        out.setdefault(pkg, {})[name] = e.value
+    return out
 
 
 def survey(key: str, package: str | None = None) -> SpecNumber:
@@ -92,4 +137,5 @@ def unverified() -> list[SpecNumber]:
     return [e for e in _table().values() if not e.verified]
 
 
-__all__ = ["SpecNumber", "survey", "all_entries", "unverified", "load_survey", "SURVEY_FILE", "SOURCES"]
+__all__ = ["SpecNumber", "survey", "all_entries", "unverified", "load_survey", "SURVEY_FILE", "SOURCES",
+           "preset", "all_presets", "preset_values", "PRESETS_FILE"]

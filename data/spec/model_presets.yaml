@@ -1,0 +1,136 @@
+# 模型预设表 —— 不是规范数字,是本库对两种封装走线的**估计**,一条一个,来源标签一律是 model。
+#
+#   model   估计值:来自教科书量级、公开论文的典型值或本库自己的推导;note 写依据与不确定度。
+#           用 grep 数这个标签(见 README)恰好得到估计条目数:文件头不含标签字串。
+#
+# 规范数字(速率、BER、bump 间距、reach、模块宽度、眼罩)在 ucie_survey.yaml;这里只放"没有规范、
+# 只能估"的几何与材料参数。L、C 不在表里:它们由 z0_ohm 与叠层几何推出(config/schema.py::LinkConfig.rlgc),
+# 让信道延时与串扰估计用同一个介电常数。tools/budget_report.py --sensitivity 把每条 ±20% 看结论翻不翻。
+
+entries:
+
+  standard.rdc_ohm_m:
+    value: 10.0
+    unit: ohm/m
+    source: model
+    cite: "organic package microstrip, ~20 um wide, ~15 um copper: R_dc ~ 1.7e-8 / (20e-6 * 15e-6) * 1.0 ~ 60 ohm/m before plating; taken at the low end for a thick, plated trace"
+    note: "估计:量级 10–60 Ω/m;对 25 mm 的直流损耗 < 0.1 dB,对结论不敏感。"
+
+  standard.r_skin:
+    value: 8.0e-3
+    unit: ohm/(m sqrt(Hz))
+    source: model
+    cite: "skin-effect resistance of a 20 um copper microstrip: R_s(f) ~ sqrt(pi f mu0 rho) / w ~ 8e-3 sqrt(f) ohm/m (Johnson & Graham, High-Speed Digital Design, ch. 4)"
+    note: "估计:给 25 mm @ 16 GHz 约 2.2 dB 的导体损耗,是 IL 的主项。"
+
+  standard.loss_tangent:
+    value: 0.010
+    unit: ""
+    source: model
+    cite: "build-up film (ABF-class) loss tangent 0.005–0.02 at 10–20 GHz (vendor datasheets as summarised in package-substrate surveys)"
+    note: "估计:介质损耗 ∝ f·√ε_eff·tanδ;0.010 给 25 mm @ 16 GHz 约 0.4 dB。"
+
+  standard.g_s_m:
+    value: 0.0
+    unit: S/m
+    source: model
+    cite: "no DC shunt conductance in a build-up dielectric"
+    note: "估计:置 0;介质损耗全部由 loss_tangent 表示。"
+
+  standard.z0_ohm:
+    value: 50.0
+    unit: ohm
+    source: model
+    cite: "single-ended 50 ohm routing is the usual target for die-to-die package traces"
+    note: "估计:L、C 由 Z0 与 ε_eff(Hammerstad,叠层几何)推出;Z0 ±20% 直接按 ±20% 失配进入反射与幅度。"
+
+  standard.trace_width_um:
+    value: 20.0
+    unit: um
+    source: model
+    cite: "organic build-up substrate design rules: 15–25 um lines"
+    note: "估计:进入 Hammerstad ε_eff 与耦合系数。"
+
+  standard.dielectric_height_um:
+    value: 30.0
+    unit: um
+    source: model
+    cite: "build-up film thickness 25–35 um per layer"
+    note: "估计:耦合系数 κ = 1/(1+(s/h)²) 对 h 最敏感 —— 115 um 间距、30 um 高度给 κ = 0.064。"
+
+  standard.eps_r:
+    value: 3.5
+    unit: ""
+    source: model
+    cite: "ABF-class build-up film relative permittivity 3.2–3.6 at 10 GHz"
+    note: "估计:ε_eff(Hammerstad, w=20, h=30) = 2.54;信道速度与 FEXT 速度失配都用它。"
+
+  standard.xtalk_adjacent_db:
+    value: -30.0
+    unit: dB
+    source: model
+    cite: "behavioural far-end crosstalk level at Nyquist for a well-routed package lane pair (order-of-magnitude placeholder for xtalk: fext)"
+    note: "估计:只在 channel.xtalk = fext 时用;coupled 模式用几何估计(标准封装 25 mm 给 −18.6 dB,比它强 11 dB)。"
+
+  advanced.rdc_ohm_m:
+    value: 2.0e3
+    unit: ohm/m
+    source: model
+    cite: "RDL line 2 um wide, ~1 um thick copper: R_dc ~ 1.7e-8 / (2e-6 * 1e-6) ~ 8.5e3 ohm/m; taken lower for a thicker RDL"
+    note: "估计:对 2 mm 走线约 4 Ω 串联,幅度损失 < 0.4 dB。"
+
+  advanced.r_skin:
+    value: 2.5e-2
+    unit: ohm/(m sqrt(Hz))
+    source: model
+    cite: "skin effect of a 2 um RDL line (thickness comparable to skin depth above ~4 GHz, so the sqrt(f) law is itself an approximation)"
+    note: "估计:2 mm @ 16 GHz 约 0.6 dB。"
+
+  advanced.loss_tangent:
+    value: 0.004
+    unit: ""
+    source: model
+    cite: "polyimide / oxide RDL dielectrics: tan delta 0.002–0.006"
+    note: "估计。"
+
+  advanced.g_s_m:
+    value: 0.0
+    unit: S/m
+    source: model
+    cite: "no DC shunt conductance"
+    note: "估计:置 0。"
+
+  advanced.z0_ohm:
+    value: 50.0
+    unit: ohm
+    source: model
+    cite: "fine-pitch RDL lines are often higher than 50 ohm (thin dielectric, narrow lines); 50 kept as the matched reference"
+    note: "估计:实际 RDL 线可能 60–80 Ω;敏感性报告里 ±20% 看它。"
+
+  advanced.trace_width_um:
+    value: 2.0
+    unit: um
+    source: model
+    cite: "silicon-bridge / interposer RDL design rules: 1–3 um lines"
+    note: "估计。"
+
+  advanced.dielectric_height_um:
+    value: 4.0
+    unit: um
+    source: model
+    cite: "RDL inter-layer dielectric 2–5 um"
+    note: "估计:45 um 间距、4 um 高度给 κ = 0.008,FEXT 很弱。"
+
+  advanced.eps_r:
+    value: 3.3
+    unit: ""
+    source: model
+    cite: "polyimide RDL dielectric ~3.3; silicon oxide ~3.9"
+    note: "估计:ε_eff(Hammerstad, w=2, h=4) = 2.38。"
+
+  advanced.xtalk_adjacent_db:
+    value: -24.0
+    unit: dB
+    source: model
+    cite: "behavioural far-end crosstalk level at Nyquist for dense RDL routing (placeholder for xtalk: fext)"
+    note: "估计:只在 channel.xtalk = fext 时用;coupled 模式几何估计给 2 mm −56.9 dB。"

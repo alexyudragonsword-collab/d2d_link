@@ -14,11 +14,12 @@ from d2d_link.engine.statistical import (StatisticalEngine, isi_model, jitter_qu
 from d2d_link.vendor.halo.waveform import Waveform
 
 
-def _flat_response(cfg: LinkConfig, amp: float) -> LinkResponse:
-    """An ideal 1-UI rectangular pulse of height ``amp``: no ISI at all."""
+def _flat_response(cfg: LinkConfig, amp: float, width_ui: float = 1.0) -> LinkResponse:
+    """An ideal rectangular pulse of height ``amp`` and width ``width_ui``
+    (1 UI: no ISI at all)."""
     osr = cfg.sim.osr
     p = np.zeros(8 * osr)
-    p[2 * osr:3 * osr] = amp
+    p[2 * osr:int(round((2.0 + width_ui) * osr))] = amp
     from d2d_link.channel import ChannelModel
     f = ChannelModel.grid(cfg)
     return LinkResponse(Waveform(p, cfg.dt), Waveform(p / amp / osr, cfg.dt),
@@ -88,7 +89,7 @@ def test_isi_grid_converges_with_hundreds_of_crosstalk_cursors():
     assert fine.extras["n_cursors"] > 300 and fine.extras["isi_bins"] > coarse.extras["isi_bins"]
     assert abs(fine.eye_width_ui - coarse.eye_width_ui) < 0.002
     assert abs(fine.eye_height_v - coarse.eye_height_v) < 1e-3
-    assert fine.eye_width_ui == pytest.approx(0.685, abs=0.01)      # 0.6849 on the 64-point grid; 0.671 with 12 cursors enumerated
+    assert fine.eye_width_ui == pytest.approx(0.699, abs=0.01)      # 0.685 before the geometry-derived L / C (0.5.0); 0.671 with 12 cursors enumerated
 
 
 def test_tails_live_in_the_log_domain():
@@ -102,17 +103,23 @@ def test_tails_live_in_the_log_domain():
                      sim=SimConfig(stat_phase_points=16))
     r = run_statistical(cfg)
     assert np.isfinite(r.log10_ber) and r.log10_ber < -300 and r.ber == 0.0
-    assert np.all(np.isfinite(r.bathtub_log10_ber)) and r.bathtub_log10_ber.max() == pytest.approx(np.log10(0.5), abs=0.01)
+    assert np.all(np.isfinite(r.bathtub_log10_ber)) and r.bathtub_log10_ber.max() > -1.0   # the neighbour, half a UI on
     assert "10^" in r.summary()
 
 
 def test_eye_width_is_capped_at_one_ui():
-    """A 1 mm line without a driver pole rings at the band edge (Gibbs) and
-    the bathtub read 1.026 UI; a symbol's eye cannot be wider than the
-    symbol, so the width is clipped and the clipping is flagged."""
-    cfg = LinkConfig(channel=ChannelConfig(length_mm=1.0), rx=RxConfig(noise_rms_v=3e-3), sim=SimConfig(stat_phase_points=32))
+    """A 2 mm line with ideal (brick-wall) driver edges rings at the band edge
+    (Gibbs) and the bathtub reads 1.026 UI; a symbol's eye cannot be wider
+    than the symbol, so the width is clipped and the clipping is flagged.
+    (The default driver pole at twice Nyquist damps the ringing.)"""
+    import math
+    from d2d_link.config import TxConfig
+
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=2.0), rx=RxConfig(noise_rms_v=3e-3), tx=TxConfig(bw_hz=math.inf),
+                     sim=SimConfig(stat_phase_points=32))
     r = run_statistical(cfg)
     assert r.eye_width_ui == 1.0 and r.extras["eye_width_clipped"] and r.extras["eye_width_raw_ui"] > 1.0
+    assert not run_statistical(dataclasses.replace(cfg, tx=TxConfig())).extras["eye_width_clipped"]   # the default pole damps it
     assert "(clipped)" in r.summary()
     ok = run_statistical(dataclasses.replace(cfg, channel=ChannelConfig(length_mm=25.0)))
     assert ok.eye_width_ui < 1.0 and not ok.extras["eye_width_clipped"] and "(clipped)" not in ok.summary()
@@ -159,23 +166,34 @@ def test_jitter_quadrature_is_normalised_and_wide_enough():
     assert x0.tolist() == [0.0] and w0.tolist() == [1.0]
 
 
-def test_bathtub_window_follows_a_flat_topped_eye():
-    """A short line at a low rate has a 1-UI plateau whose 'peak' sample is at
-    its end; the whole eye lies on one side of it and the +-0.5 UI window
-    extends to hold it (it read half an eye, 0.5 UI, before). The BER is not
-    periodic in the phase -- one UI away the neighbour is sampled -- so the
-    search is a plain widest-opening search on the extended window."""
-    from d2d_link.config import PackageConfig
-
-    low = LinkConfig(data_rate_gtps=4.0, package=PackageConfig(kind="advanced"),
-                     channel=ChannelConfig(length_mm=2.0), rx=RxConfig(noise_rms_v=3e-3),
-                     sim=SimConfig(stat_phase_points=32))
-    r = run_statistical(low)
-    assert r.eye_width_ui > 0.9 and r.bathtub_phase_ui[0] <= -1.0 + 1e-12
-    assert r.bathtub_ber[-1] == pytest.approx(0.5)                    # one UI on: the neighbour's cursor
-    # the milestone-1 link keeps its +-0.5 UI window and its numbers
+def test_bathtub_window_follows_the_eye_wherever_the_reference_sits():
+    """An opening that reaches the +-0.5 UI window's edge extends the window
+    by half a UI on that side (M3; it read half an eye before). A reference
+    sample pushed 0.45 UI off the eye's centre -- what a flat-topped pulse
+    did to the peak-sample reference three times -- must give the same eye,
+    found 0.45 UI away. The BER is not periodic in the phase (one UI away the
+    neighbour is sampled), so the search is a plain widest-opening search on
+    the extended window."""
     from conftest import REPO
+    from d2d_link.channel import link_response
 
+    cfg = load_config(REPO / "configs" / "standard_32g_x1.yaml")
+    cfg = dataclasses.replace(cfg, sim=dataclasses.replace(cfg.sim, stat_phase_points=32))
+    resp = link_response(cfg)
+
+    class Shifted(LinkResponse):
+        @property
+        def main_index(self) -> int:
+            return LinkResponse.main_index.fget(self) + int(round(0.45 * self.osr))
+
+    shifted = Shifted(resp.pulse, resp.impulse, resp.channel, resp.H_total, resp.osr, resp.xtalk_pulses)
+    r0, r = StatisticalEngine(cfg, resp).run(), StatisticalEngine(cfg, shifted).run()
+    assert r0.bathtub_phase_ui[0] == -0.5 and r0.bathtub_phase_ui[-1] == 0.5
+    assert r.bathtub_phase_ui[0] <= -1.0 + 1e-12 and r.bathtub_phase_ui[-1] == 0.5    # grown on the side the eye went
+    assert r.eye_width_ui == pytest.approx(r0.eye_width_ui, abs=0.002)
+    assert r.eye_height_v == pytest.approx(r0.eye_height_v, rel=0.01)
+    assert r.phase_ui == pytest.approx(r0.phase_ui - 0.45, abs=0.02)
+    # the milestone-1 link keeps its +-0.5 UI window and its numbers
     r1 = run_statistical(load_config(REPO / "configs" / "standard_32g_x1.yaml"))
     assert r1.bathtub_phase_ui[0] == -0.5 and r1.bathtub_phase_ui[-1] == 0.5 and r1.bathtub_ber.size == 65
-    assert r1.eye_width_ui == pytest.approx(0.772, abs=0.001)
+    assert r1.eye_width_ui == pytest.approx(0.775, abs=0.001)

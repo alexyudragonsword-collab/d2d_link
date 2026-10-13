@@ -4,6 +4,37 @@
 
 ---
 
+## [0.5.0] — 2026-10-13 — 段 2:结论可信度 B(一套几何驱动一切;数字再变一次,逐项解释在 `cairn/LOG.md`)
+
+### 修改(模型)
+- **L、C 由几何推出**(`config/schema.py::LinkConfig.rlgc`):`PACKAGE_RLGC` 只留 R_dc、R_skin、tanδ、G 与 **Z0**(50 Ω);
+  L = Z0·√ε_eff / c、C = √ε_eff / (Z0·c),ε_eff 是叠层(w、h、ε_r)的 Hammerstad 值 —— 与 `channel/coupled.py` 的串扰估计共用一个
+  介电常数。此前预设自带的 L、C 隐含 ε_eff 3.94 / 5.75,与叠层 ε_r 3.5 / 3.3 矛盾(体检 #3)。显式 `l_h_m` / `c_f_m` 仍可覆盖;
+  新字段 `channel.z0_ohm`。标准封装 ε_eff 2.54、先进 2.38,Z0 恰为 50 Ω。
+- **模型参数带来源**:`data/spec/model_presets.yaml`(18 条,全部 `source: model`,cite + note),`d2d_link.spec.preset()` 读取,
+  `PACKAGE_RLGC / PACKAGE_STACKUP / PACKAGE_XTALK_DB` 由它生成;`grep -c "source: model"` = 18。两张表互不混放(loader 校验)。
+- **发端带宽默认 2 × Nyquist**(`tx.bw_hz` 留空;`inf` = 理想边沿),`LinkConfig.tx_bw_hz` 解析。bundled 配置都显式 60 GHz,不受影响;
+  库默认配置(测试、合成指纹例)因此变。
+- **耦合长度**:`channel.coupled_length_mm`,Touchstone 信道配 `xtalk: coupled` 时必填(文件里没有走线长度);解析线默认 = `length_mm`。
+
+### 新增
+- `tools/budget_report.py --sensitivity`:对每条 `source: model` 预设与结论依赖的 `source: survey` 数(bump 间距)±20%、眼罩目标 ±10 mV /
+  ±0.05 UI,列最差 lane 裕度并标出翻转 PASS/FAIL 的参数("哪些猜测决定结论")。`sensitivity()` / `sensitivity_knobs()` 可编程调用。
+- 报表 JSON 增加 `channel_model`(RLGC 与 `rlgc_source: model`)、串扰 `adjacent_source`;`describe()` 增加 `stackup_source`、`coupled_length_mm`、
+  `eps_eff`;示例 00 / 07 打印预设来源。
+- 测试(+5):Z0 = √(L/C) = 50、c²LC = ε_eff(Hammerstad)、显式 L / Z0 / ε_r 覆盖;发端带宽默认与 `inf`;预设表 grep 计数与两表互斥;
+  Touchstone + coupled 必填长度、耦合长度线性;敏感性报告在"目标贴着眼"的链路上标出 R_skin 与 Z0 翻转、R_dc 不翻转。
+
+### 数字(与 0.4.0 比)
+- 标准封装 25 mm @ 16 GHz 插损 −2.95 → **−2.80 dB**(介质损耗 ∝ √ε_eff:√2.54 / √3.94 = 0.80;导体损耗不变,Z0 本来就是 49.8 Ω);
+  主光标 163.3 → 164.6 mV;x1 眼 209.8 mV / 0.772 UI → **215.6 mV / 0.775 UI**,相位 −0.0198 → −0.0078(线更快:延时 √ε_eff 比 0.80)。
+- reach 扫描:每 5 mm 插损 −0.59 → −0.56 dB;**30 → 35 mm** 是最后通过的长度(35 mm 眼宽 0.747 → 0.753 UI);对综述 25 mm 的比 1.20× → 1.40×。
+- 示例 05:x16 模块八个 lane 眼高 +4.6…+4.8 mV、眼宽 +0.002 UI,最差 lane 仍是逻辑 5(228.5 mV / 0.754 UI);x64 最差 lane 54 不变。
+  示例 07:标准 25 mm 32 GT/s 中间 lane 138.7 mV / 0.685 UI → 143.2 mV / 0.693 UI,仍因眼宽不过;4–24 GT/s 过;先进 2 mm 六档全过。
+  示例 03 / 06 八个 2× 点全部仍在 0.5–2× 内(1.18 / 0.96 / 0.88;1.03 / 0.74 / 0.75 / 0.84 / 0.83),工作点由二分重新找到。
+
+---
+
 ## [0.4.0] — 2026-10-13 — 段 1:结论可信度 A(数字会变,逐项解释在 `cairn/LOG.md`)
 
 ### 修改(模型)

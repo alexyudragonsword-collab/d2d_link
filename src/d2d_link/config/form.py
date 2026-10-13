@@ -41,12 +41,13 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
         _f("channel.zs_ohm", "Source term [ohm]", "float"),
         _f("channel.zl_ohm", "Receiver term [ohm]", "float"),
         _f("channel.n_freq", "Freq grid points", "int"),
-        _f("channel.rdc_ohm_m", "R_dc [ohm/m] (empty = package preset)", "opt_float"),
+        _f("channel.rdc_ohm_m", "R_dc [ohm/m] (empty = package preset, source: model)", "opt_float"),
         _f("channel.r_skin", "R_skin [ohm/(m sqrt(Hz))]", "opt_float"),
-        _f("channel.l_h_m", "L [H/m]", "opt_float"),
-        _f("channel.c_f_m", "C [F/m]", "opt_float"),
+        _f("channel.l_h_m", "L [H/m] (empty = from Z0 and stack-up)", "opt_float"),
+        _f("channel.c_f_m", "C [F/m] (empty = from Z0 and stack-up)", "opt_float"),
         _f("channel.loss_tangent", "Loss tangent", "opt_float"),
         _f("channel.g_s_m", "G [S/m]", "opt_float"),
+        _f("channel.z0_ohm", "Z0 [ohm] (empty = package preset, source: model)", "opt_float"),
         _f("channel.xtalk", "Lane crosstalk", "enum", options=["none", "fext", "coupled"]),
         _f("channel.xtalk_adjacent_db", "FEXT nearest lane @Nyquist [dB] (empty = package preset)", "opt_float"),
         _f("channel.xtalk_second_db", "FEXT second lane @Nyquist [dB] (empty = -12 dB)", "opt_float"),
@@ -54,6 +55,7 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
         _f("channel.trace_width_um", "Trace width [um] (empty = package preset)", "opt_float"),
         _f("channel.dielectric_height_um", "Dielectric height [um] (empty = package preset)", "opt_float"),
         _f("channel.eps_r", "Dielectric eps_r (empty = package preset)", "opt_float"),
+        _f("channel.coupled_length_mm", "Coupled length [mm] (empty = length; needed with Touchstone)", "opt_float"),
     ]),
     ("lanes", "Lanes and repair", [
         _f("lanes.count", "Data lanes", "int"),
@@ -93,7 +95,7 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
     ]),
     ("tx", "Transmitter", [
         _f("tx.swing_vpp", "Swing [V pp]", "float"),
-        _f("tx.bw_hz", "Driver bandwidth [GHz]", "opt_float", scale=1e9),
+        _f("tx.bw_hz", "Driver bandwidth [GHz] (empty = 2x Nyquist)", "opt_float", scale=1e9),
     ]),
     ("rx", "Receiver", [
         _f("rx.noise_rms_v", "Sampler noise [mV RMS]", "float", scale=1e-3),
