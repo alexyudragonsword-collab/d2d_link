@@ -68,6 +68,7 @@ python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity
 pip install -e ".[gui]"
 d2d-link-gui configs/standard_32g_x16_module.yaml        # http://127.0.0.1:8050,左栏列出 configs/ 里的场景
 d2d-link-gui configs/standard_32g_x5_coupled.yaml --workers 2 --port 8050
+d2d-link-gui configs/standard_32g_x5_coupled.yaml --also sensitivity,rate_sweep   # 启动时就排上敏感性与速率扫描
 ```
 
 页面就是 `tools/budget_report.py` 的报表:标题句里带下划线的值(封装、速率、长度、lane 数、串扰、布线)是控件,改一个就入队重跑,

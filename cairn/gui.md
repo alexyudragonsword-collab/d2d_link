@@ -26,6 +26,15 @@ authoring_mode: ai_generated
   ETA 按同 kind、同 lane 数的历史平均。
 - 耗时基准(空闲机器):x1 1.6 s、x5 耦合 21 s、x16 29 s、bundled x64(无串扰、去重)0.9 s。
 
+## G2(0.11.0)
+
+- 三种任务 kind:`run`、`sensitivity`(`report.sensitivity(progress=)`,进度经 `multiprocessing.Manager().dict()` 回到页面)、`rate_sweep`
+  (当前配置 × 规范表的 6 个速率档)。同一 (kind, 配置哈希, 参数) 排队中的任务不重复提交。x16 的速率扫描 6 × 37 s = 222 s(内联测量)。
+- lane 平面图不画真实 bump map(仓库里没有):一维物理编号,每格一个按比例的眼六边形 + 目标 mask;攻击 lane 来自 worker 结果
+  (`engine.lanes.aggressors_of` 的物理编号),页面不自己推邻接(铁律 1)。
+- 浴盆图把 log10 BER 截到 −60:再深处的数值由抖动核最外节点决定,不是物理量(段 3 的结论),画出来只会误导。
+- Plotly 图只在三处(浴盆叠图、Inspector 小浴盆、tornado);平面图、速率矩阵、预算条全是 CSS,x64 的 68 格不卡。
+
 ## 决策记录
 
 - Dash 锁 `>=3,<5`(PyPI 4.4.1):Dash 4 的 Dropdown 换成了 `button.dash-dropdown` 结构,行内控件的 CSS 针对它写;不用 dash-bootstrap / dash-mantine,
@@ -36,6 +45,9 @@ authoring_mode: ai_generated
 - Opus 实跑纠正的三条记录(x5 耦合敏感性无单个翻转、x16 / x5 耗时 29 / 21 s、"x64 五分钟"只在开串扰时成立)已改进 ROADMAP / engines.md。
 
 ## 教训
+
+- Dash 回调的 Input 若是字符串 id 且此刻不在 layout 里(随结果出现的按钮),客户端 ReferenceError、整页空白;模式匹配 id 没有这个检查。
+- 每次改 Python 都要重启服务;CSS 不用。截图前看 PNG 大小(十几 KB 就是空白页),或 `--dump-dom` 找关键字。
 
 - `python -m d2d_link.gui.app` 第一次静默退出:忘了 `if __name__ == "__main__"`,日志一行都没有。
 - 无头 Chromium 的完整版 `chrome --headless=new` 只渲染约 910 px 高(视口比窗口少 90 px);截图用 `headless_shell` 或把窗口加高再裁。

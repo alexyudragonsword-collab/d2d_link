@@ -165,11 +165,12 @@ def sensitivity_knobs(cfg) -> list[dict]:
     return knobs
 
 
-def sensitivity(cfg, eye_height_mv: float = 10.0, eye_width_ui: float = 0.05) -> dict:
+def sensitivity(cfg, eye_height_mv: float = 10.0, eye_width_ui: float = 0.05, progress=None) -> dict:
     """Rerun the link with each knob at (1 - rel) and (1 + rel) of its nominal
     value; the eye-mask targets are moved by +-``eye_height_mv`` /
     +-``eye_width_ui`` without a rerun (the margins are read off the nominal
-    result). Returns the nominal verdict and one row per knob."""
+    result). Returns the nominal verdict and one row per knob. ``progress``
+    (done, total) is called after each run (the GUI's queue reads it)."""
     from d2d_link.config import apply_overrides
     from d2d_link.engine import run_link
     from d2d_link.engine.statistical import resolved_targets
@@ -179,14 +180,25 @@ def sensitivity(cfg, eye_height_mv: float = 10.0, eye_width_ui: float = 0.05) ->
         return {"passes": bool(res.passes), "worst_lane": worst.lane, "margin": float(worst.margin),
                 "eye_height_mv": 1e3 * res.eye_height_min_v, "eye_width_ui": res.eye_width_min_ui}
 
+    knobs = sensitivity_knobs(cfg)
+    total, done = 1 + 2 * len(knobs), 0
+
+    def tick():
+        nonlocal done
+        done += 1
+        if progress is not None:
+            progress(done, total)
+
     base = run_link(cfg)
+    tick()
     nominal = verdict(base)
     rows = []
-    for k in sensitivity_knobs(cfg):
+    for k in knobs:
         sides = {}
         for sign, name in ((-1.0, "low"), (1.0, "high")):
             value = k["nominal"] * (1.0 + sign * k["rel"])
             res = run_link(apply_overrides(cfg, {k["path"]: value}))
+            tick()
             sides[name] = {"value": value, **verdict(res)}
         rows.append({**k, **sides, "flips": sides["low"]["passes"] != nominal["passes"]
                      or sides["high"]["passes"] != nominal["passes"]})

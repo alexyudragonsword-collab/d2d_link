@@ -18,8 +18,21 @@
 - 文档:`docs/USAGE.md` GUI 段、`cairn/gui.md`;ROADMAP P1 #2 改为实跑事实(x5 耦合没有单个 ±20 % 估计能翻转 FAIL,裕度 −0.118);
   x16 / x5 耗时改为空闲机器的 29 / 21 s。
 
-### 没做(G2 / G3)
-- lane 物理平面图与 Inspector 浴盆、敏感性 tornado、Rate × package、sweeps 附录、Compare with、磁盘缓存。
+### G2(同一版本内追加)
+- **lane 平面图**(Lanes & repair 段):每个物理 lane 一格,眼按比例画成六边形(宽 = UI,高 = 对 ±主光标的比例)叠目标 mask(虚线框),
+  死 bump 斜纹、闲置半区 / 备用灰、最差 lane 琥珀、不过的红;点一格(或表里一行)选中,它的攻击 lane 虚线圈出,右栏 **Inspector** 显示该 lane 的
+  眼对目标子弹条、浴盆、采样相位 / 抖动 / 噪声 / 光标数 / 串扰 / skew 残余 / 训练偏移。worker 结果里新增每 lane 的攻击 lane 物理编号(`engine.lanes.aggressors_of`)。
+- **What flips the verdict 段**:敏感性是一个任务(`sensitivity` kind,1 + 2 × 旋钮次运行,`report.sensitivity(progress=)` 回报进度),按钮入队;
+  完成后一句结论("没有单个 ±20 % 估计能翻转" / "N 个估计翻转")+ tornado(各旋钮低 / 高侧的最差 lane 裕度,名义线与判定边界)+ 表;
+  导出的 Markdown 自动带上 `sensitivity_markdown`。
+- **Eye & bathtub per lane 段**:所有 lane 的浴盆叠在一条轴上(log10 BER 截到 −60,目标虚线、采样相位菱形),选中 lane 在前。
+- **Data rate × package 卡**(右栏):`rate_sweep` 任务 —— 当前配置在规范表的每个速率档各跑一次,格子 = 最小眼高 / 最小眼宽,红绿 = 过不过,
+  一句"first failing rate"。
+- 队列显示任务进度(n / total runs)与按进度估的剩余时间;`d2d-link-gui --also sensitivity,rate_sweep` 启动时就把它们排进队列。
+- 测试 +3(敏感性与速率扫描任务内联、G2 各段与图、lane 选择与额外任务)。
+
+### 没做(G3)
+- sweeps 附录(tracker bw、local PLL f_n、reach)、Compare with、磁盘缓存、文档 `docs/gui.md`。
 
 ---
 

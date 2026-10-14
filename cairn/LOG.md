@@ -3,6 +3,16 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短(数字原值、被推翻的判断、下一步),
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-10-13 · 段 8 G2:平面图、Inspector、敏感性 tornado、速率矩阵(ccr-a2094794-9qa40v,0.11.0)
+
+- 做了:任务 kind `sensitivity`(进度回调)与 `rate_sweep`;Lanes 段的物理 lane 平面图(按比例眼六边形 + 目标 mask,死 / 闲置 / 备用 / 最差 / 不过,
+  点选 → 攻击 lane 圈出)、右栏 Inspector(子弹条 + 小浴盆 + 事实表)、What flips 段(按钮入队 → 一句结论 + tornado + 表)、Eye & bathtub 叠图、
+  Data rate × package 卡;`--also` 启动参数;测试 +3(套件 191 过 + 1 slow 排除)。
+- 数字原值:x16 速率扫描 6 档 222 s(内联);x5 耦合敏感性 17 次 348 s、速率扫描 6 档 167 s(2 worker 并行跑两者);小配置(2 mm、16 相位点)敏感性 9 次在测试里几秒。
+- 被推翻的判断 / 坑:(1) 服务进程在代码修完前就起了,页面用旧的 `figures.py` 报错 —— 开发时每改一次要重启服务,截图前看文件大小(13 KB 的 PNG 是错误页);
+  (2) Plotly `go.Layout(**base, **kw)` 对 `margin` 重复传参报错,改成 dict.update 再展开;(3) Dash 回调的 Input 若是**字符串 id 且不在当前 layout 里**(只在有结果时才出现的按钮),客户端直接 ReferenceError、整页空白 —— 这类按钮一律用模式匹配 id;(4) 场景栏取"同名最新完成的任务"时把敏感性任务也算进去,读它的 lanes 报 KeyError —— 只看 `kind == run`,测试补了"三种任务都完成后各栏都能渲染"。
+- 下一步:G3(sweeps 附录、Compare with、磁盘缓存、docs/gui.md),用户看截图后快进。
+
 ## 2026-10-13 · 段 8 G1:浏览器 GUI 骨架(ccr-a2094794-9qa40v,0.11.0)
 
 - 先做了设计评审:我与 Opus 5.5 各出 PySide6 / Web 两张效果图,用户选"方案 4 骨架(报告即界面)+ 方案 3 的 lane 平面图 + 方案 1 的来源标签树,Web,只浅色";

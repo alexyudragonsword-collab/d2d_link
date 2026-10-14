@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dash import html
+from dash import dcc, html
 
-from ...spec import all_entries
+from ...spec import all_entries, survey
+from ..figures import bathtub_figure
 from .common import chip
 
 
@@ -38,13 +39,23 @@ def queue(jobs: list, manager) -> html.Div:
         sub = j.scope
         if j.status == "running":
             eta = manager.eta_s(j)
+            if j.progress and j.progress[1] > 1:
+                sub += f" · {j.progress[0]} / {j.progress[1]} runs"
             sub += f" · {j.elapsed_s:.0f} s" + (f" · ~{eta:.0f} s left" if eta is not None else "")
         elif j.status == "done" and j.result:
-            sub += f" · {j.result.get('elapsed_s', 0):.1f} s · " + ("PASS" if j.result.get("passes") else "FAIL")
+            sub += f" · {j.result.get('elapsed_s', 0):.1f} s"
+            if j.kind == "run":
+                sub += " · " + ("PASS" if j.result.get("passes") else "FAIL")
+            elif j.kind == "sensitivity":
+                n = sum(1 for r in j.result["sensitivity"]["rows"] if r["flips"])
+                sub += f" · {n} flip(s)"
+            elif j.kind == "rate_sweep":
+                sub += " · " + "/".join("✔" if r["passes"] else "✘" for r in j.result["rows"])
         elif j.status == "failed":
             sub += f" · {j.error}"
         items.append(html.Div([html.Span(icon, className=f"q-icon {j.status}"),
-                               html.Div([html.Div(j.label, className="q-lbl"), html.Div(sub, className="q-sub")]),
+                               html.Div([html.Div(f"{j.label} · {j.kind}" if j.kind != "run" else j.label, className="q-lbl"),
+                                         html.Div(sub, className="q-sub")]),
                                html.Button("✕", id={"type": "cancel", "id": j.id}, className="q-cancel",
                                            title="cancel") if j.status in ("queued", "running") else None],
                               className="q-item"))
@@ -98,7 +109,7 @@ def scenarios(configs_dir: Path, current: Path | None, manager) -> html.Div:
     for p in sorted(configs_dir.glob("*.yaml")):
         job = None
         for j in reversed(manager.poll()):
-            if j.label == p.stem and j.status == "done":
+            if j.label == p.stem and j.kind == "run" and j.status == "done":
                 job = j
                 break
         sub = "not run yet"
@@ -115,4 +126,76 @@ def scenarios(configs_dir: Path, current: Path | None, manager) -> html.Div:
     return html.Div([html.H4(["Scenarios", html.Span("configs/", className="aside")]), *items], className="card")
 
 
-__all__ = ["this_page", "queue", "exports", "unverified", "scenarios"]
+
+
+def inspector(result: dict | None, selected: int | None) -> html.Div:
+    """The selected lane: eye against the targets, its bathtub, what it sees."""
+    if not result:
+        return html.Div([html.H4("Inspector"), html.P("run the link, then click a lane", className="fine")], className="card")
+    lanes = result["lanes"]
+    r = next((q for q in lanes if q["lane"] == selected), None)
+    if r is None:
+        r = next(q for q in lanes if q["lane"] == result["worst_lane"])
+    t = result["report"]["targets"]
+    ew_t, eh_t = t["eye_width_ui"]["value"], t["eye_height_mv"]["value"]
+
+    def bullet(label, frac, tick, text, ok):
+        return html.Div([html.Span(label, className="ins-lbl"),
+                         html.Div([html.Div(className="ins-fill " + ("ok" if ok else "fail"), style={"width": f"{100 * min(frac, 1):.1f}%"}),
+                                   html.Div(className="ins-tick", style={"left": f"{100 * min(tick, 1):.1f}%"})], className="ins-trk"),
+                         html.Span(text, className="ins-val")], className="ins-row")
+
+    amp = max(2.0 * r["main_cursor_v"], 1e-9)
+    rows = [
+        bullet("eye height", r["eye_height_v"] / amp, 1e-3 * eh_t / amp, f"{1e3 * r['eye_height_v']:.1f} mV ({r['eye_height_margin_mv']:+.1f})",
+               r["eye_height_margin_mv"] >= 0),
+        bullet("eye width", r["eye_width_ui"], ew_t, f"{r['eye_width_ui']:.3f} UI ({r['eye_width_margin_ui']:+.3f})",
+               r["eye_width_margin_ui"] >= 0),
+    ]
+    facts = [("BER at the sampling phase", f"10^{r['log10_ber']:.1f}"), ("sampling phase", f"{r['phase_ui']:+.4f} UI"),
+             ("jitter at the sampler", f"{1e15 * r['sigma_jitter_s']:.1f} fs"), ("noise at the sampler", f"{1e3 * r['sigma_noise_v']:.2f} mV"),
+             ("ISI cursors", str(r["n_cursors"])), ("aggressors", f"{r['n_aggressors']} · {1e3 * r['xtalk_rms_v']:.2f} mV RMS"),
+             ("skew residual", f"{r['skew_residual_ui']:+.4f} UI")]
+    if r.get("centre_offset_ui"):
+        facts.append(("training offset", f"{r['centre_offset_ui']:+.4f} UI"))
+    fig = bathtub_figure([r], t["ber"]["value"], r["lane"], height=190)
+    fig.update_layout(margin=dict(l=40, r=8, t=8, b=32), showlegend=False)
+    fig.update_xaxes(title_text=None)
+    fig.update_yaxes(title_text=None)
+    return html.Div([html.H4(["Inspector", html.Span(f"lane {r['lane']} · physical {r['physical']}"
+                                                      + (" · worst" if r["lane"] == result["worst_lane"] else ""), className="aside")]),
+                     *rows, dcc.Graph(figure=fig, config={"displayModeBar": False, "staticPlot": True}, style={"height": "190px"}),
+                     *[html.Div([html.Span(k, className="k"), html.Span(v, className="v")], className="kv") for k, v in facts]],
+                    className="card")
+
+
+def rates(result: dict | None, cfg, job, manager) -> html.Div:
+    """C -- data rate x package: this config at every survey rate (a job)."""
+    rate_list = [float(x) for x in survey("data_rates_gtps").value]
+    t = result["report"]["targets"] if result else None
+    head = html.H4(["Data rate × package", html.Span(f"{cfg.package.kind} · {cfg.channel.length_mm:g} mm", className="aside")])
+    if result is None:
+        return html.Div([head, html.P("run the link first", className="fine")], className="card")
+    if job is None or job.status in ("failed", "cancelled"):
+        return html.Div([head, html.P(f"this config at {', '.join(f'{r:g}' for r in rate_list)} GT/s: {len(rate_list)} runs", className="fine"),
+                         html.Button("Run rate sweep", id={"type": "action", "name": "rate_sweep"}, n_clicks=0, className="btn"),
+                         html.P(f"last attempt failed: {job.error}", className="fine") if job is not None and job.error else None],
+                        className="card")
+    if job.status in ("queued", "running"):
+        done, total = job.progress or (0, len(rate_list))
+        return html.Div([head, html.Div(html.Div(className="pbar-fill", style={"width": f"{100.0 * done / max(total, 1):.0f}%"}), className="pbar"),
+                         html.P(f"{done} / {total} rates", className="fine")], className="card")
+    rows = job.result["rows"]
+    cells = [html.Div(f"{r['rate_gtps']:g}", className="rt-h") for r in rows]
+    vals = [html.Div([html.Div(f"{r['eye_height_mv']:.0f}", className="rt-mv"), html.Div(f"{r['eye_width_ui']:.3f}", className="rt-ui")],
+                     className="rt-cell " + ("ok" if r["passes"] else "fail"), title=f"worst lane {r['worst_lane']} · IL {r['il_db']:.2f} dB")
+            for r in rows]
+    first_fail = next((r for r in rows if not r["passes"]), None)
+    note = (f"first failing rate {first_fail['rate_gtps']:g} GT/s (eye {first_fail['eye_height_mv']:.1f} mV / {first_fail['eye_width_ui']:.3f} UI "
+            f"vs {t['eye_height_mv']['value']:g} mV / {t['eye_width_ui']['value']:g} UI)" if first_fail else "every rate passes")
+    return html.Div([head, html.Div(cells + vals, className="rt-grid", style={"gridTemplateColumns": f"repeat({len(rows)}, 1fr)"}),
+                     html.P(f"min eye height [mV] over lanes / min eye width [UI] at {t['ber']['value']:.0e}; {note}.", className="fine")],
+                    className="card")
+
+
+__all__ = ["this_page", "queue", "exports", "unverified", "scenarios", "inspector", "rates"]

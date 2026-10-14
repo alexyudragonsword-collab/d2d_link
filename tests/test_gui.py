@@ -20,7 +20,7 @@ from d2d_link.gui.state import PageState, source_of  # noqa: E402
 REPO = Path(__file__).resolve().parents[1]
 GUI = REPO / "src" / "d2d_link" / "gui"
 ALLOWED = {"d2d_link.config", "d2d_link.config.form", "d2d_link.config.loader", "d2d_link.config.schema",
-           "d2d_link.engine", "d2d_link.report", "d2d_link.spec", "d2d_link.clock.forwarded",
+           "d2d_link.engine", "d2d_link.engine.lanes", "d2d_link.report", "d2d_link.spec", "d2d_link.clock.forwarded",
            "d2d_link.channel.coupled"}
 
 
@@ -142,3 +142,75 @@ def test_every_bundled_config_opens_without_running():
         app = create_app(REPO / "configs", p, workers=0, autorun=False)
         assert app.d2d.state.config_path == p
         json.dumps(app.d2d.page().to_plotly_json(), default=str)
+
+
+# ----------------------------------------------------------------- G2
+def _small():
+    """A link the whole sensitivity sweep runs on in seconds."""
+    from d2d_link.config import ChannelConfig, ClockingConfig, LinkConfig, RxConfig, SimConfig
+
+    return LinkConfig(channel=ChannelConfig(length_mm=2.0), clocking=ClockingConfig(), rx=RxConfig(noise_rms_v=0.02),
+                      sim=SimConfig(stat_phase_points=16))
+
+
+def test_sensitivity_and_rate_sweep_jobs_inline():
+    from d2d_link.report import sensitivity_knobs
+
+    cfg = _small()
+    m = JobManager(workers=0)
+    s = m.submit("sensitivity", cfg, label="small", scope="1 lanes")
+    assert s.status == "done", s.error
+    rows = s.result["sensitivity"]["rows"]
+    assert len(rows) == len(sensitivity_knobs(cfg)) + 2 and s.progress == (1 + 2 * len(sensitivity_knobs(cfg)),) * 2
+    json.dumps(s.result)
+    r = m.submit("rate_sweep", cfg, label="small", scope="1 lanes")
+    assert r.status == "done", r.error
+    assert [row["rate_gtps"] for row in r.result["rows"]] == [4.0, 8.0, 12.0, 16.0, 24.0, 32.0]
+    assert r.progress == (6, 6)
+
+
+def test_g2_sections_and_figures(x1_result):
+    from d2d_link.gui.figures import bathtub_figure, tornado_figure
+    from d2d_link.gui.sections.eyes import eyes
+    from d2d_link.gui.sections.flips import flips
+    from d2d_link.gui.sections.lanes import floor_plan, lanes
+    from d2d_link.gui.sections.rails import inspector, rates
+
+    fig = bathtub_figure(x1_result["lanes"], 1e-27, 0)
+    assert len(fig.data) == 2            # the lane and its sampling marker
+    text = json.dumps([eyes(x1_result, 0).to_plotly_json(), lanes(x1_result, 0).to_plotly_json(),
+                       floor_plan(x1_result, 0).to_plotly_json(), inspector(x1_result, 0).to_plotly_json()], default=str)
+    assert "fp-eye" in text and "0.774" in text and "Inspector" in text
+    cfg = _small()
+    m = JobManager(workers=0)
+    s = m.submit("sensitivity", cfg)
+    small = execute("run", __import__("d2d_link.config.loader", fromlist=["config_to_dict"]).config_to_dict(cfg))
+    sec = json.dumps(flips(small, s, 9, None).to_plotly_json(), default=str)
+    assert "flips this" in sec and "tornado" not in sec.lower() or "Bar" in sec
+    assert len(tornado_figure(s.result["sensitivity"]).data) == 2
+    assert "Run sensitivity" in json.dumps(flips(small, None, 9, 3.0).to_plotly_json(), default=str)
+    r = m.submit("rate_sweep", cfg)
+    card = json.dumps(rates(small, cfg, r, m).to_plotly_json(), default=str)
+    assert "rt-cell" in card and ("every rate passes" in card or "first failing rate" in card)
+
+
+def test_lane_selection_and_extra_jobs():
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0, autorun=False)
+    core = app.d2d
+    core.state.file_cfg = _small()
+    core.run()
+    core.run("rate_sweep")
+    assert core.job_for("rate_sweep").status == "done" and core.job_for("sensitivity") is None
+    core.state.selected_lane = 0
+    page = json.dumps(core.page().to_plotly_json(), default=str)
+    assert "fp-sel" in page and "lane 0 in front" in page
+    right = json.dumps([c.to_plotly_json() for c in core.right()], default=str)
+    assert "rt-grid" in right and "Inspector" in right
+    core.run("sensitivity")
+    assert core.job_for("sensitivity").status == "done"
+    # every rail renders with sensitivity and sweep results beside the run (the scenario list once
+    # picked the latest done job of any kind and read its lanes)
+    json.dumps([c.to_plotly_json() for c in core.left()], default=str)
+    page = json.dumps(core.page().to_plotly_json(), default=str)
+    assert "flips this" in page
+    assert "sensitivity" in export.markdown(core.current_result()[0]).lower()

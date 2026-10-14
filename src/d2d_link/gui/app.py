@@ -21,13 +21,16 @@ from .drawer import drawer, drawer_head
 from .jobs import JobManager, config_hash
 from .sections import rails
 from .sections.common import section
+from .sections.eyes import eyes
+from .sections.flips import flips
 from .sections.header import headline, lede
 from .sections.jitter import jitter
 from .sections.lanes import lanes
 from .sections.verdict import verdict
 from .state import PageState
 
-SECTION_TOC = [("verdict", "1", "Verdict"), ("jitter", "3", "Clock-path jitter"), ("lanes", "5", "Lanes & repair"),
+SECTION_TOC = [("verdict", "1", "Verdict"), ("flips", "2", "What flips the verdict"), ("jitter", "3", "Clock-path jitter"),
+               ("eyes", "4", "Eye & bathtub per lane"), ("lanes", "5", "Lanes & repair"),
                ("crosstalk", "6", "Crosstalk"), ("receiver", "7", "Receiver")]
 
 
@@ -43,12 +46,25 @@ class App:
         self.shown: dict | None = None          # the last result rendered (kept while a re-run is pending)
 
     # --------------------------------------------------------------- runs
-    def run(self) -> None:
-        cfg = self.state.cfg
+    def label(self) -> str:
         label = self.state.config_path.stem if self.state.config_path else "config"
         if self.state.overrides:
             label += f" +{len(self.state.overrides)}"
-        self.manager.submit("run", cfg, label=label, scope=f"{cfg.lanes.count} lanes")
+        return label
+
+    def run(self, kind: str = "run") -> None:
+        cfg = self.state.cfg
+        self.manager.submit(kind, cfg, label=self.label(), scope=f"{cfg.lanes.count} lanes")
+
+    def job_for(self, kind: str):
+        """The latest done job of ``kind`` for the current config, else the pending one, else None."""
+        h = config_hash(self.state.cfg)
+        return self.manager.latest_done(h, kind) or self.manager.pending(h, kind)
+
+    def sensitivity_runs(self) -> int:
+        from ..report import sensitivity_knobs
+
+        return 1 + 2 * len(sensitivity_knobs(self.state.cfg))
 
     def current_result(self) -> tuple[dict | None, bool]:
         """(result to show, stale): the run of the current config if done,
@@ -57,6 +73,9 @@ class App:
         jobs = self.manager.poll()
         done = self.manager.latest_done(h)
         if done is not None:
+            sens = self.manager.latest_done(h, "sensitivity")
+            if sens is not None:
+                done.result["sensitivity"] = sens.result["sensitivity"]
             self.shown = done.result
             return done.result, False
         pending = any(j.cfg_hash == h and j.status in ("queued", "running") for j in jobs)
@@ -70,7 +89,14 @@ class App:
                          className="kicker"), headline(cfg, result), lede(cfg, result)]
         if result:
             rep = result["report"]
-            kids += [verdict(result), jitter(result), lanes(result),
+            sel = self.state.selected_lane
+            sens_job = self.job_for("sensitivity")
+            est = None
+            if sens_job is None:
+                run_job = self.manager.latest_done(config_hash(cfg))
+                est = (run_job.result["elapsed_s"] * self.sensitivity_runs()) if run_job and run_job.result else None
+            kids += [verdict(result), flips(result, sens_job, self.sensitivity_runs(), est), jitter(result),
+                     eyes(result, sel), lanes(result, sel),
                      section("crosstalk", "6", "Crosstalk", rep["crosstalk"]["mode"], html.P(_crosstalk_text(rep), className="note")),
                      section("receiver", "7", "Receiver", None, html.P(_receiver_text(rep), className="note"))]
         else:
@@ -89,6 +115,13 @@ class App:
                     aside = f"{result['report']['jitter_budget'][-1]['fs']:.1f} fs"
                 elif anchor == "lanes":
                     aside = f"{result['active']} / {result['requested']}"
+                elif anchor == "flips":
+                    sj = self.job_for("sensitivity")
+                    aside = ("not run" if sj is None else "running" if sj.status in ("queued", "running") else
+                             f"{sum(1 for r in sj.result['sensitivity']['rows'] if r['flips'])} / {len(sj.result['sensitivity']['rows'])}"
+                             if sj.status == "done" else sj.status)
+                elif anchor == "eyes":
+                    aside = str(len(result["lanes"]))
             toc.append(html.A([f"{num} {title}", html.Span(aside, className="aside")], href=f"#sec-{anchor}"))
         return [rails.scenarios(self.configs_dir, self.state.config_path, self.manager),
                 html.Div([html.H4("On this page")] + toc, className="card toc")]
@@ -97,8 +130,10 @@ class App:
         result, _ = self.current_result()
         jobs = self.manager.poll()
         job = self.manager.get(self.state.job_id) if self.state.job_id else None
-        return [rails.this_page(self.state, result, job), rails.queue(jobs, self.manager), rails.exports(result),
-                rails.unverified(result)]
+        return [rails.this_page(self.state, result, job), rails.queue(jobs, self.manager),
+                rails.inspector(result, self.state.selected_lane),
+                rails.rates(result, self.state.cfg, self.job_for("rate_sweep"), self.manager),
+                rails.exports(result), rails.unverified(result)]
 
     def drawer(self) -> html.Div:
         return drawer(self.state, self.open_groups)
@@ -148,7 +183,7 @@ def _receiver_text(rep: dict) -> str:
 
 
 def create_app(configs_dir: str | Path = "configs", config: str | Path | None = None, workers: int = 2,
-               autorun: bool = True, drawer_open: bool = False) -> Dash:
+               autorun: bool = True, drawer_open: bool = False, extra_jobs: tuple[str, ...] = ()) -> Dash:
     """The Dash app bound to a scenario directory; ``config`` opens one and
     (with ``autorun``) queues its run. The ``App`` object is ``dash_app.d2d``."""
     configs_dir = Path(configs_dir)
@@ -158,6 +193,8 @@ def create_app(configs_dir: str | Path = "configs", config: str | Path | None = 
         core.state.open(Path(config))
         if autorun:
             core.run()
+            for kind in extra_jobs:
+                core.run(kind)
     app = Dash(__name__, title="d2d_link budget", update_title=None, suppress_callback_exceptions=True)
     app.d2d = core
 
@@ -184,8 +221,13 @@ def create_app(configs_dir: str | Path = "configs", config: str | Path | None = 
                   Input({"type": "group", "key": ALL}, "n_clicks"),
                   Input({"type": "cancel", "id": ALL}, "n_clicks"),
                   Input("btn-rerun", "n_clicks"), Input("btn-rerun-drawer", "n_clicks"), Input("btn-discard", "n_clicks"),
+                  Input({"type": "lane-cell", "lane": ALL}, "n_clicks"), Input({"type": "lane-row", "lane": ALL}, "n_clicks"),
+                  Input({"type": "action", "name": ALL}, "n_clicks"),
                   prevent_initial_call=False)
-    def refresh(_tick, _sc, _hl, _fl, _gr, _cx, _r1, _r2, _dis):
+    def refresh(_tick, _sc, _hl, _fl, _gr, _cx, _r1, _r2, _dis, _lc, _lr, _ac):
+        # a string id that is not in the layout is a client-side error in
+        # Dash (the page renders nothing), so the buttons that come and go
+        # with the result use pattern ids
         trig = ctx.triggered_id
         st = core.state
         redraw_drawer = trig != "tick"          # the drawer re-renders only on an edit, a toggle or a new scenario
@@ -203,10 +245,15 @@ def create_app(configs_dir: str | Path = "configs", config: str | Path | None = 
                 core.open_groups ^= {trig["key"]}
             elif kind == "cancel" and _clicked(ctx, 5):
                 core.manager.cancel(trig["id"])
+            elif kind in ("lane-cell", "lane-row") and _clicked(ctx, 9 if kind == "lane-cell" else 10):
+                st.selected_lane = None if st.selected_lane == trig["lane"] else trig["lane"]
+            elif kind == "action" and _clicked(ctx, 11):
+                core.run(trig["name"])
         elif trig in ("btn-rerun", "btn-rerun-drawer"):
             core.run()
         elif trig == "btn-discard":
             st.overrides.clear()
+
         cfg_label = (str(st.config_path) if st.config_path else "no config") + (
             f"  · {len(st.overrides)} override(s)" if st.overrides else "")
         return core.page(), core.left(), core.right(), core.drawer() if redraw_drawer else no_update, cfg_label
@@ -259,10 +306,11 @@ def main(argv=None) -> int:
     ap.add_argument("--workers", type=int, default=2, help="worker processes (0 = run inline)")
     ap.add_argument("--no-autorun", action="store_true")
     ap.add_argument("--open-drawer", action="store_true", help="start with the All-fields drawer open")
+    ap.add_argument("--also", default="", help="comma-separated extra jobs to queue at start: sensitivity,rate_sweep")
     args = ap.parse_args(argv)
     configs_dir = args.configs or (args.config.parent if args.config else Path("configs"))
     app = create_app(configs_dir, args.config, workers=args.workers, autorun=not args.no_autorun,
-                     drawer_open=args.open_drawer)
+                     drawer_open=args.open_drawer, extra_jobs=tuple(k for k in args.also.split(",") if k))
     print(f"d2d_link GUI on http://{args.host}:{args.port}  (scenarios: {configs_dir})")
     app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
     return 0
