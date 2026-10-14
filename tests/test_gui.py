@@ -112,7 +112,7 @@ def test_job_manager_inline_caches_by_config(x1_result):
     assert b.status == "done" and b.result is a.result          # the cache, not a second run
     assert m.latest_done(config_hash(cfg)) is b
     with pytest.raises(ValueError):
-        m.submit("sweep", cfg)
+        m.submit("nonsense", cfg)
 
 
 def test_app_builds_and_edits_queue_runs(tmp_path):
@@ -214,3 +214,73 @@ def test_lane_selection_and_extra_jobs():
     page = json.dumps(core.page().to_plotly_json(), default=str)
     assert "flips this" in page
     assert "sensitivity" in export.markdown(core.current_result()[0]).lower()
+
+
+def _text(component) -> str:
+    """Every string in a component tree (``to_plotly_json`` reprs abbreviate deep children)."""
+    out = []
+
+    def walk(node):
+        if isinstance(node, str):
+            out.append(node)
+        elif isinstance(node, (list, tuple)):
+            for n in node:
+                walk(n)
+        elif hasattr(node, "to_plotly_json"):
+            props = node.to_plotly_json().get("props", {})
+            for k, v in props.items():
+                if k in ("children", "options", "title", "placeholder", "value", "id", "className"):
+                    walk(v)
+        elif isinstance(node, dict):
+            for v in node.values():
+                walk(v)
+    walk(component)
+    return "\n".join(str(x) for x in out)
+
+
+# ----------------------------------------------------------------- G3
+def test_sweep_job_disk_cache_and_sections(tmp_path):
+    from d2d_link.config.loader import config_to_dict
+    from d2d_link.gui.figures import sweep_figure
+    from d2d_link.gui.sections.compare import compare
+    from d2d_link.gui.sections.sweeps import sweeps
+
+    cfg = _small()
+    m = JobManager(workers=0, cache_dir=tmp_path)
+    j = m.submit("sweep", cfg, params={"axis": "reach", "points": [1.0, 2.0, 4.0]}, label="small", scope="1 lanes")
+    assert j.status == "done", j.error
+    rows = j.result["rows"]
+    assert [r["value"] for r in rows] == [1.0, 2.0, 4.0] and all("residual_fs" in r for r in rows)
+    assert j.progress == (3, 3)
+    files = sorted(p.name for p in tmp_path.iterdir())
+    assert len(files) == 1 and files[0].startswith("sweep-")
+    # a fresh manager on the same directory answers from disk, no run
+    m2 = JobManager(workers=0, cache_dir=tmp_path)
+    j2 = m2.submit("sweep", cfg, params={"axis": "reach", "points": [1.0, 2.0, 4.0]})
+    assert j2.status == "done" and j2.result["rows"] == rows and j2.started == j2.finished
+    small = execute("run", config_to_dict(cfg))
+    assert len(sweep_figure(rows, "line length [mm]", small["report"]["targets"], log_x=False).data) == 2
+    sec = _text(sweeps(small, {"reach": j}, cfg))
+    assert ("last passing length" in sec or "no length passes" in sec) and "Run sweep A" in sec and "no local PLL" in sec
+    cmp_sec = _text(compare(small, small, "a", "b", None))
+    assert "worst-lane eye width" in cmp_sec and "cmp-row" in cmp_sec
+    pending = _text(compare(small, None, "a", "b", None))
+    assert "not run" in pending
+
+
+def test_app_sweeps_and_compare(tmp_path):
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0, autorun=False, cache_dir=tmp_path)
+    core = app.d2d
+    core.state.file_cfg = _small()
+    core.run()
+    core.run("sweep:reach")
+    assert core.sweep_jobs()["reach"].status == "done" and core.sweep_jobs()["reach"].params == {"axis": "reach"}
+    core.state.compare_path = REPO / "configs" / "standard_32g_x1.yaml"
+    other, job = core.compare_result()                  # queued and, inline, done at once
+    assert other is not None and job.status == "done" and job.label == "standard_32g_x1"
+    page = _text(core.page())
+    assert "Compare with" in page and "worst-lane eye width" in page
+    assert "last passing length" in page or "no length passes" in page
+    left = _text(core.left())
+    assert "compare" in left and "standard_32g_x16_repair" in left
+    assert any(p.name.startswith("run-") for p in tmp_path.iterdir())

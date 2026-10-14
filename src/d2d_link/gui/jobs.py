@@ -5,7 +5,10 @@ A job is ``(kind, config, params)``:
 - ``run``          -- ``run_link`` and the report (what the page is made of);
 - ``sensitivity``  -- ``report.sensitivity`` (every model / survey knob
                       +-20 %, 1 + 2 x knobs runs, progress per run);
-- ``rate_sweep``   -- the same config at every survey data rate.
+- ``rate_sweep``   -- the same config at every survey data rate;
+- ``sweep``        -- the config along one axis (``params["axis"]``:
+                      ``track_bw``, ``local_pll_fn`` or ``reach``), one run
+                      per point plus the clock's closed-form residual.
 
 Results are plain dicts (picklable, JSON-able) so the page never touches a
 ``LinkResult`` across the process boundary. ``JobManager(workers=0)`` runs
@@ -18,15 +21,25 @@ from __future__ import annotations
 import hashlib
 import json
 import multiprocessing
+import os
 import time
 import uuid
 from concurrent.futures import Future, ProcessPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from ..config import LinkConfig
 from ..config.loader import config_from_dict, config_to_dict
 
-KINDS = ("run", "sensitivity", "rate_sweep")
+KINDS = ("run", "sensitivity", "rate_sweep", "sweep")
+
+SWEEP_AXES = {
+    "track_bw": ("clocking.track_bw_hz", "tracker bandwidth [Hz]",
+                 [None, 1e5, 3e5, 1e6, 3e6, 1e7, 3e7, 1e8, 3e8, 1e9, 3e9, 1e10]),
+    "local_pll_fn": ("clocking.local_pll_fn_hz", "local PLL natural frequency [Hz]",
+                     [1e4, 3e4, 1e5, 3e5, 1e6, 3e6, 1e7, 3e7, 1e8, 3e8, 1e9]),
+    "reach": ("channel.length_mm", "line length [mm]", [5.0 * k for k in range(1, 11)] + [60.0]),   # 5..50 by 5, then 60
+}
 
 
 def config_hash(cfg: LinkConfig) -> str:
@@ -107,7 +120,28 @@ def execute(kind: str, cfg_dict: dict, params: dict | None = None, progress=None
             tick(i + 1, len(rates))
         return {"kind": kind, "rows": rows, "package": cfg.package.kind, "length_mm": cfg.channel.length_mm,
                 "elapsed_s": time.perf_counter() - t0}
+    if kind == "sweep":
+        axis = params.get("axis", "track_bw")
+        path, _label, default_points = SWEEP_AXES[axis]
+        points = params.get("points") or default_points
+        rows = []
+        tick(0, len(points))
+        for i, value in enumerate(points):
+            c = apply_overrides(cfg, {path: value})
+            res = run_link(c)
+            w = res.worst
+            rows.append({"value": value, "passes": bool(res.passes), "worst_lane": w.lane,
+                         "eye_height_mv": 1e3 * res.eye_height_min_v, "eye_width_ui": res.eye_width_min_ui,
+                         "residual_fs": 1e15 * ForwardedClock(c).residual_sigma_s(),
+                         "log10_ber": float(w.log10_ber)})
+            tick(i + 1, len(points))
+        return {"kind": kind, "axis": axis, "path": path, "rows": rows, "elapsed_s": time.perf_counter() - t0}
     raise ValueError(f"unknown job kind {kind!r}")
+
+
+def default_cache_dir() -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    return Path(base) / "d2d_link" / "gui"
 
 
 @dataclass
@@ -143,8 +177,9 @@ class JobManager:
     futures to done/failed and must be called from the page's interval
     callback. ``workers=0`` executes inline (tests)."""
 
-    def __init__(self, workers: int = 2):
+    def __init__(self, workers: int = 2, cache_dir: Path | str | None = None):
         self.workers = workers
+        self.cache_dir = Path(cache_dir) if cache_dir else None     # None: memory only
         self._pool = ProcessPoolExecutor(max_workers=workers) if workers > 0 else None
         self._mgr = multiprocessing.Manager() if workers > 0 else None
         self._progress = self._mgr.dict() if self._mgr is not None else {}
@@ -166,6 +201,8 @@ class JobManager:
         job = Job(id=uuid.uuid4().hex[:8], kind=kind, label=label or kind, cfg_hash=h,
                   cfg_dict=config_to_dict(cfg), params=dict(params or {}), scope=scope)
         cached = self._cache.get(self._key(kind, h, params))
+        if cached is None:
+            cached = self._load_disk(kind, h, params)
         if cached is not None:
             job.status, job.result = "done", cached
             job.started = job.finished = time.time()
@@ -196,6 +233,39 @@ class JobManager:
         self._cache[self._key(job.kind, job.cfg_hash, job.params)] = job.result
         if job.started is not None and job.finished is not None:
             self._durations.setdefault(self._bucket(job), []).append(job.finished - job.started)
+        self._save_disk(job)
+
+    # ---------------------------------------------------------- disk cache
+    def _disk_path(self, kind: str, cfg_hash: str, params: dict | None) -> Path | None:
+        if self.cache_dir is None:
+            return None
+        ph = hashlib.sha256(json.dumps(params or {}, sort_keys=True).encode()).hexdigest()[:8]
+        return self.cache_dir / f"{kind}-{cfg_hash}-{ph}.json"
+
+    def _load_disk(self, kind: str, cfg_hash: str, params: dict | None) -> dict | None:
+        p = self._disk_path(kind, cfg_hash, params)
+        if p is None or not p.is_file():
+            return None
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if data.get("kind") != kind:
+            return None
+        self._cache[self._key(kind, cfg_hash, params)] = data
+        return data
+
+    def _save_disk(self, job: Job) -> None:
+        p = self._disk_path(job.kind, job.cfg_hash, job.params)
+        if p is None or job.result is None:
+            return
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            tmp = p.with_suffix(".tmp")
+            tmp.write_text(json.dumps(job.result), encoding="utf-8")
+            tmp.replace(p)
+        except OSError:
+            pass                                 # a cache that cannot be written is just no cache
 
     @staticmethod
     def _bucket(job: Job) -> str:
@@ -276,4 +346,4 @@ class JobManager:
             self._mgr.shutdown()
 
 
-__all__ = ["JobManager", "Job", "execute", "config_hash", "KINDS"]
+__all__ = ["JobManager", "Job", "execute", "config_hash", "KINDS", "SWEEP_AXES", "default_cache_dir"]

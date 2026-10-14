@@ -76,10 +76,12 @@ Markulic 2016 SSPLL 剖面(带内 186 fs),数据 / 时钟路径各 200 fs 白抖
 |---|---|---|
 | `09_receiver_front_end.py` | 接收机自己花掉多少 | x1 25 mm:前端 48 / 32 / 24 GHz 眼高 215.6 → 208.8 / 196.5 / 179.9 mV(噪声在采样点);同一 3 mV 改到输入:137.9 / 150.5 / 148.7 mV(窄前端省噪声,32 GHz 附近最好)。35 mm + 32 GHz 前端的 CTLE:噪声在采样点 6 dB 最好 222.7 mV,在输入 4 dB 最好 179.0 mV(6 dB 掉到 168.8)。训练 1e-3 居中:x1 偏 −0.0008 UI(眼宽 −0.002),x5 耦合中间 lane 偏 −0.024 UI、眼宽 0.691 → 0.644。时域滤噪声:采到 68.5 对闭式 69.05 mV |
 
-## 段 8:浏览器 GUI(0.11.0,G1)
+## 段 8:浏览器 GUI(0.11.0)
 
-`pip install -e ".[gui]"` 后 `d2d-link-gui configs/standard_32g_x16_module.yaml`:页面就是时序预算报表,标题句里的值是控件,改一个就入队重跑;
-右栏队列 / 导出 / 未核实输入,抽屉列全部字段带来源标签。GUI 不含仿真逻辑(铁律 1,`tests/test_gui.py` 用 AST 守);见 `docs/USAGE.md`、`cairn/gui.md`。
+`pip install -e ".[gui]"` 后 `d2d-link-gui configs/standard_32g_x16_module.yaml`:页面就是时序预算报表,标题句里的值是控件,改一个就入队重跑。
+段落:Verdict、What flips the verdict(敏感性 tornado)、Clock-path jitter、Eye & bathtub per lane、Lanes and repair(物理 lane 平面图 + Inspector)、
+Crosstalk、Receiver、Sweeps(tracker 带宽 / 本地 PLL / reach);右栏队列(进程池,进度与剩余时间)、Data rate × package、导出(Markdown 与 CLI 同文)、
+未核实输入;Compare with 并排两场景;结果按配置哈希缓存到磁盘。GUI 不含仿真逻辑(铁律 1,`tests/test_gui.py` 用 AST 守);见 `docs/gui.md`、`cairn/gui.md`。
 
 ## 规范数字
 

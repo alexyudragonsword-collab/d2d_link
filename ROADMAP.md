@@ -46,7 +46,8 @@
    单端 Touchstone 文件里距离 d 的左右两个邻 lane 取较强的一条(引擎按距离索引攻击 lane);带状线只做了一阶(FEXT = 0)。
 2. 前向时钟的四分之一速率变体(`clocking.scheme` 目前只有 `forwarded_ddr`)。随机占空比误差有意不加(与白抖动不可区分,段 3 / 段 7 两次确认)。
 3. 收端(段 7 之后还没有的):训练的 deskew 分辨率与眼监视器的样本数(`rx.training_ber` 只给了居中的 BER,没有给它的统计误差)、前端的非线性与失调、噪声在时域里的符号间相关对簇统计的影响(波形路径已带相关,`error_bursts` 没有按它解读)。
-3. 桌面 GUI 与 Android:`config/form.py::SECTIONS` 已按 Halo 的方式声明了全部字段;Halo 的 `config_bridge` / Dash 表单可以直接搬。
+3. Android:段 8 的浏览器 GUI(`d2d_link.gui`,Dash)在手机上只差一个跑在服务器上的后端;本机 APK 要把 numpy / scipy 打进 Chaquopy,未排期。
+   GUI 本身还没有的:多用户共享(缓存与 worker 没按用户隔离)、真实 bump map(平面图是一维物理编号)、深色主题(有意不做)。
 
 ## 边界(有意不做)
 

@@ -18,29 +18,31 @@ from dash import ALL, Dash, Input, Output, State, ctx, dcc, html, no_update
 from ..config.form import FIELDS, values_to_overrides
 from . import export
 from .drawer import drawer, drawer_head
-from .jobs import JobManager, config_hash
+from .jobs import JobManager, config_hash, default_cache_dir
 from .sections import rails
 from .sections.common import section
+from .sections.compare import compare
 from .sections.eyes import eyes
 from .sections.flips import flips
 from .sections.header import headline, lede
 from .sections.jitter import jitter
 from .sections.lanes import lanes
+from .sections.sweeps import sweeps
 from .sections.verdict import verdict
 from .state import PageState
 
 SECTION_TOC = [("verdict", "1", "Verdict"), ("flips", "2", "What flips the verdict"), ("jitter", "3", "Clock-path jitter"),
                ("eyes", "4", "Eye & bathtub per lane"), ("lanes", "5", "Lanes & repair"),
-               ("crosstalk", "6", "Crosstalk"), ("receiver", "7", "Receiver")]
+               ("crosstalk", "6", "Crosstalk"), ("receiver", "7", "Receiver"), ("sweeps", "A–C", "Sweeps")]
 
 
 class App:
     """What the callbacks close over."""
 
-    def __init__(self, configs_dir: Path, workers: int = 2):
+    def __init__(self, configs_dir: Path, workers: int = 2, cache_dir: Path | None = None):
         self.configs_dir = configs_dir
         self.state = PageState()
-        self.manager = JobManager(workers=workers)
+        self.manager = JobManager(workers=workers, cache_dir=cache_dir)
         self.open_groups: set[str] = set()
         self.drawer_open = False
         self.shown: dict | None = None          # the last result rendered (kept while a re-run is pending)
@@ -53,8 +55,39 @@ class App:
         return label
 
     def run(self, kind: str = "run") -> None:
+        """Queue a job on the current config; ``sweep:<axis>`` picks a sweep."""
         cfg = self.state.cfg
-        self.manager.submit(kind, cfg, label=self.label(), scope=f"{cfg.lanes.count} lanes")
+        params = None
+        if kind.startswith("sweep:"):
+            kind, axis = "sweep", kind.split(":", 1)[1]
+            params = {"axis": axis}
+        self.manager.submit(kind, cfg, params=params, label=self.label(), scope=f"{cfg.lanes.count} lanes")
+
+    def sweep_jobs(self) -> dict:
+        """axis -> latest done or pending sweep job for the current config."""
+        h = config_hash(self.state.cfg)
+        out = {}
+        for j in reversed(self.manager.poll()):
+            if j.kind == "sweep" and j.cfg_hash == h and j.status in ("done", "queued", "running"):
+                out.setdefault(j.params.get("axis"), j)
+        return out
+
+    def compare_result(self):
+        """(result, job) of the scenario chosen in 'Compare with', queueing its run once."""
+        path = self.state.compare_path
+        if path is None:
+            return None, None
+        from ..config import load_config
+
+        cfg = load_config(path)
+        h = config_hash(cfg)
+        done = self.manager.latest_done(h)
+        if done is not None:
+            return done.result, done
+        job = self.manager.pending(h)
+        if job is None:
+            job = self.manager.submit("run", cfg, label=path.stem, scope=f"{cfg.lanes.count} lanes")
+        return (job.result, job) if job.status == "done" else (None, job)
 
     def job_for(self, kind: str):
         """The latest done job of ``kind`` for the current config, else the pending one, else None."""
@@ -95,10 +128,15 @@ class App:
             if sens_job is None:
                 run_job = self.manager.latest_done(config_hash(cfg))
                 est = (run_job.result["elapsed_s"] * self.sensitivity_runs()) if run_job and run_job.result else None
-            kids += [verdict(result), flips(result, sens_job, self.sensitivity_runs(), est), jitter(result),
+            kids.append(verdict(result))
+            if self.state.compare_path is not None:
+                other, other_job = self.compare_result()
+                kids.append(compare(result, other, self.label(), self.state.compare_path.stem, other_job))
+            kids += [flips(result, sens_job, self.sensitivity_runs(), est), jitter(result),
                      eyes(result, sel), lanes(result, sel),
                      section("crosstalk", "6", "Crosstalk", rep["crosstalk"]["mode"], html.P(_crosstalk_text(rep), className="note")),
-                     section("receiver", "7", "Receiver", None, html.P(_receiver_text(rep), className="note"))]
+                     section("receiver", "7", "Receiver", None, html.P(_receiver_text(rep), className="note")),
+                     sweeps(result, self.sweep_jobs(), cfg)]
         else:
             kids.append(html.P("Pick a scenario on the left or press Run.", className="note"))
         return html.Div(kids, className="page" + (" stale" if stale else ""))
@@ -124,6 +162,7 @@ class App:
                     aside = str(len(result["lanes"]))
             toc.append(html.A([f"{num} {title}", html.Span(aside, className="aside")], href=f"#sec-{anchor}"))
         return [rails.scenarios(self.configs_dir, self.state.config_path, self.manager),
+                rails.compare_picker(self.configs_dir, self.state.config_path, self.state.compare_path),
                 html.Div([html.H4("On this page")] + toc, className="card toc")]
 
     def right(self) -> list:
@@ -183,11 +222,13 @@ def _receiver_text(rep: dict) -> str:
 
 
 def create_app(configs_dir: str | Path = "configs", config: str | Path | None = None, workers: int = 2,
-               autorun: bool = True, drawer_open: bool = False, extra_jobs: tuple[str, ...] = ()) -> Dash:
+               autorun: bool = True, drawer_open: bool = False, extra_jobs: tuple[str, ...] = (),
+               cache_dir: str | Path | None = None) -> Dash:
     """The Dash app bound to a scenario directory; ``config`` opens one and
-    (with ``autorun``) queues its run. The ``App`` object is ``dash_app.d2d``."""
+    (with ``autorun``) queues its run. ``cache_dir`` keeps results across
+    sessions (None: memory only). The ``App`` object is ``dash_app.d2d``."""
     configs_dir = Path(configs_dir)
-    core = App(configs_dir, workers=workers)
+    core = App(configs_dir, workers=workers, cache_dir=Path(cache_dir) if cache_dir else None)
     core.drawer_open = drawer_open
     if config is not None:
         core.state.open(Path(config))
@@ -222,9 +263,9 @@ def create_app(configs_dir: str | Path = "configs", config: str | Path | None = 
                   Input({"type": "cancel", "id": ALL}, "n_clicks"),
                   Input("btn-rerun", "n_clicks"), Input("btn-rerun-drawer", "n_clicks"), Input("btn-discard", "n_clicks"),
                   Input({"type": "lane-cell", "lane": ALL}, "n_clicks"), Input({"type": "lane-row", "lane": ALL}, "n_clicks"),
-                  Input({"type": "action", "name": ALL}, "n_clicks"),
+                  Input({"type": "action", "name": ALL}, "n_clicks"), Input({"type": "compare", "name": ALL}, "value"),
                   prevent_initial_call=False)
-    def refresh(_tick, _sc, _hl, _fl, _gr, _cx, _r1, _r2, _dis, _lc, _lr, _ac):
+    def refresh(_tick, _sc, _hl, _fl, _gr, _cx, _r1, _r2, _dis, _lc, _lr, _ac, _cw):
         # a string id that is not in the layout is a client-side error in
         # Dash (the page renders nothing), so the buttons that come and go
         # with the result use pattern ids
@@ -249,6 +290,9 @@ def create_app(configs_dir: str | Path = "configs", config: str | Path | None = 
                 st.selected_lane = None if st.selected_lane == trig["lane"] else trig["lane"]
             elif kind == "action" and _clicked(ctx, 11):
                 core.run(trig["name"])
+            elif kind == "compare":
+                value = next((i.get("value") for i in ctx.inputs_list[12] if i["id"] == trig), None)
+                st.compare_path = Path(value) if value else None
         elif trig in ("btn-rerun", "btn-rerun-drawer"):
             core.run()
         elif trig == "btn-discard":
@@ -306,12 +350,20 @@ def main(argv=None) -> int:
     ap.add_argument("--workers", type=int, default=2, help="worker processes (0 = run inline)")
     ap.add_argument("--no-autorun", action="store_true")
     ap.add_argument("--open-drawer", action="store_true", help="start with the All-fields drawer open")
-    ap.add_argument("--also", default="", help="comma-separated extra jobs to queue at start: sensitivity,rate_sweep")
+    ap.add_argument("--also", default="",
+                    help="comma-separated extra jobs to queue at start: sensitivity,rate_sweep,sweep:track_bw,sweep:reach")
+    ap.add_argument("--cache", type=Path, default=default_cache_dir(), help="result cache directory (survives restarts)")
+    ap.add_argument("--no-cache", action="store_true", help="keep results in memory only")
+    ap.add_argument("--compare", type=Path, help="start with this scenario in 'Compare with'")
     args = ap.parse_args(argv)
     configs_dir = args.configs or (args.config.parent if args.config else Path("configs"))
     app = create_app(configs_dir, args.config, workers=args.workers, autorun=not args.no_autorun,
-                     drawer_open=args.open_drawer, extra_jobs=tuple(k for k in args.also.split(",") if k))
-    print(f"d2d_link GUI on http://{args.host}:{args.port}  (scenarios: {configs_dir})")
+                     drawer_open=args.open_drawer, extra_jobs=tuple(k for k in args.also.split(",") if k),
+                     cache_dir=None if args.no_cache else args.cache)
+    if args.compare:
+        app.d2d.state.compare_path = args.compare
+    print(f"d2d_link GUI on http://{args.host}:{args.port}  (scenarios: {configs_dir}; "
+          f"cache: {'off' if args.no_cache else args.cache})")
     app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
     return 0
 

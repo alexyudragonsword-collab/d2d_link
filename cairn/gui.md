@@ -35,6 +35,14 @@ authoring_mode: ai_generated
 - 浴盆图把 log10 BER 截到 −60:再深处的数值由抖动核最外节点决定,不是物理量(段 3 的结论),画出来只会误导。
 - Plotly 图只在三处(浴盆叠图、Inspector 小浴盆、tornado);平面图、速率矩阵、预算条全是 CSS,x64 的 68 格不卡。
 
+## G3(0.11.0)
+
+- `sweep` kind 的三条轴来自示例 01 / 04 / 02 的网格(`SWEEP_AXES`),每点一次 `run_link` 加闭式残余;x1 的 tracker 带宽扫描与示例 01 同数(0.774 → 0.913 UI)。
+- Compare with:另一个场景的运行按需入队(同一配置哈希只排一次),落地前显示"running",不阻塞本页。
+- 磁盘缓存只存 worker 返回的纯 dict(JSON),文件名 `<kind>-<配置哈希>-<参数哈希>.json`;写入走临时文件再 replace;写不了就当没有缓存。
+  缓存不跟库版本走 —— 数字会变的版本(性能轮那种)要手动清 `~/.cache/d2d_link/gui`,记在 docs/gui.md。
+- 字符串 id 的 Input 只用于**初始 layout 里就有**的控件(顶栏按钮、tick);栏里渲染出来的全部用模式匹配 id —— 左栏在第一次回调之前是空的,`compare-with` 用字符串 id 时整页空白(G3 第一次截图)。
+
 ## 决策记录
 
 - Dash 锁 `>=3,<5`(PyPI 4.4.1):Dash 4 的 Dropdown 换成了 `button.dash-dropdown` 结构,行内控件的 CSS 针对它写;不用 dash-bootstrap / dash-mantine,

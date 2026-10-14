@@ -31,8 +31,14 @@
 - 队列显示任务进度(n / total runs)与按进度估的剩余时间;`d2d-link-gui --also sensitivity,rate_sweep` 启动时就把它们排进队列。
 - 测试 +3(敏感性与速率扫描任务内联、G2 各段与图、lane 选择与额外任务)。
 
-### 没做(G3)
-- sweeps 附录(tracker bw、local PLL f_n、reach)、Compare with、磁盘缓存、文档 `docs/gui.md`。
+### G3(同一版本内追加)
+- **Sweeps 附录 A–C**:`sweep` 任务 kind(`params.axis`:`track_bw` / `local_pll_fn` / `reach`,每点一次 `run_link` + 闭式时钟残余),各一个按钮入队;
+  完成后一句结论(残余减半的带宽 / 最宽眼的 f_n / 最后通过的长度)+ 眼宽与残余双轴曲线 + 表。x1 的 tracker 带宽扫描 12 点 18 s,
+  眼宽 0.774(无跟踪器)→ 0.913 UI(10 GHz),与示例 01 同数。
+- **Compare with**(左栏下拉):选另一个场景,它的运行自动入队,落地后在 Verdict 下方并排判定 / 损耗 / 时钟残余 / 最差 lane 眼与裕度,逐 lane 眼宽条左右对照。
+- **磁盘缓存**:`JobManager(cache_dir)` 把每个结果按 (kind, 配置哈希, 参数) 存 JSON,默认 `~/.cache/d2d_link/gui`(`--cache DIR` / `--no-cache`),
+  重启后同一配置秒开。`--compare PATH` 启动参数。
+- 文档:`docs/gui.md`(启动参数、页面各段、耗时表、不做的);README 段 8;`cairn/gui.md` G3。测试 +2。
 
 ---
 

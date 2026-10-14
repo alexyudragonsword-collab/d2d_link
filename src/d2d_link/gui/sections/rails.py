@@ -198,4 +198,16 @@ def rates(result: dict | None, cfg, job, manager) -> html.Div:
                     className="card")
 
 
-__all__ = ["this_page", "queue", "exports", "unverified", "scenarios", "inspector", "rates"]
+def compare_picker(configs_dir: Path, current: Path | None, compare: Path | None) -> html.Div:
+    """The 'Compare with' dropdown: another scenario whose latest run joins the page."""
+    opts = [{"label": "— none —", "value": ""}]
+    for p in sorted(configs_dir.glob("*.yaml")):
+        if current is None or p.resolve() != current.resolve():
+            opts.append({"label": p.stem, "value": str(p)})
+    return html.Div([html.H4("Compare with"),
+                     dcc.Dropdown(id={"type": "compare", "name": "with"}, options=opts, value=str(compare) if compare else "",
+                                  clearable=False,
+                                  searchable=False, className="fld-dd")], className="card")
+
+
+__all__ = ["this_page", "queue", "exports", "unverified", "scenarios", "inspector", "rates", "compare_picker"]

@@ -105,3 +105,8 @@ table.clickable tbody tr{cursor:pointer}table.clickable tbody tr:hover td{backgr
 .rt-grid{display:grid;gap:4px;margin-top:6px}.rt-h{text-align:center;font-size:11px;color:var(--dim)}
 .rt-cell{border-radius:5px;padding:4px 2px;text-align:center;font-family:ui-monospace,Menlo,monospace;font-size:11px}.rt-cell.ok{background:var(--okbg);color:var(--ok)}.rt-cell.fail{background:var(--failbg);color:var(--fail)}
 .rt-mv{font-weight:700}.rt-ui{font-size:10px}
+
+.sec-head.sub{margin-top:18px}.sec-head.sub h3{margin:0;font:600 16px Georgia,serif}
+.sweep{margin-bottom:10px}
+table.cmp td{text-align:left;font-family:ui-monospace,Menlo,monospace}table.cmp td.lbl{color:var(--dim);font-family:Inter,system-ui,sans-serif}table.cmp th{text-align:left}
+.cmp-row{grid-template-columns:62px 1fr 1fr;gap:10px}.cmp-trk{height:12px}.bar-fill.cmp-b{opacity:.55}

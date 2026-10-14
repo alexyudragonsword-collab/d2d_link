@@ -3,6 +3,16 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短(数字原值、被推翻的判断、下一步),
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-10-14 · 段 8 G3:sweeps 附录、Compare with、磁盘缓存、文档(ccr-a2094794-9qa40v,0.11.0)
+
+- 做了:`sweep` 任务(tracker 带宽 / 本地 PLL f_n / reach,每点一次运行 + 闭式残余)与附录 A–C 段;Compare with 下拉 + 并排段;
+  `JobManager(cache_dir)` 磁盘缓存(`--cache` / `--no-cache`);`--compare`;`docs/gui.md`;README / CHANGELOG / ROADMAP(P3 #3 改为 Android 与 GUI 未做项)。测试 +2。
+- 数字原值:x1 tracker 带宽扫描 12 点 18 s,眼宽 0.774 → 0.913 UI(与示例 01 同);缓存文件 `run-<hash>-<params>.json`,x1 结果约 40 KB。
+- 被推翻的判断 / 坑:(1) 测试里用 `json.dumps(component.to_plotly_json(), default=str)` 找文本不可靠 —— 深层 children 被 repr 截断成 "Span(children..."",
+  改为遍历组件树收集字符串(`_text`);(2) 内联模式下"比较场景"的任务提交即完成,`compare_result` 第一版仍返回 None,下一个 tick 才显示 —— 提交后看状态。
+- 段 8 收口:三个里程碑 G1 / G2 / G3 都在 0.11.0;方案里的"Android 以后"记在 ROADMAP P3 #3。
+- 下一步:段 5(等规范原文)、接收机基线(等 `rx.bw_hz` 与噪声口径)、或把 GUI 用起来后再提的需求。
+
 ## 2026-10-13 · 段 8 G2:平面图、Inspector、敏感性 tornado、速率矩阵(ccr-a2094794-9qa40v,0.11.0)
 
 - 做了:任务 kind `sensitivity`(进度回调)与 `rate_sweep`;Lanes 段的物理 lane 平面图(按比例眼六边形 + 目标 mask,死 / 闲置 / 备用 / 最差 / 不过,

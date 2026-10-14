@@ -55,6 +55,7 @@ class PageState:
     overrides: dict[str, Any] = dataclasses.field(default_factory=dict)
     job_id: str | None = None          # the run whose result is on screen
     selected_lane: int | None = None
+    compare_path: Path | None = None   # another scenario shown beside this one
 
     @property
     def cfg(self) -> LinkConfig:

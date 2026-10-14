@@ -78,4 +78,34 @@ def tornado_figure(sens: dict, height: int | None = None) -> go.Figure:
     return fig
 
 
-__all__ = ["bathtub_figure", "tornado_figure", "FLOOR"]
+def sweep_figure(rows: list[dict], axis_label: str, targets: dict, log_x: bool = True, height: int = 260) -> go.Figure:
+    """Eye width (left axis) and clock residual (right axis) along a sweep;
+    the eye-width target dashed; failing points hollow."""
+    xs = [r["value"] if r["value"] is not None else None for r in rows]
+    has_none = any(x is None for x in xs)
+    labels = ["none" if x is None else f"{x:g}" for x in xs]
+    xv = list(range(len(rows))) if (has_none or not log_x) else xs
+    fig = go.Figure(layout=_base(height, margin=dict(l=52, r=56, t=22, b=44), yaxis2=dict(overlaying="y", side="right",
+                                                                                          showgrid=False, title="residual [fs]")))
+    fig.add_trace(go.Scatter(x=xv, y=[r["eye_width_ui"] for r in rows], mode="lines+markers", name="min eye width [UI]",
+                             line=dict(color=BLUE, width=2),
+                             marker=dict(size=8, color=[BLUE if r["passes"] else "white" for r in rows],
+                                         line=dict(color=BLUE, width=2)),
+                             customdata=[[1e0 * r["eye_height_mv"], "PASS" if r["passes"] else "FAIL", r["worst_lane"]] for r in rows],
+                             hovertemplate="%{text}: eye %{y:.3f} UI · %{customdata[0]:.1f} mV · %{customdata[1]} (lane %{customdata[2]})<extra></extra>",
+                             text=labels))
+    fig.add_trace(go.Scatter(x=xv, y=[r["residual_fs"] for r in rows], mode="lines", name="clock residual [fs]",
+                             line=dict(color=AMBER, width=1.5, dash="dot"), yaxis="y2", text=labels,
+                             hovertemplate="%{text}: %{y:.1f} fs<extra></extra>"))
+    fig.add_hline(y=targets["eye_width_ui"]["value"], line=dict(color=RED, dash="dash", width=1),
+                  annotation_text=f"target {targets['eye_width_ui']['value']:g} UI", annotation_position="bottom right",
+                  annotation_font=dict(size=11, color=RED))
+    if has_none or not log_x:
+        fig.update_xaxes(tickmode="array", tickvals=xv, ticktext=labels, title_text=axis_label)
+    else:
+        fig.update_xaxes(type="log", title_text=axis_label)
+    fig.update_layout(yaxis_title="eye width [UI]")      # update_yaxes would retitle the residual axis too
+    return fig
+
+
+__all__ = ["bathtub_figure", "tornado_figure", "sweep_figure", "FLOOR"]
