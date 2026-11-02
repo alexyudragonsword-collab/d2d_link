@@ -73,6 +73,20 @@ class ChannelModel:
         length = cfg.channel.length_mm * 1e-3
         r, l, g, c = analytic.skin_effect_rlgc(f, p["rdc_ohm_m"], p["r_skin"], p["l_h_m"], p["c_f_m"],
                                                loss_tangent=p["loss_tangent"], g_per_m=p["g_s_m"])
+        if cfg.channel.skin_inductance:
+            # the skin effect's surface impedance is (1 + j) r_skin sqrt(f):
+            # the resistance the vendored RLGC carries comes with an equal
+            # internal reactance, an inductance r_skin / (2 pi sqrt(f)) that
+            # falls with frequency. Without it H(f) is not causal (R rises
+            # with f while the phase is pure LC delay) and the pulse carries
+            # energy before the line's delay -- 6.5 % of the main cursor on
+            # the 25 mm standard line, 1 % with it; the lossy line's group
+            # delay dispersion, most of its post-cursor ISI, was missing too
+            # (second health check, 2026-11-02). At DC the reactance is zero
+            # whatever L is, so the 1 / sqrt(0) point needs no value.
+            l_int = np.zeros_like(f)
+            np.divide(p["r_skin"], 2.0 * np.pi * np.sqrt(f), out=l_int, where=f > 0.0)
+            l = l + l_int
         abcd = analytic.tline_abcd(r, l, g, c, length, f)
         H = analytic.abcd_to_transfer(abcd, zs, zl) / (zl / (zs + zl))
         return cls(H, f, name=f"{cfg.package.kind}_rlgc_{cfg.channel.length_mm:g}mm")
@@ -88,12 +102,23 @@ class ChannelModel:
         sdd = import_diff_network(path, renumber=renumber, lane=lane)
         sdd_i = interp_s2p(sdd, f)
         H = terminate_renormalize(sdd_i, 2.0 * zs, 2.0 * zl) / (zl / (zs + zl))
-        return cls(fill_dc(H, f), f, name=path)
+        return cls(fill_dc(extend_band(H, f, float(sdd.f[-1])), f), f, name=path)
 
     # ------------------------------------------------------------ metrics
     def insertion_loss_db(self, f_hz: float) -> float:
         """|H| at ``f_hz`` in dB (0 dB = matched lossless)."""
         return float(20.0 * np.log10(max(abs(np.interp(f_hz, self.f, np.abs(self.H))), 1e-300)))
+
+    def xtalk_db(self, f_hz: float, neighbour: int = 1) -> float | None:
+        """A Touchstone file's far-end coupling from the lane ``neighbour``
+        places away relative to the through path, |X / H| at ``f_hz`` in dB;
+        None when the model carries no such term."""
+        hx = (self.xtalk_H or {}).get(neighbour)
+        if hx is None:
+            return None
+        x = abs(np.interp(f_hz, self.f, np.abs(hx)))
+        h = abs(np.interp(f_hz, self.f, np.abs(self.H)))
+        return float(20.0 * np.log10(max(x, 1e-300) / max(h, 1e-300)))
 
 
 def fill_dc(H: np.ndarray, f: np.ndarray) -> np.ndarray:
@@ -116,6 +141,38 @@ def fill_dc(H: np.ndarray, f: np.ndarray) -> np.ndarray:
             H[0] = min(1.0, h1)
     elif f.size > 1 and f[0] == 0.0 and H[0] == 0.0:
         H[0] = abs(H[1])
+    return H
+
+
+def extend_band(H: np.ndarray, f: np.ndarray, f_edge: float) -> np.ndarray:
+    """A measured network ends at ``f_edge`` and the vendored interpolation
+    fills transmission beyond it with 0: a brick wall on this grid, which
+    runs to osr x f_Nyquist (512 GHz at 32 GT/s on the 32x grid). The wall
+    rings the pulse (Gibbs) and throws away the attenuation the line goes on
+    having: the 25 mm standard line written to a file that stops at 50 GHz
+    read 0.016 UI less eye width than the same line in closed form (two
+    thirds of x1's margin; second health check). Beyond the edge log|H| is
+    continued linearly in f with the slope fitted over the file's last
+    decade [f_edge / 10, f_edge] (dielectric loss grows as f and dominates
+    there, conductor loss as sqrt f; the fit sits between), never rising;
+    the phase continues with that decade's mean group delay. The through
+    path only -- a coupling term can rise through the band edge, and 0 stays
+    the conservative fill for it. A file covering the grid is left alone."""
+    H = np.asarray(H, dtype=complex).copy()
+    out = f > f_edge * (1.0 + 1e-9)
+    if not out.any():
+        return H
+    band = (f >= f_edge / 10.0) & ~out & (np.abs(H) > 0.0)
+    if np.count_nonzero(band) < 3:
+        band = np.zeros_like(out)
+        band[np.flatnonzero(~out & (np.abs(H) > 0.0))[-3:]] = True
+    if np.count_nonzero(band) < 2:
+        return H
+    fb, hb = f[band], H[band]
+    slope = min(float(np.polyfit(fb, np.log(np.abs(hb)), 1)[0]), 0.0)
+    delay = float(np.polyfit(fb, np.unwrap(np.angle(hb)), 1)[0])        # d(phase)/df, negative for a delay
+    df = f[out] - fb[-1]
+    H[out] = abs(hb[-1]) * np.exp(slope * df) * np.exp(1j * (np.angle(hb[-1]) + delay * df))
     return H
 
 
@@ -210,13 +267,16 @@ def next_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
 
 
 def read_cursors(pulse: np.ndarray, position: float, osr: int, n_max: int = 64,
-                 keep_centre: bool = True) -> tuple[np.ndarray, int]:
+                 keep_centre: bool = True, floor: float = 1e-6) -> tuple[np.ndarray, int]:
     """Baud-spaced samples of ``pulse`` around sample ``position`` (linear
-    interpolation): ``(c, i_centre)``. Cursors below 1e-9 of the pulse's peak
-    at both ends are dropped; the centre is kept when ``keep_centre``."""
+    interpolation): ``(c, i_centre)``. Cursors below ``floor`` of the pulse's
+    peak at both ends are dropped (a 0.2 uV cursor on a 200 mV pulse is
+    nothing next to the 50 uV ISI bin; the 1e-9 of earlier versions kept
+    the crosstalk pulses' 1e-8 tails and tripled a module's run time once
+    the window grew to 512 UI); the centre is kept when ``keep_centre``."""
     ks = np.arange(-n_max, n_max + 1)
     c = np.interp(position + ks * osr, np.arange(pulse.size), pulse, left=0.0, right=0.0)
-    keep = np.abs(c) > 1e-9 * max(float(np.max(np.abs(pulse))), 1e-300)
+    keep = np.abs(c) > floor * max(float(np.max(np.abs(pulse))), 1e-300)
     if keep_centre:
         keep[n_max] = True
     if not keep.any():
@@ -237,6 +297,8 @@ class LinkResponse:
     osr: int
     xtalk_pulses: dict = None   # {neighbour distance: Waveform [V]}; empty when crosstalk is off
     noise_impulse: Waveform | None = None   # front end x CTLE impulse (sum = 1) for rx.noise_at: input
+    cursor_reach: int = 64      # cursors read on each side of the main one (sim.stat_cursor_reach)
+    cursor_floor: float = 1e-6  # end cursors below this fraction of the pulse's peak are dropped (sim.stat_cursor_floor)
 
     @property
     def main_index(self) -> int:
@@ -255,15 +317,17 @@ class LinkResponse:
     def main_amplitude(self) -> float:
         return float(self.pulse.y[self.main_index])
 
-    def cursors(self, phase_ui: float, n_max: int = 64) -> tuple[np.ndarray, int]:
+    def cursors(self, phase_ui: float, n_max: int | None = None) -> tuple[np.ndarray, int]:
         """Baud-spaced cursors of the pulse at ``phase_ui`` from the peak
         (linear interpolation between waveform samples): ``(c, i_main)`` with
         ``c[i_main]`` the main cursor. Cursors below 1e-9 of the peak at both
-        ends are dropped; at most ``n_max`` on each side."""
-        return read_cursors(self.pulse.y, self.main_index + phase_ui * self.osr, self.osr, n_max)
+        ends are dropped (``cursor_floor`` of the peak); at most ``n_max``
+        (default ``cursor_reach``) on each side."""
+        n_max = self.cursor_reach if n_max is None else n_max
+        return read_cursors(self.pulse.y, self.main_index + phase_ui * self.osr, self.osr, n_max, floor=self.cursor_floor)
 
     def xtalk_cursors(self, neighbour, phase_ui: float, rel_skew_ui: float = 0.0,
-                      n_max: int = 64) -> np.ndarray:
+                      n_max: int | None = None) -> np.ndarray:
         """Baud-spaced crosstalk cursors a neighbour ``neighbour`` lanes away
         leaves at this lane's sampling instant (``phase_ui`` from its own
         peak). The aggressor's symbols arrive ``rel_skew_ui`` later than the
@@ -274,7 +338,8 @@ class LinkResponse:
         if neighbour not in pulses:
             return np.zeros(0)
         pos = self.main_index + (phase_ui - rel_skew_ui) * self.osr
-        c, _ = read_cursors(pulses[neighbour].y, pos, self.osr, n_max, keep_centre=False)
+        n_max = self.cursor_reach if n_max is None else n_max
+        c, _ = read_cursors(pulses[neighbour].y, pos, self.osr, n_max, keep_centre=False, floor=self.cursor_floor)
         return c
 
 
@@ -303,7 +368,8 @@ def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkR
         hn = freq2impulse(next_response(cfg, f) * front, f)
         xt["next"] = Waveform(np.convolve(hn.y, np.ones(osr))[: hn.y.size] * amp, hn.dt)
     noise_h = freq2impulse(rx_front, f) if cfg.rx.noise_at == "input" else None
-    return LinkResponse(Waveform(pulse, h.dt), h, ch, H, osr, xt, noise_h)
+    return LinkResponse(Waveform(pulse, h.dt), h, ch, H, osr, xt, noise_h,
+                        cursor_reach=cfg.sim.stat_cursor_reach, cursor_floor=cfg.sim.stat_cursor_floor)
 
 
 __all__ = ["ChannelModel", "LinkResponse", "link_response", "tx_response", "rx_response", "ctle_response",

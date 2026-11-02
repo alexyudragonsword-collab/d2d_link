@@ -24,7 +24,11 @@ one = dataclasses.replace(cfg, lanes=dataclasses.replace(cfg.lanes, count=1, fai
                           channel=dataclasses.replace(cfg.channel, xtalk="none"))
 
 
-def noise_for_ber(c, target):
+def tuned(c, target):
+    """``c`` with its sampler noise raised until the statistics predict
+    ``target`` at the quiet link's eye centre, and both engines pinned to that
+    phase: a rerun with the raised noise would re-centre the closed eye where
+    the pulse is tallest and land well below the target (example 03, 9b)."""
     eng = StatisticalEngine(c)
     phase = eng.run().phase_ui
     lo, hi = 1e-4, 0.5
@@ -35,7 +39,7 @@ def noise_for_ber(c, target):
             hi = mid
         else:
             lo = mid
-    return (lo * hi) ** 0.5
+    return dataclasses.replace(c, rx=dataclasses.replace(c.rx, noise_rms_v=(lo * hi) ** 0.5, sampling_phase_ui=phase))
 
 
 def point(name, c, n_symbols):
@@ -59,14 +63,14 @@ results = []
 c = dataclasses.replace(one, clocking=dataclasses.replace(one.clocking, pll_shift_db=24.0, local_pll_shift_db=24.0,
                                                           local_pll_fn_hz=2e5, track_bw_hz=None, pi_step_ui=0.0,
                                                           data_path_wander_s=0.0, clock_path_wander_s=0.0))
-c = dataclasses.replace(c, rx=dataclasses.replace(c.rx, noise_rms_v=noise_for_ber(c, 1e-5)))
+c = tuned(c, 1e-5)
 results.append(point("local PLL, coloured clock noise", c, 4_000_000))
 
 # 2. tracker with latency and a coarse phase interpolator, on white path jitter
 c = dataclasses.replace(one, clocking=dataclasses.replace(one.clocking, data_path_rj_s=2e-12, clock_path_rj_s=2e-12,
                                                           track_bw_hz=5e8, track_delay_ui=4, pi_step_ui=1 / 32,
                                                           data_path_wander_s=0.0, clock_path_wander_s=0.0))
-c = dataclasses.replace(c, rx=dataclasses.replace(c.rx, noise_rms_v=noise_for_ber(c, 1e-5)))
+c = tuned(c, 1e-5)
 results.append(point("quantised, delayed tracker", c, 4_000_000))
 
 # 3. path wander through the 2 MHz tracker (the module's own setting, raised).
@@ -77,7 +81,7 @@ results.append(point("quantised, delayed tracker", c, 4_000_000))
 # wander is kept to a share of the margin.
 c = dataclasses.replace(one, clocking=dataclasses.replace(one.clocking, data_path_wander_s=2.5e-12,
                                                           clock_path_wander_s=2.5e-12, wander_corner_hz=3e6, pi_step_ui=0.0))
-c = dataclasses.replace(c, rx=dataclasses.replace(c.rx, noise_rms_v=noise_for_ber(c, 1e-5)))
+c = tuned(c, 1e-5)
 results.append(point("path wander through the tracker", c, 4_000_000))
 
 # 4. crosstalk: x3 module, strong coupling, the middle lane
@@ -106,7 +110,7 @@ adv = dataclasses.replace(adv, lanes=dataclasses.replace(adv.lanes, count=1, fai
                           clocking=dataclasses.replace(adv.clocking, data_path_rj_s=1e-12, clock_path_rj_s=1e-12, dcd_ui=0.06),
                           rx=dataclasses.replace(adv.rx, ctle=dataclasses.replace(adv.rx.ctle, enable=True, peak_db=3.0)),
                           sim=dataclasses.replace(adv.sim, stat_phase_points=cfg.sim.stat_phase_points))
-adv = dataclasses.replace(adv, rx=dataclasses.replace(adv.rx, noise_rms_v=noise_for_ber(adv, 1e-5)))
+adv = tuned(adv, 1e-5)
 results.append(point("advanced package, CTLE, 0.06 UI DCD", adv, 4_000_000))
 
 ratios = [r for _, _, r in results]

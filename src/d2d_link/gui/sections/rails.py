@@ -153,7 +153,9 @@ def inspector(result: dict | None, selected: int | None) -> html.Div:
                r["eye_width_margin_ui"] >= 0),
     ]
     facts = [("BER at the sampling phase", f"10^{r['log10_ber']:.1f}"), ("sampling phase", f"{r['phase_ui']:+.4f} UI"),
-             ("jitter at the sampler", f"{1e15 * r['sigma_jitter_s']:.1f} fs"), ("noise at the sampler", f"{1e3 * r['sigma_noise_v']:.2f} mV"),
+             ("jitter at the sampler", f"{1e15 * r.get('sigma_sampling_s', r['sigma_jitter_s']):.1f} fs"
+                                       + (f" (Gaussian {1e15 * r['sigma_jitter_s']:.1f} + PI step)"
+                                          if r.get('sigma_sampling_s', 0.0) > r['sigma_jitter_s'] else "")), ("noise at the sampler", f"{1e3 * r['sigma_noise_v']:.2f} mV"),
              ("ISI cursors", str(r["n_cursors"])), ("aggressors", f"{r['n_aggressors']} · {1e3 * r['xtalk_rms_v']:.2f} mV RMS"),
              ("skew residual", f"{r['skew_residual_ui']:+.4f} UI")]
     if r.get("centre_offset_ui"):

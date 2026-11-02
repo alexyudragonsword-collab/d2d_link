@@ -272,6 +272,7 @@ class StatResult:
     cursors_v: np.ndarray
     i_main: int
     skew_residual_ui: float = 0.0
+    sigma_sampling_s: float = 0.0   # what the sampler sees: the Gaussian budget and the PI step's uniform, in power
     targets: dict = field(default_factory=dict)
     extras: dict = field(default_factory=dict)
 
@@ -313,7 +314,10 @@ class StatResult:
         return (f"lane {self.lane}: BER 10^{self.log10_ber:.1f} at {self.phase_ui:+.4f} UI | "
                 f"eye {1e3 * self.eye_height_v:.1f} mV / {self.eye_width_ui:.3f} UI{clipped} at {self.target_ber:.0e} "
                 f"(targets {eh[0]:g} mV source: {eh[1]}, {ew[0]:g} UI source: {ew[1]}) | "
-                f"jitter {1e15 * self.sigma_jitter_s:.1f} fs, noise {1e3 * self.sigma_noise_v:.2f} mV")
+                f"jitter {1e15 * self.sigma_jitter_s:.1f} fs"
+                + (f" (+ PI step: {1e15 * self.sigma_sampling_s:.1f} fs at the sampler)"
+                   if self.sigma_sampling_s > self.sigma_jitter_s else "")
+                + f", noise {1e3 * self.sigma_noise_v:.2f} mV")
 
 
 class StatisticalEngine:
@@ -461,17 +465,20 @@ class StatisticalEngine:
         ber = np.array([self.log10_error_probability(p) for p in phases])
         return phases, ber
 
-    def bathtub_around_the_eye(self, target: float) -> tuple[np.ndarray, np.ndarray]:
+    def bathtub_around_the_eye(self, target: float, *others: float) -> tuple[np.ndarray, np.ndarray]:
         """The bathtub over [-0.5, 0.5] UI from the reference sample, extended
-        by half a UI on a side where the opening at ``target`` reaches the
-        window's edge. At most one extension per side."""
+        by half a UI on a side where the opening at ``target`` (or at any of
+        ``others`` -- the training BER's wider opening, phase 9b: read inside
+        a window it overflowed, training centred 0.015 UI off on a 2 mm line)
+        reaches the window's edge. At most one extension per side."""
         lo, hi = -0.5, 0.5
         phases, ber = self.bathtub(lo, hi)
         for _ in range(2):
-            region = self.eye_region(phases, ber, target)
-            if region is None:
+            regions = [r for r in (self.eye_region(phases, ber, t) for t in (target, *others)) if r is not None]
+            if not regions:
                 break
-            left, right = region
+            left = min(r[0] for r in regions)
+            right = max(r[1] for r in regions)
             grow_lo = left <= phases[0] + 1e-12
             grow_hi = right >= phases[-1] - 1e-12
             if not (grow_lo or grow_hi):
@@ -599,7 +606,7 @@ class StatisticalEngine:
         cfg = self.cfg
         targets = resolved_targets(cfg)
         target_ber = targets["ber"][0]
-        phases, ber = self.bathtub_around_the_eye(target_ber)
+        phases, ber = self.bathtub_around_the_eye(target_ber, *(() if cfg.rx.training_ber is None else (cfg.rx.training_ber,)))
         i_min = int(np.argmin(ber))
         region = self.eye_region(phases, ber, target_ber, refine=self.eye_edge)
         if region is not None:
@@ -642,6 +649,7 @@ class StatisticalEngine:
             eye_height_v=eh, eye_width_ui=ew, target_ber=target_ber,
             sigma_noise_v=self.sigma_n, sigma_jitter_s=self.budget.total_s, jitter=self.budget,
             main_cursor_v=m.main, cursors_v=c, i_main=i_main, skew_residual_ui=skew_residual_ui,
+            sigma_sampling_s=math.sqrt(self.budget.total_s ** 2 + self.clock.quantisation_sigma_s() ** 2),
             targets=targets,
             extras={"sigma_isi_v": m.sigma_isi_v, "isi_bins": int(m.pmf.size), "isi_bin_v": m.bin_v,
                     "n_cursors": m.n_cursors, "n_aggressors": len(self.aggressors),
@@ -653,7 +661,12 @@ class StatisticalEngine:
                     "training_centre_ui": float(center), "centre_offset_ui": float(center - target_centre),
                     "noise_gain": float(self.noise_gain), "sigma_noise_input_v": float(cfg.rx.noise_rms_v),
                     "eye_width_raw_ui": float(ew_raw), "eye_width_clipped": bool(clipped),
-                    "insertion_loss_nyquist_db": self.resp.channel.insertion_loss_db(cfg.f_nyquist)})
+                    "insertion_loss_nyquist_db": self.resp.channel.insertion_loss_db(cfg.f_nyquist),
+                    "xtalk_adjacent_db": (self.resp.channel.xtalk_db(cfg.f_nyquist, 1) if cfg.channel.xtalk == "touchstone"
+                                          else cfg.xtalk_db()[0] if cfg.channel.xtalk != "none" else None),
+                    "xtalk_source": ("file" if cfg.channel.xtalk == "touchstone" else "model" if cfg.channel.xtalk == "coupled"
+                                     else "config" if cfg.channel.xtalk_adjacent_db is not None else "model")
+                                    if cfg.channel.xtalk != "none" else None})
 
 
 def run_statistical(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,

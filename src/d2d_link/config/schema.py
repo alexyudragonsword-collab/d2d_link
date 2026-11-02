@@ -103,11 +103,15 @@ class ChannelConfig:
     renumber: bool = True              # auto-detect 1<->3 port ordering (PyBERT)
     zs_ohm: float = 50.0               # source termination
     zl_ohm: float = 50.0               # receiver termination
-    n_freq: int = 2048                 # points on the uniform DC-inclusive grid
+    n_freq: int = 8192                 # points on the uniform DC-inclusive grid: the pulse's time window is
+                                       # 2 (n_freq - 1) / osr UI (512 UI at osr 32; 2048 gave 128, phase 9b)
     # analytic RLGC, None -> PACKAGE_RLGC[package.kind] (source: model); L and
     # C default to the values z0_ohm and the stack-up's eps_eff imply
     rdc_ohm_m: Optional[float] = None
     r_skin: Optional[float] = None     # R(f) = rdc + r_skin sqrt(f)  [ohm/(m sqrt(Hz))]
+    skin_inductance: bool = True       # the skin effect's internal inductance r_skin / (2 pi sqrt(f)) rides with R(f):
+                                       # the surface impedance is (1 + j) r_skin sqrt(f), and R(f) alone is non-causal
+                                       # (phase 9b); False reproduces the 0.11 model
     l_h_m: Optional[float] = None      # explicit L overrides the geometry
     c_f_m: Optional[float] = None      # explicit C overrides the geometry
     loss_tangent: Optional[float] = None
@@ -455,6 +459,9 @@ class SimConfig:
     stat_isi_bin_v: float = 5.0e-5     # voltage bin of the exact ISI distribution [V]
     stat_phase_points: int = 64        # bathtub phases per UI
     stat_jitter_sigmas: float = 12.0   # jitter quadrature reach [sigma]; 1e-27 needs 10.8
+    stat_cursor_reach: int = 256       # cursors the statistical engine reads on each side of the main one [UI]
+                                       # (a hard-coded 64 until phase 9b; the pulse window above bounds it anyway)
+    stat_cursor_floor: float = 1.0e-6  # end cursors below this fraction of a pulse's peak are dropped (was 1e-9)
     engine: Literal["statistical", "time", "both"] = "statistical"
     time_mode: Literal["waveform", "samples"] = "waveform"   # time engine: full waveform, or sampled values only
                                                             # (sum of interpolated cursors; much faster, no eye traces)
@@ -472,6 +479,8 @@ class SimConfig:
         _require(0.0 <= self.time_cursor_floor < 1.0, "sim.time_cursor_floor must be in [0, 1)")
         _require(math.isfinite(self.stat_jitter_sigmas) and self.stat_jitter_sigmas >= 1.0,
                  "sim.stat_jitter_sigmas must be >= 1")
+        _require(self.stat_cursor_reach >= 8, f"sim.stat_cursor_reach must be >= 8, got {self.stat_cursor_reach}")
+        _require(0.0 <= self.stat_cursor_floor < 1.0, "sim.stat_cursor_floor must be in [0, 1)")
         _require_in(self.pattern, {"prbs15", "prbs31", "random"}, "sim.pattern")
         _require_in(self.engine, {"statistical", "time", "both"}, "sim.engine")
 
@@ -514,6 +523,15 @@ class LinkConfig:
 
     def __post_init__(self):
         _finite_pos(self.data_rate_gtps, "data_rate_gtps")
+        if self.rx.bw_hz is not None:
+            # the pulse and the time engine stop at the waveform grid's top
+            # frequency osr x f_Nyquist while the closed-form noise integral
+            # runs to infinity: a pole within a quarter of it keeps the two
+            # within a few percent (a 1 THz pole on the 32x grid was 1.8x apart)
+            f_max = self.sim.osr * 0.5 * self.data_rate_gtps * 1e9
+            _require(self.rx.bw_hz <= 0.25 * f_max,
+                     f"rx.bw_hz {self.rx.bw_hz:g} must be <= a quarter of the waveform grid's top frequency "
+                     f"(sim.osr x f_Nyquist / 4 = {0.25 * f_max:g} Hz): raise sim.osr or lower the bandwidth")
 
     # -- derived ------------------------------------------------------------
     @property

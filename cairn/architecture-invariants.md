@@ -5,7 +5,7 @@ summary: "六条铁律为什么存在、靠哪个测试执行、边界在哪。"
 tags: [invariants, architecture]
 contains: [decision]
 created: "2026-10-12"
-updated: "2026-10-13"
+updated: "2026-11-02"
 related: [forwarded-clock.md, engines.md, spec-sources.md]
 authoring_mode: ai_generated
 ---
@@ -37,6 +37,8 @@ authoring_mode: ai_generated
   段 0 体检发现它让最差 lane 永远是 lane 0)。
 - 怎么守:`tests/test_engines.py` 三个 ~1e-4 工作点(噪声主导、抖动主导、混合)加一个 1e-6 点(2.5e7 符号)时域 / 统计在 0.5–2× 内;
   `tests/test_engines_deep.py`(`slow`,每周 `examples-full.yml` 的 `deep` 作业)跑 1e9 符号的 3e-8 点;`run_link` 默认只跑统计。
+  段 9b 加一个低噪声 ISI 支撑点(10 µV 噪声、1e-6,3 % 内)。**这条铁律守不住模型本身**:两个引擎共用一个脉冲,非因果走线在每个点上都一致
+  (第二次体检);脉冲的结构性质另有测试(`test_analytic_line_is_causal`、`test_touchstone_band_is_extended_past_the_file`)。
 - 边界:2× 判据只对 LTI + 高斯成立;串扰(M2 起)按独立 ±1 干扰项进入,仍在该范围内;驱动器非线性不在模型里。
   诚实的尺度(段 4):波形路径每 1e6 符号约 6 s,1e-8 的 25 个误码要 2.5e9 符号 ≈ 5 h,只能手动触发;"1e-9" 在这个引擎上不可达。
   `sim.time_mode: samples` 只算采样值(逐光标内插求和),与波形路径同一算术,但有损走线的脉冲尾在 130 UI 内都高于主光标的 1e-6,

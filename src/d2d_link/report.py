@@ -28,6 +28,20 @@ def budget_rows(cfg, clock) -> list[tuple[str, float]]:
     return rows
 
 
+def _xtalk_level(cfg, res) -> dict:
+    """The nearest neighbour's coupling at Nyquist and where it came from:
+    the file's own term for ``xtalk: touchstone`` (the lanes carry it in their
+    extras; the first lane whose file has a neighbour speaks), the configured
+    or preset level otherwise. None when crosstalk is off."""
+    if cfg.channel.xtalk == "none":
+        return {"adjacent_db": None, "adjacent_source": None}
+    if cfg.channel.xtalk == "touchstone":
+        levels = [r.extras.get("xtalk_adjacent_db") for r in res.stat if r.extras.get("xtalk_adjacent_db") is not None]
+        return {"adjacent_db": max(levels) if levels else None, "adjacent_source": "file"}
+    return {"adjacent_db": cfg.xtalk_db()[0],
+            "adjacent_source": "config" if cfg.channel.xtalk_adjacent_db is not None else "model"}
+
+
 def report(cfg, res, clock) -> dict:
     from d2d_link.channel.coupled import describe
 
@@ -52,9 +66,7 @@ def report(cfg, res, clock) -> dict:
                          + [{"term": "total (power sum)", "fs": 1e15 * total, "ui": total / ui}],
         "targets": {k: {"value": v, "source": src} for k, (v, src) in t.items()},
         "crosstalk": ({"mode": cfg.channel.xtalk, **describe(cfg)} if cfg.channel.xtalk == "coupled"
-                      else {"mode": cfg.channel.xtalk, "adjacent_db": cfg.xtalk_db()[0] if cfg.channel.xtalk != "none" else None,
-                            "adjacent_source": ("config" if cfg.channel.xtalk_adjacent_db is not None else "model")
-                            if cfg.channel.xtalk != "none" else None}),
+                      else {"mode": cfg.channel.xtalk, **_xtalk_level(cfg, res)}),
         "channel_model": ({"rlgc_source": "model", **{k: v for k, v in cfg.rlgc().items()}}
                           if cfg.channel.kind == "analytic" else {"file": cfg.channel.file}),
         "receiver": {"bw_hz": cfg.rx.bw_hz, "noise_at": cfg.rx.noise_at, "noise_rms_mv": 1e3 * cfg.rx.noise_rms_v,

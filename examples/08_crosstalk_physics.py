@@ -52,7 +52,14 @@ for name in ("microstrip", "stripline"):
     fext = f"{x['fext_adjacent_db']:.1f}" if x["fext_adjacent_db"] > -200 else "none (1st order)"
     print(f"{name:>10s} {x['eps_eff']:8.2f} {fext:>14s} {x['coupled_delay_ps']:11.1f} {1e3 * m.eye_height_v:13.1f} "
           f"{m.eye_width_ui:13.3f} {res.worst.lane:10d} {'PASS' if res.passes else 'FAIL':>8s}")
-print("  the 32 GT/s verdict on the standard package is a routing assumption: a stripline of the same geometry passes")
+ms, st = routing["microstrip"][1], routing["stripline"][1]
+if ms.passes != st.passes:
+    print("  the 32 GT/s verdict on the standard package is a routing assumption: a stripline of the same geometry "
+          f"{'passes' if st.passes else 'fails'} where the microstrip {'passes' if ms.passes else 'fails'}")
+else:
+    print(f"  both routings {'pass' if st.passes else 'fail'} at 32 GT/s: the stripline's zero first-order FEXT buys "
+          f"{st.stat[mid].eye_width_ui - ms.stat[mid].eye_width_ui:+.3f} UI on the middle lane, "
+          f"{'not enough' if not st.passes else 'more than enough'} against the {st.targets['eye_width_ui'][0]:g} UI target")
 
 # -------------------------------------------------------------- 2. direction
 edges = (0, module.lanes.count - 1)

@@ -4,6 +4,38 @@
 
 ---
 
+## [0.12.0] — 2026-11-02 — 段 9b:可信度 C(数字会变:走线因果化、脉冲窗、Touchstone 带外、训练窗、报告标签)
+
+### 修正(会动结论)
+- **解析走线因果化**:`ChannelModel.from_rlgc` 在 L 上加皮肤效应的内电感 r_skin/(2π√f)(表面阻抗 (1 + j) r_skin√f 的虚部;vendored `skin_effect_rlgc`
+  只给实部,H(f) 违反因果、丢掉有损线的群延时色散)。x1 25 mm:到达前能量 6.5 % → 1 % 主光标,IL −2.80 → −2.77 dB,σ_ISI 11.8 → 15.2 mV,
+  **眼 215.6 mV / 0.774 UI → 209.7 mV / 0.761 UI**(眼宽裕度 +0.024 → +0.011)。`channel.skin_inductance: false` 复现旧模型。
+  **示例 02 的 reach 35 mm → 25 mm**(30 mm 眼宽 0.747 UI 不过;对综述 25 mm 的比 1.40× → 1.00×)。
+  **示例 05 的 x16 / 20 mm 模块(−30 dB 预设)从 PASS 变 FAIL**:最差 lane 5 眼宽 0.753 → 0.740 UI。x5 耦合模块更深地 FAIL(中间 lane 0.691 → 0.633 UI,裕度 −0.118 → −0.161);
+  **示例 07 标准封装 24 GT/s 起不过**(之前 32 GT/s 起);**示例 08 带状线 x5 也不过**(0.761 → 0.748 UI)—— 到 0.11 为止「32 GT/s 标准封装的判定是布线假设」不再成立。
+  上游 Halo_Serdes 同一问题,报告文本在会话 scratchpad `halo_upstream_skin_inductance.md`。
+- **脉冲窗与光标数进配置**:`channel.n_freq` 默认 2048 → 8192(时间窗 128 → 512 UI),`sim.stat_cursor_reach`(每侧 256,旧写死 64)、
+  `sim.stat_cursor_floor`(1e-6 × 峰值,旧 1e-9)。x1:+0.8 mV / +5e-4 UI;8192 → 16384 再变 < 2e-4 UI。
+- **Touchstone 带外延拓** `channel/model.py::extend_band`:直通路径在文件带边以上按最后十倍频的 log|H| 斜率(不升)与群延时延拓,两种读法都走;
+  耦合项带外仍填 0。有损 25 mm 线截到 50 GHz 的文件:眼宽对闭式 −0.013 → +0.002 UI。
+- **训练窗**:`bathtub_around_the_eye(target, training_ber)` 对训练 BER 的开眼也扩窗(5 mm / 60 GHz / 100 fs:训练中心 −0.020 → −0.030 UI,真值 −0.030)。
+- `rx.bw_hz ≤ sim.osr · f_N / 4`(跨字段校验):闭式噪声积到 ∞、脉冲与时域到网格 f_max,1 THz 极点差 1.8×。
+- 报告层 `crosstalk` 段对 `xtalk: touchstone` 给文件自己的 Nyquist 耦合(`adjacent_source: file`),不再是预设 −30 dB 的 "model";
+  lane 的 `extras["xtalk_adjacent_db"] / ["xtalk_source"]`。
+- `StatResult.sigma_sampling_s` = √(高斯预算² + PI 步长²/12);`summary()` 与 GUI Inspector 打 "(+ PI step: … fs at the sampler)"(x5:296.5 → 328.2 fs)。
+
+### 测试
+- 新增 8 项:走线因果(提前一 UI 处能量 < 0.5 %)、窗 / 光标收敛、Touchstone 50 GHz 截断 + 砖墙对照、报告标签、`rx.bw_hz` 上限、训练窗、
+  **低噪声 ISI 支撑一致性**(10 µV 噪声、1e-6,统计对时域 `samples` 1e6 符号 3 % 内)、`sigma_sampling_s`。
+- `test_spur_dominated_link_both_engines_agree` 改为在调噪声的那个相位上跑时域(重跑统计会重新居中,误码数掉到 23 个)。
+
+### 指纹与示例
+- `fp_9a` → `fp_9b`:3100 项中 1557 变,全部在上面六条里;逐配置的新旧值见 LOG。10 个示例全部重跑并接受;README 的示例行同步。
+- 示例 03 / 06:调好噪声后两引擎都钉在调噪声的那个相位上(`rx.sampling_phase_ui`),不再让统计引擎在加大的噪声下重新居中(关着的眼会把采样点挪到脉冲最高处,BER 低 3×、误码只剩 12 个);
+  示例 07 的表列最差 lane 而不是中间 lane(24 GT/s 中间 lane 过、lane 1 不过);示例 08 的布线结论句按结果生成。
+
+---
+
 ## [0.11.1] — 2026-11-02 — 段 9a:第二次体检后的卫生轮(指纹逐位相同,一处并列规则除外)
 
 ### 修复

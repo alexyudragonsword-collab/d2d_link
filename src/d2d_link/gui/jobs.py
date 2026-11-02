@@ -66,7 +66,8 @@ def _lane_rows(cfg, res) -> list[dict]:
             "eye_width_margin_ui": float(r.eye_width_margin_ui),
             "skew_residual_ui": float(r.skew_residual_ui),
             "n_aggressors": int(r.extras["n_aggressors"]), "xtalk_rms_v": float(r.extras["xtalk_rms_v"]),
-            "sigma_jitter_s": float(r.sigma_jitter_s), "sigma_noise_v": float(r.sigma_noise_v),
+            "sigma_jitter_s": float(r.sigma_jitter_s), "sigma_sampling_s": float(r.sigma_sampling_s),
+            "sigma_noise_v": float(r.sigma_noise_v),
             "main_cursor_v": float(r.main_cursor_v), "n_cursors": int(r.extras["n_cursors"]),
             "centre_offset_ui": float(r.extras.get("centre_offset_ui", 0.0)),
         })

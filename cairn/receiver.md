@@ -5,7 +5,7 @@ summary: "收端自己的机制怎么建:前端带宽对数据边沿、噪声在
 tags: [receiver, front-end, noise, ctle, training]
 contains: [decision, lesson]
 created: "2026-10-13"
-updated: "2026-10-13"
+updated: "2026-11-02"
 related: [engines.md, forwarded-clock.md, architecture-invariants.md]
 authoring_mode: ai_generated
 ---
@@ -32,7 +32,7 @@ CTLE 白拿增益,噪声不随它变。段 7 加了三件事,默认值全部保�
   而不是在链路被判定的 1e-27 上。浴盆不对称时两个中点不同,lane 像付 skew 残余一样付这个偏移(眼宽 = 围绕实际采样点的对称开口)。
   `extras["training_centre_ui"]`、`extras["centre_offset_ui"]`。留空 = 目标 BER 的中点(旧的理想化)。
 
-## 数字(2026-10-13,0.9.0;x1 标准 25 mm,噪声 3 mV)
+## 数字(2026-10-13,0.9.0;x1 标准 25 mm,噪声 3 mV —— 0.11 的非因果走线上;0.12.0 的同一张表见 README 示例 09 行与 `examples/expected/09_receiver_front_end.txt`,平坦前端 209.7 mV / 0.761 UI)
 
 | 前端 | 主光标 | 噪声在采样点:眼 | 噪声在输入:σ_采样 / 眼 |
 |---|---|---|---|
@@ -69,6 +69,10 @@ CTLE 的噪声代价(35 mm,前端 32 GHz):
 - 训练的 deskew 量化不另加字段:无跟踪器时 `lanes.deskew_step_ps` 的"skew 模步长"就是它(网格原点取在眼中心是约定);
   有跟踪器时 PI 量化是矩形核。段 7 只补了"在哪个 BER 上居中"这一维。
 - 配置固定 `rx.sampling_phase_ui` 时眼宽仍是浴盆的开口(固定相位是它自己的中心),与段 1 一致;训练偏移与 skew 残余才按对称开口扣。
+
+- 段 9b:`rx.bw_hz ≤ osr·f_N/4`(schema 跨字段校验)—— 闭式噪声积到无穷、脉冲与时域到网格 f_max = osr·f_N,极点在 f_max/4 内两者差几个百分点,
+  1 THz 极点差 1.8×;要更高带宽就提高 `sim.osr`。浴盆窗口对训练 BER 的开眼也扩(`bathtub_around_the_eye(target, training)`):训练开眼更宽、先触窗边,
+  旧版在它溢出的窗里取中点,5 mm / 60 GHz / 100 fs 的线训练中心偏 0.010 UI。
 
 ## 教训
 

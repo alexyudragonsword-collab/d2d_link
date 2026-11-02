@@ -7,7 +7,7 @@ import pytest
 
 from d2d_link.channel import ChannelModel, link_response
 from d2d_link.channel.model import ctle_response
-from d2d_link.config import ChannelConfig, CtleConfig, LinkConfig, RxConfig
+from d2d_link.config import ChannelConfig, CtleConfig, LinkConfig, RxConfig, SimConfig, TxConfig
 
 
 def _lossless(length_mm=25.0):
@@ -166,3 +166,138 @@ def test_touchstone_channels_have_no_dc_notch(tmp_path):
     assert fill_dc(np.array([0.9, 0.5, 0.4]), np.array([0.0, 1.0, 2.0]))[0] == 0.9           # a file with DC is left alone
     assert fill_dc(np.array([0.0, 0.5, 0.6]), np.array([0.0, 1.0, 2.0]))[0] == 0.5           # rising: no extrapolation, the lowest point
 
+
+
+def test_analytic_line_is_causal():
+    """The vendored RLGC gives R = R_dc + r_skin sqrt(f) with a constant L;
+    the skin effect's surface impedance is (1 + j) r_skin sqrt(f), so an
+    internal inductance r_skin / (2 pi sqrt(f)) belongs with it. Without it
+    H(f) violates causality and the pulse carries energy before the line's
+    LC delay -- 6.5 % of the main cursor at the arrival, 2 % a whole UI
+    before it, on the 25 mm standard line; no earlier probe looked at it
+    (second health check, 2026-11-02). The insertion loss hardly moves; the
+    post-cursor dispersion does."""
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0), tx=TxConfig(bw_hz=60e9))     # the x1 config's driver
+    old = dataclasses.replace(cfg, channel=dataclasses.replace(cfg.channel, skin_inductance=False))
+    p = cfg.rlgc()
+    tau = cfg.channel.length_mm * 1e-3 * np.sqrt(p["l_h_m"] * p["c_f_m"])      # the line's LC delay
+
+    def pre_arrival(c):
+        r = link_response(c)
+        n = int(tau / c.dt) - c.sim.osr                                           # one UI before the LC arrival
+        return float(np.max(np.abs(r.pulse.y[:n]))) / r.main_amplitude
+
+    assert pre_arrival(cfg) < 0.005          # 0.3 % (the band edge's Gibbs ripple)
+    assert pre_arrival(old) > 0.015          # 2.0 %
+    il, il_old = (ChannelModel.from_config(c).insertion_loss_db(cfg.f_nyquist) for c in (cfg, old))
+    assert il == pytest.approx(il_old, abs=0.1)
+    # the inductance the model adds, read back from the ABCD line: at
+    # Nyquist, L_int = r_skin / (2 pi sqrt(f_N)) over the geometry's L
+    f = np.array([0.0, cfg.f_nyquist])
+    from d2d_link.vendor.halo import analytic
+    r_, l_, g_, c_ = analytic.skin_effect_rlgc(f, p["rdc_ohm_m"], p["r_skin"], p["l_h_m"], p["c_f_m"],
+                                               loss_tangent=p["loss_tangent"], g_per_m=p["g_s_m"])
+    l_int = p["r_skin"] / (2 * np.pi * np.sqrt(cfg.f_nyquist))
+    assert 0.01 < l_int / p["l_h_m"] < 0.2            # a few percent of the geometry's inductance at 16 GHz
+    z_new = analytic.tline_abcd(r_, l_ + np.array([0.0, l_int]), g_, c_, 0.025, f)
+    z_ref = ChannelModel.from_rlgc(cfg, f).H
+    assert abs(analytic.abcd_to_transfer(z_new, 50.0, 50.0)[1] / 0.5) == pytest.approx(abs(z_ref[1]), rel=1e-9)
+
+
+def test_pulse_window_and_cursor_reach_are_converged():
+    """The pulse's time window is 2 (n_freq - 1) / osr UI and the statistical
+    engine reads sim.stat_cursor_reach cursors on each side: with the 0.11
+    defaults (2048 points = 128 UI, a hard-coded 64) the engine dropped the
+    62 cursors past +64 UI while the time engine kept them, and the window's
+    end still held 3.5e-3 of the main cursor. Doubling the 9b defaults moves
+    the x1 eye by less than the ISI bin."""
+    from d2d_link.engine import run_statistical
+    base = LinkConfig(channel=ChannelConfig(length_mm=25.0), tx=TxConfig(bw_hz=60e9),
+                      sim=SimConfig(stat_phase_points=16))
+    r8 = run_statistical(base)
+    r16 = run_statistical(dataclasses.replace(base, channel=dataclasses.replace(base.channel, n_freq=16384),
+                                              sim=dataclasses.replace(base.sim, stat_cursor_reach=512)))
+    assert abs(r16.eye_width_ui - r8.eye_width_ui) < 2e-4
+    assert abs(r16.eye_height_v - r8.eye_height_v) < 3e-4
+    resp = link_response(base)
+    assert resp.pulse.y.size == 2 * (base.channel.n_freq - 1)
+    assert resp.cursors(0.0)[0].size > 64 and resp.cursors(0.0, n_max=64)[0].size <= 129
+    c, i = resp.cursors(0.0)
+    assert np.all(np.abs(c[[0, -1]]) > base.sim.stat_cursor_floor * np.max(np.abs(resp.pulse.y)))
+    with pytest.raises(ValueError, match="stat_cursor_reach"):
+        SimConfig(stat_cursor_reach=4)
+
+
+def test_touchstone_band_is_extended_past_the_file(tmp_path, monkeypatch):
+    """A file that stops at 50 GHz used to meet a brick wall there (the
+    vendored interpolation fills transmission beyond the band with 0 on a grid
+    that runs to 512 GHz): the 25 mm line written to such a file read 0.016
+    UI less eye width than in closed form. extend_band continues log|H|
+    with the last decade's slope and the phase with its group delay."""
+    skrf = pytest.importorskip("skrf")
+    from d2d_link.channel import model as M
+    from d2d_link.config import LaneConfig
+    from d2d_link.engine import run_statistical
+
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0), sim=SimConfig(stat_phase_points=32))
+    ana = ChannelModel.from_config(cfg)
+    ref = run_statistical(cfg)
+
+    def write(f_max, name):
+        keep = (ana.f > 0) & (ana.f <= f_max)
+        f = ana.f[keep]
+        s = np.zeros((f.size, 4, 4), dtype=complex)
+        for i in range(2):
+            s[:, 2 + i, i] = s[:, i, 2 + i] = ana.H[keep]
+        skrf.Network(f=f, s=s, z0=50.0, f_unit="Hz").write_touchstone(str(tmp_path / name), form="ri")
+        return dataclasses.replace(cfg, channel=ChannelConfig(kind="touchstone", file=str(tmp_path / name) + ".s4p",
+                                                              touchstone_mode="single_ended", coupled_length_mm=25.0),
+                                   lanes=LaneConfig(count=2))
+
+    cut = write(50e9, "cut50")
+    ch = ChannelModel.from_config(cut)
+    out = ana.f > 50e9
+    assert np.all(np.diff(np.abs(ch.H[out])) <= 1e-12)                        # never rises past the edge
+    i100 = int(np.searchsorted(ana.f, 100e9))
+    assert abs(20 * np.log10(abs(ch.H[i100]) / abs(ana.H[i100]))) < 2.0        # within 2 dB an octave out
+    assert abs(np.angle(ch.H[i100] / ana.H[i100])) < 0.3                        # the group delay carries the phase
+    r = run_statistical(cut)
+    assert abs(r.eye_width_ui - ref.eye_width_ui) < 0.004
+    monkeypatch.setattr(M, "extend_band", lambda H, f, f_edge: H)              # the brick wall, for the record
+    wall = run_statistical(cut)
+    assert abs(wall.eye_width_ui - ref.eye_width_ui) > 0.008
+    monkeypatch.undo()
+    full = write(ana.f[-1], "full")
+    assert np.allclose(ChannelModel.from_config(full).H[1:], ana.H[1:], rtol=1e-3, atol=1e-6)   # covering the grid: untouched
+    assert M.extend_band(ana.H, ana.f, float(ana.f[-1])) is not ana.H
+
+
+def test_report_labels_touchstone_crosstalk_as_the_files(tmp_path):
+    """The report's crosstalk block used to quote the package preset (-30 dB,
+    'model') for channel.xtalk touchstone; the file's own coupling at Nyquist
+    is the number, source 'file'."""
+    skrf = pytest.importorskip("skrf")
+    from d2d_link.clock.forwarded import ForwardedClock
+    from d2d_link.config import LaneConfig
+    from d2d_link.engine import run_link
+    from d2d_link.report import report
+
+    cfg = LinkConfig(sim=SimConfig(stat_phase_points=16))
+    f = ChannelModel.grid(cfg)[1:]
+    thru = np.exp(-2j * np.pi * f * np.sqrt(2.656e-7 * 1.063e-10) * 0.025)
+    kx = 0.1 * (1j * f / cfg.f_nyquist) / (1 + 1j * f / cfg.f_nyquist)
+    s = np.zeros((f.size, 4, 4), dtype=complex)
+    for i in range(2):
+        s[:, 2 + i, i] = s[:, i, 2 + i] = thru
+    s[:, 2, 1] = s[:, 1, 2] = s[:, 3, 0] = s[:, 0, 3] = kx * thru
+    skrf.Network(f=f, s=s, z0=50.0, f_unit="Hz").write_touchstone(str(tmp_path / "pair"), form="ri")
+    ts = dataclasses.replace(cfg, channel=ChannelConfig(kind="touchstone", file=str(tmp_path / "pair.s4p"),
+                                                        touchstone_mode="single_ended", xtalk="touchstone"),
+                             lanes=LaneConfig(count=2))
+    res = run_link(ts)
+    x = report(ts, res, ForwardedClock(ts))["crosstalk"]
+    assert x["mode"] == "touchstone" and x["adjacent_source"] == "file"
+    assert x["adjacent_db"] == pytest.approx(20 * np.log10(0.1 / np.sqrt(2.0)), abs=0.3)
+    assert res.stat[0].extras["xtalk_source"] == "file"
+    fext = report(LinkConfig(channel=ChannelConfig(xtalk="fext"), lanes=LaneConfig(count=2)), res, ForwardedClock(ts))["crosstalk"]
+    assert fext["adjacent_source"] == "model"

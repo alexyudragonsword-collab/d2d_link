@@ -43,16 +43,21 @@ def read_single_ended(path: str, f: np.ndarray, zs: float, zl: float, lane: int,
         raise ValueError(f"{path}: lane {lane} outside 0..{n - 1}")
     norm = zl / (zs + zl)
 
-    def transfer(p_in: int, p_out: int) -> np.ndarray:
-        from .model import fill_dc
+    f_edge = float(ntwk.f[-1])
+
+    def transfer(p_in: int, p_out: int, through: bool) -> np.ndarray:
+        from .model import extend_band, fill_dc
 
         sub = ntwk.subnetwork([p_in, p_out])
-        return fill_dc(terminate_renormalize(interp_s2p(sub, f), zs, zl) / norm, f)
+        h = terminate_renormalize(interp_s2p(sub, f), zs, zl) / norm
+        # the through path is continued past the file's band (extend_band);
+        # a coupling term keeps the interpolation's 0 fill out there
+        return fill_dc(extend_band(h, f, f_edge) if through else h, f)
 
-    H = transfer(lane, n + lane)
+    H = transfer(lane, n + lane, True)
     xt: dict[int, np.ndarray] = {}
     for d in neighbours:
-        cands = [transfer(j, n + lane) for j in (lane - d, lane + d) if 0 <= j < n]
+        cands = [transfer(j, n + lane, False) for j in (lane - d, lane + d) if 0 <= j < n]
         if cands:
             xt[d] = max(cands, key=lambda h: float(np.sqrt(np.mean(np.abs(h) ** 2))))
     return H, xt

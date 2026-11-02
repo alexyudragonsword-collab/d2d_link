@@ -55,10 +55,10 @@ def test_ctle_peaking_costs_noise_once_its_poles_are_paid_for():
     # the behavioural CTLE has two poles and one zero: it is itself a lowpass,
     # so against a wide front end a little peaking still *saves* noise over
     # no CTLE at all; from there every dB of peaking costs noise
-    def g(peak, bw=200e9):
+    def g(peak, bw=120e9):            # under the osr x f_N / 4 = 128 GHz cap
         return noise_shaping_gain(_rx(noise_at="input", bw_hz=bw, ctle=CtleConfig(enable=True, peak_db=peak)))
 
-    off = noise_shaping_gain(_rx(noise_at="input", bw_hz=200e9))
+    off = noise_shaping_gain(_rx(noise_at="input", bw_hz=120e9))
     assert g(1.0) < off
     assert g(1.0) < g(3.0) < g(6.0) < g(9.0)
 
@@ -117,3 +117,34 @@ def test_training_centres_at_its_own_ber_and_the_lane_pays_the_offset():
     # the symmetric opening around the trained sampling instant
     assert trained.eye_width_ui == pytest.approx(ideal.eye_width_ui - 2.0 * abs(off), abs=2e-4)
     assert trained.eye_height_v <= ideal.eye_height_v + 1e-6
+
+
+def test_front_end_bandwidth_is_capped_by_the_waveform_grid():
+    """The closed-form noise integral runs to infinity, the pulse and the time
+    engine stop at osr x f_Nyquist: a 1 THz pole on the 32x grid put the two
+    1.8x apart (second health check). A quarter of the grid's top is the limit."""
+    with pytest.raises(ValueError, match="quarter of the waveform grid"):
+        _rx(bw_hz=1e12)
+    assert _rx(bw_hz=128e9).rx.bw_hz == 128e9
+    LinkConfig(rx=RxConfig(bw_hz=256e9), sim=SimConfig(osr=64))
+    with pytest.raises(ValueError, match="quarter"):
+        LinkConfig(rx=RxConfig(bw_hz=129e9), sim=SimConfig(osr=32))
+
+
+def test_training_window_follows_the_training_opening():
+    """The bathtub window grows when the opening at the target BER reaches its
+    edge; the training opening is wider and reached it first, so training
+    was centred inside a window it overflowed (0.010 UI off on this 5 mm
+    line). The window now grows for either opening."""
+    from d2d_link.engine.statistical import StatisticalEngine
+
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=5.0), tx=TxConfig(bw_hz=60e9),
+                     clocking=ClockingConfig(data_path_rj_s=100e-15), rx=RxConfig(training_ber=1e-3),
+                     sim=SimConfig(stat_phase_points=32))
+    r = run_statistical(cfg)
+    eng = StatisticalEngine(cfg)
+    wide = eng.eye_region(*eng.bathtub(-1.5, 1.5), 1e-3, refine=eng.eye_edge)
+    assert r.extras["training_centre_ui"] == pytest.approx(0.5 * (wide[0] + wide[1]), abs=1e-3)
+    assert r.bathtub_phase_ui[0] < -0.5 or r.bathtub_phase_ui[-1] > 0.5
+    narrow = eng.eye_region(*eng.bathtub(-0.5, 0.5), 1e-3, refine=eng.eye_edge)
+    assert abs(0.5 * (narrow[0] + narrow[1]) - r.extras["training_centre_ui"]) > 0.005

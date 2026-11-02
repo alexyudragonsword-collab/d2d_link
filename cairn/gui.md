@@ -37,7 +37,7 @@ authoring_mode: ai_generated
 
 ## G3(0.11.0)
 
-- `sweep` kind 的三条轴来自示例 01 / 04 / 02 的网格(`SWEEP_AXES`),每点一次 `run_link` 加闭式残余;x1 的 tracker 带宽扫描与示例 01 同数(0.774 → 0.913 UI)。
+- `sweep` kind 的三条轴来自示例 01 / 04 / 02 的网格(`SWEEP_AXES`),每点一次 `run_link` 加闭式残余;x1 的 tracker 带宽扫描与示例 01 同数(0.11:0.774 → 0.913 UI;0.12.0 因果线 0.761 → 0.891)。
 - Compare with:另一个场景的运行按需入队(同一配置哈希只排一次),落地前显示"running",不阻塞本页。
 - 磁盘缓存只存 worker 返回的纯 dict(JSON),文件名 `<kind>-<配置哈希>-<参数哈希>.json`;写入走临时文件再 replace;写不了就当没有缓存。
   缓存不跟库版本走 —— 数字会变的版本(性能轮那种)要手动清 `~/.cache/d2d_link/gui`,记在 docs/gui.md。

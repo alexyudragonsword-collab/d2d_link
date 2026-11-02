@@ -4,17 +4,17 @@ loop -> inf (10 THz): residual 0.000 fs
 
 loop bandwidth sweep, the module's clock path (tree, path noise, wander, 2 MHz tracker with 4 UI latency and 0.0156 UI steps):
 loop bw [Hz]  Tx leak [fs]  local [fs]  wander [fs]  total [fs]  eye width [UI]  eye height [mV]
-       1e+04         132.6        52.7        120.3       291.3           0.774            238.9
-       3e+04         132.6        52.7        120.4       291.3           0.774            238.9
-       1e+05         132.3        52.5        121.3       291.5           0.774            238.9
-       3e+05         130.4        51.6        126.4       292.7           0.773            238.9
-       1e+06         120.4        48.1        145.3       296.5           0.771            238.9
-       3e+06         103.4        43.5        165.3       299.9           0.768            238.8
-       1e+07          92.8        40.7        172.3       300.1           0.768            238.8
-       3e+07          90.5        39.8        171.7       299.2           0.769            238.8
-       1e+08          90.7        38.6        170.7       299.7           0.769            238.8
-       3e+08          93.2        35.6        170.4       303.1           0.766            238.8
-       1e+09          98.3        26.5        170.2       313.5           0.760            238.8
+       1e+04         132.6        52.7        120.3       291.3           0.766            233.1
+       3e+04         132.6        52.7        120.4       291.3           0.766            233.1
+       1e+05         132.3        52.5        121.3       291.5           0.766            233.1
+       3e+05         130.4        51.6        126.4       292.7           0.765            233.1
+       1e+06         120.4        48.1        145.3       296.5           0.763            233.0
+       3e+06         103.4        43.5        165.3       299.9           0.760            233.0
+       1e+07          92.8        40.7        172.3       300.1           0.760            233.0
+       3e+07          90.5        39.8        171.7       299.2           0.761            233.0
+       1e+08          90.7        38.6        170.7       299.7           0.761            233.0
+       3e+08          93.2        35.6        170.4       303.1           0.758            233.0
+       1e+09          98.3        26.5        170.2       313.5           0.752            232.9
 
 the trade-off: 300 fs of white jitter on the clock path before the local PLL, ideal tree, no wander:
 loop bw [Hz]  Tx leak [fs]  local [fs]  clock path [fs]  total [fs]
@@ -29,10 +29,10 @@ optimum near 2.5e+07 Hz: 100.9 fs (vs 206.7 fs at 1e+04 Hz, where the Tx PLL lea
 
 per-lane tracker: latency and phase-interpolator step at 2 MHz (module clocking, 200 fs wander per path):
 latency [UI] PI step [UI]  linear [fs]  +quantisation [fs]  eye width [UI]
-           0       0.0000        296.4               296.4           0.781
-           4       0.0000        296.5               296.5           0.781
-          32       0.0000        297.2               297.2           0.780
-           0       0.0156        296.4               328.2           0.769
-           4       0.0156        296.5               328.3           0.769
-           4       0.0625        296.5               637.1           0.724
+           0       0.0000        296.4               296.4           0.773
+           4       0.0000        296.5               296.5           0.773
+          32       0.0000        297.2               297.2           0.772
+           0       0.0156        296.4               328.2           0.761
+           4       0.0156        296.5               328.3           0.761
+           4       0.0625        296.5               637.1           0.716
 wrote examples/output/04_local_pll_bandwidth.png

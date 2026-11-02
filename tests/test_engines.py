@@ -93,9 +93,31 @@ def test_one_in_a_million_point_within_2x():
             hi = mid
         else:
             lo = mid
-    tuned = dataclasses.replace(cfg, rx=RxConfig(noise_rms_v=(lo * hi) ** 0.5))
+    # both engines sample where the noise was tuned: left to re-centre, the
+    # closed eye's best phase moves to where the pulse is tallest (+0.22 UI
+    # on the causal line) and the BER there is 1.9e-7
+    tuned = dataclasses.replace(cfg, rx=RxConfig(noise_rms_v=(lo * hi) ** 0.5, sampling_phase_ui=phase))
     s = run_statistical(tuned)
     assert 5e-7 < s.ber < 2e-6
     t = run_time(tuned, phase_ui=s.phase_ui)
     assert t.n_errors >= 10, t.n_errors
     assert 0.5 < t.ber / s.ber < 2.0, (t.ber, s.ber, t.n_errors)
+
+
+def test_isi_support_agrees_at_low_noise():
+    """The 2x points above carry 45-50 mV of noise and cannot see a 10 mV
+    ISI error. With 10 uV of noise and no jitter the eye at 1e-6 is the ISI
+    distribution's own tail: the statistical engine's exact PDF against the
+    time engine's sampled eye over 1e6 symbols (samples mode), within 3 %.
+    Both engines read the same pulse, so a model error they share (the
+    non-causal line lived through every consistency test) is not what this
+    sees; what it sees is the cursors one engine keeps and the other drops."""
+    from d2d_link.config import TargetConfig, TxConfig
+
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0), tx=TxConfig(bw_hz=60e9), rx=RxConfig(noise_rms_v=1e-5),
+                     sim=SimConfig(stat_phase_points=32, n_symbols=1_000_000, time_mode="samples"),
+                     target=TargetConfig(ber=1e-6))
+    s = run_statistical(cfg)
+    t = run_time(cfg, phase_ui=s.phase_ui)
+    assert t.n_errors == 0
+    assert abs(t.eye_height_sampled_v - s.eye_height_v) / s.eye_height_v < 0.03, (s.eye_height_v, t.eye_height_sampled_v)

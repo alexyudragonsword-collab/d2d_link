@@ -5,7 +5,7 @@ summary: "lane 间串扰怎么建:FEXT 的行为级 / 耦合线估计、带状�
 tags: [crosstalk, fext, next, stripline, touchstone]
 contains: [decision, lesson]
 created: "2026-10-13"
-updated: "2026-10-13"
+updated: "2026-11-02"
 related: [architecture-invariants.md, engines.md, spec-sources.md]
 authoring_mode: ai_generated
 ---
@@ -22,9 +22,11 @@ authoring_mode: ai_generated
 - **`xtalk: touchstone`**(段 6):单端 2N 端口文件自己的耦合项 —— 端口 1..N 是 lane 0..N−1 的近端、N+1..2N 远端;`channel/touchstone_se.py`
   对每个 2 端口子网络用 vendored 的内插与端接(其余端口按文件参考阻抗端接,这是唯一近似),距离 d 取两侧较强的那条。合成无损 3 lane 文件上
   读回 |H| = 1、耦合 Nyquist 处 0.0707 对 0.0707、lane 间互易。**真实封装 S 参数仍然没有**(ROADMAP P1 #2):读法就位,数据缺位。
+  段 9b:文件带边以上直通路径不再是砖墙(`extend_band`,见 `engineering-pitfalls.md`),耦合项带外仍填 0(保守);报告层的 crosstalk 段对这种模式
+  给文件自己的 Nyquist 耦合、`adjacent_source: file`(之前打的是预设 −30 dB 的 "model" 标签)—— 数字来自 lane 的 `extras["xtalk_adjacent_db"]`。
 
 **带状线**(`channel.routing: stripline`):均匀介质,ε_eff = ε_r,奇偶模同速,一阶 FEXT 为 0(估计给 −300 dB 下限);同几何的线更慢
-(L、C 由 ε_r 推出)。NEXT 系数 κ/4 与布线方式无关。**32 GT/s 标准封装不过这个结论是微带假设的产物**:同几何布成带状线就过。
+(L、C 由 ε_r 推出)。NEXT 系数 κ/4 与布线方式无关。**到 0.11 为止,「32 GT/s 标准封装不过」是微带假设的产物**:同几何布成带状线就过(0.761 UI)。段 9b 走线因果化后带状线也差 0.002 UI 不过(0.748 UI,示例 08),微带 0.633 UI;结论改为:标准封装 25 mm 在 32 GT/s 的 0.75 UI 眼宽目标下,本库的每个模型变体都不过,串扰只决定差多少。
 
 **近端串扰**(`channel.xtalk_next`,段 6):模块边缘的 lane 旁边是回程模块的 lane,方向相反,它的发端在本 lane 的收端 die 上。
 弱耦合对的后向波是 K_b × [p(t) − p(t − 2τ_c)],K_b = κ/4(Johnson & Graham),τ_c 是耦合长度的单程延时;不经有损线,只经攻击方的

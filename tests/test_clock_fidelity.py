@@ -92,10 +92,15 @@ def test_spur_dominated_link_both_engines_agree(tmp_path):
             hi = mid
         else:
             lo = mid
-    tuned = dataclasses.replace(cfg, rx=dataclasses.replace(cfg.rx, noise_rms_v=(lo * hi) ** 0.5))
-    s = run_statistical(tuned)
-    t = run_time(tuned, phase_ui=s.phase_ui)
-    assert t.n_errors >= 25 and 0.5 < t.ber / s.ber < 2.0, (t.ber, s.ber, t.n_errors)
+    # the time engine samples where the noise was tuned: a rerun of the
+    # statistical engine re-centres the eye for the new noise and lands on a
+    # phase with a third of the errors (23 of 600k once), which is a weaker
+    # count, not a disagreement
+    eng.sigma_n = (lo * hi) ** 0.5
+    p_stat = eng.error_probability(phase)
+    tuned = dataclasses.replace(cfg, rx=dataclasses.replace(cfg.rx, noise_rms_v=eng.sigma_n))
+    t = run_time(tuned, phase_ui=phase)
+    assert t.n_errors >= 25 and 0.5 < t.ber / p_stat < 2.0, (t.ber, p_stat, t.n_errors)
 
 
 # ------------------------------------------------------------------- tracker

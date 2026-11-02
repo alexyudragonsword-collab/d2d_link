@@ -46,24 +46,27 @@ for name, cfg in cases.items():
           f"(source: {x['pitch_source']}), stack-up w {x['trace_width_um']:g} / h {x['dielectric_height_um']:g} um, "
           f"eps_r {x['eps_r']:g} -> eps_eff {x['eps_eff']:.2f} (source: {x['stackup_source']}), "
           f"FEXT estimate {x['fext_adjacent_db']:.1f} dB at Nyquist for 32 GT/s")
+    # the worst lane of the module at each rate (the verdict is the module's;
+    # until 0.12.0 the table showed the middle lane, which is not always the
+    # worst one -- at 24 GT/s it passed while lane 1 failed on eye width)
     print(f"{'GT/s':>5s} {'UI [ps]':>8s} {'IL@Nyq [dB]':>12s} {'FEXT [dB]':>10s} {'jitter [UI]':>12s} {'eye height [mV]':>16s} "
-          f"{'eye width [UI]':>15s} {'log10 BER':>10s} {'pass':>5s}")
+          f"{'eye width [UI]':>15s} {'log10 BER':>10s} {'lane':>5s} {'pass':>5s}")
     rows = []
     for rate in rates.value:
         c = dataclasses.replace(cfg, data_rate_gtps=float(rate))
         res = run_link(c)
-        mid = res.stat[2]
-        rows.append((rate, mid, res.passes))
-        print(f"{rate:5g} {1e12 * c.ui:8.2f} {mid.extras['insertion_loss_nyquist_db']:12.2f} {c.xtalk_db()[0]:10.1f} "
-              f"{mid.sigma_jitter_s / c.ui:12.4f} {1e3 * mid.eye_height_v:16.1f} {mid.eye_width_ui:15.3f} "
-              f"{mid.log10_ber:10.1f} {'yes' if res.passes else 'no':>5s}")
+        w = res.worst
+        rows.append((rate, w, res.passes))
+        print(f"{rate:5g} {1e12 * c.ui:8.2f} {w.extras['insertion_loss_nyquist_db']:12.2f} {c.xtalk_db()[0]:10.1f} "
+              f"{w.sigma_jitter_s / c.ui:12.4f} {1e3 * w.eye_height_v:16.1f} {w.eye_width_ui:15.3f} "
+              f"{w.log10_ber:10.1f} {w.lane:5d} {'yes' if res.passes else 'no':>5s}")
     results[name] = rows
     fails = [(r, m) for r, m, ok in rows if not ok]
     if fails:
         r, m = fails[0]
         why = "eye width" if m.eye_width_margin_ui < 0 else ("eye height" if m.eye_height_margin_mv < 0 else "BER")
         print(f"  first failing rate {r:g} GT/s, limited by {why} "
-              f"(eye {1e3 * m.eye_height_v:.1f} mV / {m.eye_width_ui:.3f} UI vs targets "
+              f"(worst lane {m.lane}: eye {1e3 * m.eye_height_v:.1f} mV / {m.eye_width_ui:.3f} UI vs targets "
               f"{m.targets['eye_height_mv'][0]:g} mV / {m.targets['eye_width_ui'][0]:g} UI, source: {m.targets['eye_width_ui'][1]})")
     else:
         print("  every rate passes")

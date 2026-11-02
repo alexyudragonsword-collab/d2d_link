@@ -21,10 +21,14 @@ from d2d_link.engine.statistical import StatisticalEngine
 cfg = load_config(CONFIGS / "standard_32g_x1.yaml")
 
 
-def noise_for_ber(cfg, target: float) -> float:
-    """The sampler noise at which the statistical engine predicts ``target``
-    at the eye centre (bisection on one engine: the ISI models do not depend
-    on the noise)."""
+def noise_for_ber(cfg, target: float) -> tuple[float, float]:
+    """``(noise, phase)``: the sampler noise at which the statistical engine
+    predicts ``target`` at the quiet link's eye centre (bisection on one
+    engine: the ISI models do not depend on the noise), and that phase. Both
+    engines then sample there: a rerun with the raised noise would re-centre
+    (a closed eye's best phase sits where the pulse is tallest, +0.23 UI on
+    the causal line) and land a factor 3 below the target with a third of
+    the errors."""
     eng = StatisticalEngine(cfg)
     phase = eng.run().phase_ui
     lo, hi = 1e-4, 0.5
@@ -35,7 +39,7 @@ def noise_for_ber(cfg, target: float) -> float:
             hi = mid
         else:
             lo = mid
-    return (lo * hi) ** 0.5
+    return (lo * hi) ** 0.5, phase
 
 
 def jitter_for_ber(cfg, target: float) -> float:
@@ -60,9 +64,10 @@ points = []
 for name, target, n_symbols in (("noise-dominated", 1e-6, 20_000_000),
                                 ("jitter-dominated", 1e-6, 20_000_000),
                                 ("mixed", 1e-5, 2_000_000)):
+    phase = None
     if name == "noise-dominated":
         c = cfg
-        noise = noise_for_ber(c, target)
+        noise, phase = noise_for_ber(c, target)
     elif name == "jitter-dominated":
         rj = jitter_for_ber(cfg, target)
         c = dataclasses.replace(cfg, clocking=dataclasses.replace(cfg.clocking, data_path_rj_s=rj,
@@ -71,8 +76,8 @@ for name, target, n_symbols in (("noise-dominated", 1e-6, 20_000_000),
     else:
         c = dataclasses.replace(cfg, clocking=dataclasses.replace(cfg.clocking, data_path_rj_s=1.5e-12,
                                                                   clock_path_rj_s=1.5e-12, track_bw_hz=None))
-        noise = noise_for_ber(c, target)
-    c = dataclasses.replace(c, rx=dataclasses.replace(c.rx, noise_rms_v=noise),
+        noise, phase = noise_for_ber(c, target)
+    c = dataclasses.replace(c, rx=dataclasses.replace(c.rx, noise_rms_v=noise, sampling_phase_ui=phase),
                             sim=dataclasses.replace(c.sim, n_symbols=n_symbols))
     t0 = time.time()
     s = StatisticalEngine(c).run()

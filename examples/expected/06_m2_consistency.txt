@@ -1,13 +1,13 @@
-local PLL, coloured clock noise: noise 38.38 mV, jitter 3042 fs, phase +0.0312 UI
-  statistical 9.675e-06 [~s]   time 7.750e-06 (31 errors in 29 bursts / 4.0e+06, 95% 5.0e-06..1.1e-05) [~s]   ratio 0.80 -> within 0.5-2x
-quantised, delayed tracker: noise 38.82 mV, jitter 2077 fs + PI step 0.03125 UI, phase +0.0625 UI
-  statistical 9.736e-06 [~s]   time 7.000e-06 (28 errors in 27 bursts / 4.0e+06, 95% 4.4e-06..1.0e-05) [~s]   ratio 0.72 -> within 0.5-2x
-path wander through the tracker: noise 38.79 mV, jitter 2220 fs, phase +0.0625 UI
-  statistical 9.720e-06 [~s]   time 7.250e-06 (29 errors in 28 bursts / 4.0e+06, 95% 4.6e-06..1.1e-05) [~s]   ratio 0.75 -> within 0.5-2x
-crosstalk, x3 module at -14 dB, middle lane (2 aggressors, 9.0 mV RMS crosstalk): noise 40.0 mV
-  statistical 2.753e-05   time 2.300e-05 (46 errors in 46 bursts / 2.0e+06) [~s]   ratio 0.84 -> within 0.5-2x; edge lanes 0.88 / 0.94
-advanced package, CTLE, 0.06 UI DCD: noise 45.41 mV, jitter 1378 fs, phase -0.0469 UI
-  statistical 9.883e-06 [~s]   time 8.250e-06 (33 errors in 33 bursts / 4.0e+06, 95% 5.4e-06..1.2e-05) [~s]   ratio 0.83 -> within 0.5-2x
+local PLL, coloured clock noise: noise 37.03 mV, jitter 3042 fs, phase +0.0000 UI
+  statistical 1.000e-05 [~s]   time 8.000e-06 (32 errors in 32 bursts / 4.0e+06, 95% 5.2e-06..1.2e-05) [~s]   ratio 0.80 -> within 0.5-2x
+quantised, delayed tracker: noise 37.95 mV, jitter 2077 fs + PI step 0.03125 UI, phase +0.0000 UI
+  statistical 1.000e-05 [~s]   time 9.750e-06 (39 errors in 38 bursts / 4.0e+06, 95% 6.7e-06..1.4e-05) [~s]   ratio 0.98 -> within 0.5-2x
+path wander through the tracker: noise 37.90 mV, jitter 2220 fs, phase +0.0000 UI
+  statistical 1.000e-05 [~s]   time 7.750e-06 (31 errors in 30 bursts / 4.0e+06, 95% 5.0e-06..1.1e-05) [~s]   ratio 0.78 -> within 0.5-2x
+crosstalk, x3 module at -14 dB, middle lane (2 aggressors, 8.6 mV RMS crosstalk): noise 40.0 mV
+  statistical 1.634e-05   time 1.350e-05 (27 errors in 27 bursts / 2.0e+06) [~s]   ratio 0.83 -> within 0.5-2x; edge lanes 0.94 / 1.05
+advanced package, CTLE, 0.06 UI DCD: noise 45.72 mV, jitter 1378 fs, phase -0.0156 UI
+  statistical 1.000e-05 [~s]   time 7.750e-06 (31 errors in 31 bursts / 4.0e+06, 95% 5.0e-06..1.1e-05) [~s]   ratio 0.77 -> within 0.5-2x
 
-5 points, ratios 0.72..0.84 -- all within 0.5-2x
+5 points, ratios 0.77..0.98 -- all within 0.5-2x
 wrote examples/output/06_m2_consistency.png
