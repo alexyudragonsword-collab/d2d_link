@@ -10,6 +10,8 @@ python examples/04_local_pll_bandwidth.py    # 收端本地 PLL 的环路带宽
 python examples/05_module_xtalk_repair.py    # x16 / x64 模块:skew、串扰、修复
 python examples/06_m2_consistency.py         # 新机制上的统计 / 时域一致性
 python examples/07_rate_sweep.py             # 规范表全部速率档 × 两种封装,耦合串扰,预算报表
+python examples/08_crosstalk_physics.py      # 布线、反向 lane 的 NEXT、单端 Touchstone 读法
+python examples/09_receiver_front_end.py     # 收端前端带宽、噪声口径、CTLE 代价、训练 BER
 python examples/08_crosstalk_physics.py      # 布线方式 / 反向 lane NEXT / 单端 Touchstone 文件
 pytest -q
 ```
@@ -39,7 +41,7 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 | `sim` | `osr`、`n_symbols`、`seed`、`pattern`、`engine`、`time_mode`(waveform / samples)+ `time_cursor_floor`、统计引擎的 ISI 分布 bin(`stat_isi_bin_v`)/ 相位网格参数 |
 | `target` | 留空 = 规范表(带 `source: survey`);写了 = 配置自己的主张 |
 
-`d2d_link.config.form.SECTIONS` 按 Halo 的方式声明了每个字段的表单行(标签、类型、显示比例);GUI 这一轮不做,
+`d2d_link.config.form.SECTIONS` 按 Halo 的方式声明了每个字段的表单行(标签、类型、显示比例);段 8 的浏览器 GUI 的抽屉由它生成,
 测试保证它与 schema 双向一致。
 
 ## 两个引擎(铁律 3)

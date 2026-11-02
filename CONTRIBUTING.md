@@ -11,7 +11,7 @@
 
 ```bash
 ruff check src/ tests/ examples/ tools/
-pytest -q                                   # 约 2 分钟
+pytest -q                                   # 约 5–6 分钟
 python tools/run_examples.py --smoke
 ```
 

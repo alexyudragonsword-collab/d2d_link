@@ -117,8 +117,11 @@ class LinkResult:
         """The lane with the smallest eye margin relative to its target (eye
         height or width, whichever is tighter). Not the largest BER: at a
         1e-27 target every lane's BER at its own eye centre is far below
-        float resolution, and ranking by it picked lane 0 every time."""
-        return min(self.stat, key=lambda r: (r.margin, r.lane))
+        float resolution, and ranking by it picked lane 0 every time. Margins
+        equal to 1e-9 are a tie (identical lanes differ in the last bits from
+        machine to machine: a stripline module's "worst lane" flipped between
+        runners); the tie goes to the lowest lane."""
+        return min(self.stat, key=lambda r: (round(r.margin, 9), r.lane))
 
     @property
     def log10_ber_worst(self) -> float:

@@ -5,7 +5,7 @@ summary: "段 8 的浏览器 GUI:报告即界面的设计决定、铁律 1 的�
 tags: [gui, dash, report]
 contains: [decision, lesson]
 created: "2026-10-13"
-updated: "2026-10-13"
+updated: "2026-11-02"
 related: [architecture-invariants.md, engines.md, spec-sources.md]
 authoring_mode: ai_generated
 ---

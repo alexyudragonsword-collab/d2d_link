@@ -1,0 +1,10 @@
+# Derived numbers the docs quote (tools/example_drift.py derived): each operand is a
+# number printed by an example; a quote is doc text with {expr} where the result is.
+- name: ex05 crosstalk cost on the x16 module
+  values:
+    eh_off: {example: "05", line: "crosstalk off on the x16 module: min eye height {} mV (on: {*} mV), min eye width {*} UI (on: {*} UI)"}
+    eh_on: {example: "05", line: "crosstalk off on the x16 module: min eye height {*} mV (on: {} mV), min eye width {*} UI (on: {*} UI)"}
+    ew_off: {example: "05", line: "crosstalk off on the x16 module: min eye height {*} mV (on: {*} mV), min eye width {} UI (on: {*} UI)"}
+    ew_on: {example: "05", line: "crosstalk off on the x16 module: min eye height {*} mV (on: {*} mV), min eye width {*} UI (on: {} UI)"}
+  quotes:
+    - {doc: README.md, text: "串扰费 {eh_off - eh_on} mV / {ew_off - ew_on} UI"}

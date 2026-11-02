@@ -13,6 +13,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -109,11 +112,13 @@ jobs:
         run: python tools/run_examples.py --smoke
 
   # Invariant #6: a change that is not meant to move a number must not move
-  # one. On a pull request the base commit and the head are fingerprinted on
-  # the same runner (bit-exact means the same machine and library versions)
-  # and compared; any difference fails unless the PR carries the label
-  # `numbers-move`, in which case the diff is kept as an artifact for the
-  # CHANGELOG to explain. On a push the fingerprint is only recorded and kept.
+  # one. The base and the head are fingerprinted on the same runner (bit-exact
+  # means the same machine and library versions: a committed baseline would
+  # differ in the last bits between machines) and compared. On a pull request
+  # the base is the PR's base commit and the escape hatch is the label
+  # `numbers-move`; on a push the base is the previous head of the branch and
+  # the escape hatch is `numbers-move` in the head commit's message. Either
+  # way the diff is kept as an artifact for the CHANGELOG to explain.
   fingerprint:
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -131,21 +136,38 @@ jobs:
           pip install -e ".[touchstone,plot,test]"
       - name: Record the head
         run: python tools/fingerprint.py record head.json
-      - name: Record the base (pull requests)
-        if: github.event_name == 'pull_request'
+      - name: Pick the base
+        id: base
         run: |
-          git worktree add ../base ${{ github.event.pull_request.base.sha }}
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
+            echo "sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Record the base
+        if: steps.base.outputs.sha != ''
+        run: |
+          git worktree add ../base ${{ steps.base.outputs.sha }}
           pip install --no-deps -e ../base
-          (cd ../base && python tools/fingerprint.py record ../d2d_link/base.json)
+          (cd ../base && python tools/fingerprint.py record "$GITHUB_WORKSPACE/base.json")
           pip install --no-deps -e .
       - name: Compare
-        if: github.event_name == 'pull_request'
+        if: steps.base.outputs.sha != ''
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           python tools/fingerprint.py compare base.json head.json > diff.txt || moved=1
           cat diff.txt
-          if [ "${moved:-0}" = "1" ] && ! echo '${{ toJson(github.event.pull_request.labels.*.name) }}' | grep -q numbers-move; then
-            echo "::error::numbers moved without the numbers-move label; explain them in CHANGELOG and label the PR"
-            exit 1
+          if [ "${moved:-0}" = "1" ]; then
+            if echo "$PR_LABELS" | grep -q '"numbers-move"' || echo "$HEAD_MESSAGE" | grep -q 'numbers-move'; then
+              echo "numbers moved and the change says so (numbers-move): the diff is kept as an artifact"
+            else
+              echo "::error::numbers moved without numbers-move (PR label, or the word in the head commit message); explain them in CHANGELOG"
+              exit 1
+            fi
           fi
       - uses: actions/upload-artifact@v4
         if: always()

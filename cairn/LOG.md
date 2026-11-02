@@ -3,6 +3,20 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短(数字原值、被推翻的判断、下一步),
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-11-02 · 第二次体检;段 9a 卫生轮(ccr-a2094794-9qa40v,0.11.1)
+
+- 体检(两个独立审计 + 探针,全文在 scratchpad `health_check_2026-11-02.md`)挂出 3 条高严重度:(1) **解析走线非因果**(vendored 皮肤电阻无内电感):
+  x1 到达前能量 10.7 mV = 主光标 6.5 %,因果化后眼 215.6 / 0.774 → 209.2 mV / 0.761 UI,30 / 35 mm 都不过,reach 35 mm → 25 mm —— 进 ROADMAP P1 #3,段 9b 修;
+  (2) **main 上 CI 从 0.10.0 起连续四次红**(3.10 缺 `tomllib`;示例 08 带状线五 lane 并列、最差 lane 随机器翻);(3) README 03 / 06 行与 engines.md 表的一致性数字过期。
+  中严重度:时间窗 / `n_max` 是仿真参数、training 窗边偏置、Touchstone 带外砖墙、`rx.bw_hz` 无上限、报告串扰标签、σ_jitter 不含量化、铁律 6 无机器把关、
+  GUI 每秒整页重绘 / 失败无反馈 / 缓存无版本键 / 上线路径零测试。上次体检的 8 条高严重度全部已关。
+- 段 9a 做了:tomllib → 文本匹配;`worst` 裕度按 1e-9 取整并列取编号小的(示例 08 带状线最差 lane 1 → 0);README / engines.md / ROADMAP 数字;
+  `examples/derived.yaml`;CI 指纹作业在 push 上与上一个 head 比对(`numbers-move` 放行)、`permissions: contents: read`;USAGE / form.py / docs/gui.md / `--also` 校验;
+  ROADMAP 新增 P1 #3、P2 #4、P3 #5。指纹对 `fp_g1` 3074 项逐位相同(并列规则在 bundled 配置里没有触发)。套件 193 过 + 1 slow 排除,5 min 12 s。
+- 被推翻的判断:(1) "快进只看本地套件"—— 本地 3.13 过、CI 3.10 红,四次没看;以后快进前看 Actions;(2) 第一次体检后所有探针都盯幅度(|H|、光标和),
+  没有一个看"到达前的能量",非因果模型从 M1 活到现在;(3) "committed 基线指纹"不可行:并列 lane 的翻转证明末位随机器变,铁律 6 只能同机比。
+- 下一步:段 9b 可信度 C(因果走线 + 窗口 / n_max + training 窗边 + Touchstone 延拓 + rx.bw 上限 + 报告标签;数字会变,一次解释);段 10 GUI 健壮性。
+
 ## 2026-10-14 · 段 8 G3:sweeps 附录、Compare with、磁盘缓存、文档(ccr-a2094794-9qa40v,0.11.0)
 
 - 做了:`sweep` 任务(tracker 带宽 / 本地 PLL f_n / reach,每点一次运行 + 闭式残余)与附录 A–C 段;Compare with 下拉 + 并排段;

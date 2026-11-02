@@ -129,7 +129,6 @@ def test_data_ships_inside_the_package(tmp_path, monkeypatch):
     p = resolve_data_file("data/clock_profiles/bench_markulic16_sspll_40m_10p24g.yaml")
     assert p.is_file() and p.is_relative_to(PACKAGE_DIR)
     assert resolve_data_file(str(tmp_path / "x.yaml")) == tmp_path / "x.yaml"
-    import tomllib
-
-    pyproject = tomllib.loads((PACKAGE_DIR.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
-    assert "data/clock_profiles/*.yaml" in pyproject["tool"]["setuptools"]["package-data"]["d2d_link"]
+    # tomllib is 3.11+; the declaration is one line of text
+    pyproject = (PACKAGE_DIR.parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    assert re.search(r'^d2d_link = \[.*"data/clock_profiles/\*\.yaml".*\]', pyproject, re.M), "package-data declaration"

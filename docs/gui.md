@@ -19,6 +19,8 @@ d2d-link-gui configs/standard_32g_x1.yaml --no-cache       # 不写磁盘缓存
 | `config` | 打开并运行的链路配置;左栏列出同目录的其它 `*.yaml` 作场景 |
 | `--configs DIR` | 场景目录(默认配置所在目录) |
 | `--workers N` | worker 进程数(默认 2;0 = 内联) |
+| `--port N` / `--host H` | 监听端口与地址(默认 8050、127.0.0.1) |
+| `--no-autorun` | 打开配置但不自动运行 |
 | `--also a,b` | 启动时就排进队列的任务:`sensitivity`、`rate_sweep`、`sweep:track_bw`、`sweep:local_pll_fn`、`sweep:reach` |
 | `--compare PATH` | 启动时就在 "Compare with" 里选中的场景 |
 | `--cache DIR` / `--no-cache` | 结果缓存目录(默认 `$XDG_CACHE_HOME/d2d_link/gui` 或 `~/.cache/d2d_link/gui`),按配置哈希存 JSON,重启后秒开;缓存不跟库版本走,升级到会动数字的版本后请清掉它 |

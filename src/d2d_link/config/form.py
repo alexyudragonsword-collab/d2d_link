@@ -1,6 +1,6 @@
 """Form-field declarations for a future GUI (Halo_Serdes ``config_bridge.SECTIONS`` method).
 
-No GUI ships in this milestone. What ships is the declaration a GUI would be
+The browser GUI's All-fields drawer (phase 8) is generated from this declaration, which a GUI would be
 generated from: every ``LinkConfig`` field, by dotted path, with a label, a
 kind and (where the config stores SI units) a display scale. A test keeps
 ``SECTIONS`` and the schema's field inventory identical in both directions, so

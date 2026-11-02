@@ -4,7 +4,26 @@
 
 ---
 
-## [0.11.0] — 2026-10-13 — 段 8 G1:浏览器 GUI 骨架(指纹逐位相同)
+## [0.11.1] — 2026-11-02 — 段 9a:第二次体检后的卫生轮(指纹逐位相同,一处并列规则除外)
+
+### 修复
+- **CI 在 main 上红了四次**(0.10.0 起):`tests/test_spec_sources.py` 用了 3.11+ 的 `tomllib`(3.10 两个作业失败)—— 改为文本匹配;
+  示例 08 带状线模块五条 lane 结果完全相同,`LinkResult.worst` 按浮点末位挑 lane,本机 1、CI 2 —— 裕度按 1e-9 取整后再比、并列取编号小的
+  (示例 08 该行的最差 lane 变为 0,期望输出重新接受)。
+- README 的一致性证据数字过期:示例 03 行 1.23 / 1.22 / 0.87 → 1.18 / 0.96 / 0.88,示例 06 行 → 0.80 / 0.72 / 0.75 / 0.84 / 0.83,40 mm 的 0.739 / 150 → 0.738 / 150.4;
+  `cairn/engines.md` 里程碑 2 的表同步;"pytest 约 2 分钟" → 5–6 分钟。
+- 派生数登记:`examples/derived.yaml`(README 的"串扰费 22 mV / 0.018 UI"),`example_drift derived` 从此把关。
+- 铁律 6 进 CI:`fingerprint` 作业在 **push** 上也比对(基线 = 分支上一个 head,同一 runner),差异无 `numbers-move`(PR 标签或 head 提交信息里的词)即红;
+  base 路径不再写死;两个工作流加 `permissions: contents: read`。
+- 过期文字:USAGE "GUI 这一轮不做"、`form.py` "No GUI ships"、USAGE 示例列表补 08 / 09、ROADMAP P3 编号与 Touchstone 行、docs/gui.md 参数表补
+  `--port/--host/--no-autorun`、`--also` 帮助文本与未知任务名的友好报错、`cairn/gui.md` 日期。
+
+### 体检记录
+- 第二次体检(2026-11-02)全文在会话 scratchpad `health_check_2026-11-02.md`,结论进 ROADMAP:P1 新增"解析走线非因果"(段 9b 修)。
+
+---
+
+## [0.11.0] — 2026-10-13 … 10-14 — 段 8 G1:浏览器 GUI 骨架(指纹逐位相同)
 
 ### 新增
 - **`d2d_link.report`**:`budget_rows` / `report` / `to_markdown` / `sensitivity*` 从 `tools/budget_report.py` 搬进包(CLI 只剩入口);数字不变。

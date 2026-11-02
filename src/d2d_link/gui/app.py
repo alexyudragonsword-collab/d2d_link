@@ -351,12 +351,19 @@ def main(argv=None) -> int:
     ap.add_argument("--no-autorun", action="store_true")
     ap.add_argument("--open-drawer", action="store_true", help="start with the All-fields drawer open")
     ap.add_argument("--also", default="",
-                    help="comma-separated extra jobs to queue at start: sensitivity,rate_sweep,sweep:track_bw,sweep:reach")
+                    help="comma-separated extra jobs to queue at start: sensitivity, rate_sweep, "
+                         "sweep:track_bw, sweep:local_pll_fn, sweep:reach")
     ap.add_argument("--cache", type=Path, default=default_cache_dir(), help="result cache directory (survives restarts)")
     ap.add_argument("--no-cache", action="store_true", help="keep results in memory only")
     ap.add_argument("--compare", type=Path, help="start with this scenario in 'Compare with'")
     args = ap.parse_args(argv)
     configs_dir = args.configs or (args.config.parent if args.config else Path("configs"))
+    from .jobs import SWEEP_AXES
+
+    allowed = {"sensitivity", "rate_sweep"} | {f"sweep:{a}" for a in SWEEP_AXES}
+    for k in (k for k in args.also.split(",") if k):
+        if k not in allowed:
+            ap.error(f"--also {k!r}: not a job; choose from {', '.join(sorted(allowed))}")
     app = create_app(configs_dir, args.config, workers=args.workers, autorun=not args.no_autorun,
                      drawer_open=args.open_drawer, extra_jobs=tuple(k for k in args.also.split(",") if k),
                      cache_dir=None if args.no_cache else args.cache)
