@@ -129,7 +129,7 @@ def _shift_add(p: np.ndarray, s: float) -> np.ndarray:
         # a long tail are below one bin and take this path)
         q[m: m + n] = half + half
     else:
-        q[m + j: m + j + n] += half
+        q[m + j: m + j + n] = half           # onto zeros: an assignment is the addition, one pass fewer
         q[m - j: m - j + n] += half
     if f > 0.0:
         frac = 0.5 * f * p
@@ -147,34 +147,44 @@ def _sorted_cursors(cursors: np.ndarray, i_main: int, extra: np.ndarray | None) 
     return c[np.argsort(-np.abs(c), kind="stable")]
 
 
-def small_kernel(small: np.ndarray, chunk: int = 16) -> np.ndarray:
-    """The kernel of the sub-bin shifts ``small`` (in order): the product of
-    their 3-tap kernels [f/2, 1-f, f/2].
+def small_kernels(smalls: list[np.ndarray], chunk: int = 16) -> list[np.ndarray]:
+    """One kernel per entry of ``smalls`` (each the sub-bin shifts of one
+    phase, in order): the product of the 3-tap kernels [f/2, 1-f, f/2].
 
     The chain of 480 ``np.convolve`` calls a module lane's tail took (6 us of
     overhead each, half of a module's run time before perf round II) is
-    replaced by two cheaper stages: the cursors are cut into chunks of
-    ``chunk`` and every chunk's kernel is built at once on a 2-D array (one
-    step = three slice products and two sums over all chunks; the last chunk
-    is padded with f = 0, the identity kernel [0, 1, 0], whose zero taps are
-    cut off afterwards), then the chunk kernels are convolved together.
-    The products are the same, in another association, so the result agrees
-    with the plain chain to the last few bits -- the one place this round
-    moved the fingerprint (max 3e-16 relative on the kernel taps)."""
-    small = np.asarray(small, dtype=np.float64)
-    n = small.size
-    if n == 0:
-        return np.ones(1)
-    rows = -(-n // chunk)
-    F = np.zeros((rows, chunk))
-    F.flat[:n] = small
+    replaced by two cheaper stages: every phase's cursors are cut into
+    chunks of ``chunk``, and the chunk kernels of *all* phases are built at
+    once on one 2-D array (rows = chunks, 33 columns at the end; a step is
+    three slice products and two sums -- perf round III batches the rows
+    across the phases a bathtub needs, which cuts the Python overhead of the
+    16 steps from once per model to once per batch); then each phase's
+    chunk kernels are convolved together. A short last chunk is padded with
+    f = 0, the identity kernel [0, 1, 0], whose zero taps are cut off
+    afterwards. The products are the same, in another association, so the
+    result agrees with the plain chain to the last few bits (3e-15
+    relative), and a batch of one equals the single call bit for bit."""
+    rows_of = []
+    total = 0
+    for sm in smalls:
+        n = int(np.asarray(sm).size)
+        r = -(-n // chunk) if n else 0
+        rows_of.append((total, r, n))
+        total += r
+    kernels: list[np.ndarray] = [np.ones(1)] * len(smalls)
+    if total == 0:
+        return kernels
+    F = np.zeros((total, chunk))
+    for (start, r, n), sm in zip(rows_of, smalls):
+        if n:
+            F[start:start + r].flat[:n] = np.asarray(sm, dtype=np.float64)
     half_f, one_f = 0.5 * F, 1.0 - F
-    k = np.ones((rows, 1))
+    k = np.ones((total, 1))
     for j in range(chunk):
         a = half_f[:, j][:, None]
         b = one_f[:, j][:, None]
         width = k.shape[1]
-        out = np.empty((rows, width + 2))
+        out = np.empty((total, width + 2))
         # out[m] = (x[m-2] a + x[m-1] b) + x[m] a, x being zero outside its range
         out[:, 0] = k[:, 0] * a[:, 0]
         if width == 1:
@@ -187,14 +197,25 @@ def small_kernel(small: np.ndarray, chunk: int = 16) -> np.ndarray:
             out[:, width] = k[:, -2] * a[:, 0] + k[:, -1] * b[:, 0]
             out[:, width + 1] = k[:, -1] * a[:, 0]
         k = out
-    pad = rows * chunk - n
-    kern = k[0]
-    for r in range(1, rows):
-        row = k[r, pad: k.shape[1] - pad] if r == rows - 1 and pad else k[r]
-        kern = np.convolve(kern, row)
-    if rows == 1 and pad:
-        kern = kern[pad: kern.size - pad]
-    return kern
+    for idx, (start, r, n) in enumerate(rows_of):
+        if n == 0:
+            continue
+        pad = r * chunk - n
+        kern = k[start]
+        for q in range(1, r):
+            row = k[start + q]
+            if q == r - 1 and pad:
+                row = row[pad: row.size - pad]
+            kern = np.convolve(kern, row)
+        if r == 1 and pad:
+            kern = kern[pad: kern.size - pad]
+        kernels[idx] = kern
+    return kernels
+
+
+def small_kernel(small: np.ndarray, chunk: int = 16) -> np.ndarray:
+    """The kernel of one phase's sub-bin shifts (see ``small_kernels``)."""
+    return small_kernels([small], chunk)[0]
 
 
 def _assemble(cursors, i_main: int, bin_v: float, c: np.ndarray, kern: np.ndarray | None) -> IsiModel:
@@ -228,6 +249,14 @@ def isi_model(cursors: np.ndarray, i_main: int, bin_v: float, extra: np.ndarray 
     c = _sorted_cursors(cursors, i_main, extra)
     small = _small_shifts(c, bin_v)
     return _assemble(cursors, i_main, bin_v, c, small_kernel(small) if small.size else None)
+
+
+def isi_models(items: list[tuple], bin_v: float) -> list[IsiModel]:
+    """``isi_model`` for many phases at once -- ``items`` are ``(cursors,
+    i_main, extra)`` tuples; the sub-bin kernels are built in one batch."""
+    sorted_c = [_sorted_cursors(c, i, e) for c, i, e in items]
+    kerns = small_kernels([_small_shifts(c, bin_v) for c in sorted_c])
+    return [_assemble(it[0], it[1], bin_v, c, k if k.size > 1 else None) for it, c, k in zip(items, sorted_c, kerns)]
 
 
 def log10_tail(m: IsiModel, sigma_noise: float, v) -> np.ndarray | float:
@@ -520,10 +549,37 @@ class StatisticalEngine:
                 side = +1
         return a
 
+    def prefetch(self, phases) -> int:
+        """Build the ISI models of every sampling phase a bathtub over
+        ``phases`` reads (the phases times the jitter nodes) that the cache
+        lacks, in one batch (``isi_models``: the sub-bin kernels of all of
+        them on one 2-D array); returns how many were built. The models are
+        the ones ``model_at`` would build one by one, bit for bit."""
+        todo: dict[int, float] = {}
+        for p in np.atleast_1d(phases):
+            for ph, _w in self.sampling_phases(float(p)):
+                key = round(ph * 1e9)
+                if key not in self._models and key not in todo:
+                    todo[key] = ph
+        if not todo:
+            return 0
+        if len(self._models) + len(todo) >= self.max_cached_models:
+            self._models.clear()
+            self._tails.clear()
+        items = []
+        for ph in todo.values():
+            c, i_main = self.resp.cursors(ph)
+            extra = [self.resp.xtalk_cursors(d, ph, skew) for d, skew in self.aggressors]
+            items.append((c, i_main, np.concatenate(extra) if extra else None))
+        for key, m in zip(todo, isi_models(items, self.bin_v)):
+            self._models[key] = m
+        return len(todo)
+
     def bathtub(self, lo: float = -0.5, hi: float = 0.5) -> tuple[np.ndarray, np.ndarray]:
         """``(phases, log10 BER)`` on ``sim.stat_phase_points`` phases per UI."""
         n = int(round(self.cfg.sim.stat_phase_points * (hi - lo)))
         phases = np.linspace(lo, hi, n + 1)
+        self.prefetch(phases)
         ber = np.array([self.log10_error_probability(p) for p in phases])
         return phases, ber
 
@@ -611,6 +667,7 @@ class StatisticalEngine:
             c = (a * fb - b * fa) / (fb - fa)
             if not (min(a, b) < c < max(a, b)):
                 c = 0.5 * (a + b)
+            self.prefetch(c)                   # the off-grid phase's ~50 node models in one batch
             fc = self.log10_error_probability(c) - lt
             if fc <= 0.0:
                 a, fa = c, fc

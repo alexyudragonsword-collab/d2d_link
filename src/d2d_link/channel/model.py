@@ -294,16 +294,30 @@ def next_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
 
 
 def read_cursors(pulse: np.ndarray, position: float, osr: int, n_max: int = 64,
-                 keep_centre: bool = True, floor: float = 1e-6) -> tuple[np.ndarray, int]:
+                 keep_centre: bool = True, floor: float = 1e-6, peak: float | None = None) -> tuple[np.ndarray, int]:
     """Baud-spaced samples of ``pulse`` around sample ``position`` (linear
     interpolation): ``(c, i_centre)``. Cursors below ``floor`` of the pulse's
     peak at both ends are dropped (a 0.2 uV cursor on a 200 mV pulse is
     nothing next to the 50 uV ISI bin; the 1e-9 of earlier versions kept
     the crosstalk pulses' 1e-8 tails and tripled a module's run time once
-    the window grew to 512 UI); the centre is kept when ``keep_centre``."""
+    the window grew to 512 UI); the centre is kept when ``keep_centre``.
+    ``peak`` is max|pulse| when the caller has it (perf round III: scanning
+    the 16k-sample pulse for it on every call was most of this function).
+    The interpolation is np.interp's arithmetic, (y1 - y0) (x - x0) + y0 on
+    the unit grid, by direct indexing (bit for bit the same, no search)."""
     ks = np.arange(-n_max, n_max + 1)
-    c = np.interp(position + ks * osr, np.arange(pulse.size), pulse, left=0.0, right=0.0)
-    keep = np.abs(c) > floor * max(float(np.max(np.abs(pulse))), 1e-300)
+    x = position + ks * osr
+    n = pulse.size
+    i = np.floor(x).astype(np.int64)
+    inside = (i >= 0) & (i < n - 1)
+    ii = np.clip(i, 0, n - 2)
+    c = (pulse[ii + 1] - pulse[ii]) * (x - i) + pulse[ii]
+    c = np.where(inside, c, 0.0)
+    last = x == n - 1
+    if last.any():
+        c = np.where(last, pulse[-1], c)
+    top = float(np.max(np.abs(pulse))) if peak is None else peak
+    keep = np.abs(c) > floor * max(top, 1e-300)
     if keep_centre:
         keep[n_max] = True
     if not keep.any():
@@ -329,6 +343,11 @@ class LinkResponse:
     grid_top_response: float = 0.0   # |H_total| at the grid's top frequency osr x f_N, relative to its DC value: what the
                                      # brick wall there cuts off (0.58 at 4 GT/s on the 32x grid rang the pulse, phase 12)
 
+    def __post_init__(self):
+        # the peaks the cursor floor is measured against, once per pulse
+        object.__setattr__(self, "_peak", float(np.max(np.abs(self.pulse.y))))
+        object.__setattr__(self, "_xt_peak", {k: float(np.max(np.abs(w.y))) for k, w in (self.xtalk_pulses or {}).items()})
+
     @property
     def main_index(self) -> int:
         """The symbol's reference sample: the midpoint of the pulse's
@@ -353,7 +372,8 @@ class LinkResponse:
         ends are dropped (``cursor_floor`` of the peak); at most ``n_max``
         (default ``cursor_reach``) on each side."""
         n_max = self.cursor_reach if n_max is None else n_max
-        return read_cursors(self.pulse.y, self.main_index + phase_ui * self.osr, self.osr, n_max, floor=self.cursor_floor)
+        return read_cursors(self.pulse.y, self.main_index + phase_ui * self.osr, self.osr, n_max, floor=self.cursor_floor,
+                            peak=self._peak)
 
     def xtalk_cursors(self, neighbour, phase_ui: float, rel_skew_ui: float = 0.0,
                       n_max: int | None = None) -> np.ndarray:
@@ -368,7 +388,8 @@ class LinkResponse:
             return np.zeros(0)
         pos = self.main_index + (phase_ui - rel_skew_ui) * self.osr
         n_max = self.cursor_reach if n_max is None else n_max
-        c, _ = read_cursors(pulses[neighbour].y, pos, self.osr, n_max, keep_centre=False, floor=self.cursor_floor)
+        c, _ = read_cursors(pulses[neighbour].y, pos, self.osr, n_max, keep_centre=False, floor=self.cursor_floor,
+                            peak=self._xt_peak.get(neighbour))
         return c
 
 

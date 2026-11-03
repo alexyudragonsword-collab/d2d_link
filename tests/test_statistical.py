@@ -266,3 +266,38 @@ def test_small_kernel_is_the_chain_of_three_tap_kernels():
     m = isi_model(c, i_main, cfg.sim.stat_isi_bin_v)
     assert m.pmf.sum() == pytest.approx(1.0, abs=1e-12) and m.n_cursors == c.size - 1
     assert float(np.sqrt(np.sum((m.grid_v ** 2) * m.pmf))) == pytest.approx(m.sigma_isi_v, rel=0.02)   # the grid's variance over by < f(1-f) bin^2 per cursor
+
+
+def test_batched_models_equal_the_single_path_bit_for_bit():
+    """Perf round III: a bathtub's models are built in one batch (the sub-bin
+    kernels of all its phases on one 2-D array) -- the same arithmetic per
+    row, so each model equals the one model_at builds alone, bit for bit;
+    and reading cursors by direct indexing equals np.interp bit for bit."""
+    from conftest import REPO
+    from d2d_link.channel import link_response
+    from d2d_link.channel.model import read_cursors
+    from d2d_link.engine.statistical import isi_models
+
+    cfg = load_config(REPO / "configs" / "standard_32g_x16_module.yaml")
+    cfg = dataclasses.replace(cfg, sim=dataclasses.replace(cfg.sim, stat_phase_points=16))
+    resp = link_response(cfg)
+    phases = np.linspace(-0.4, 0.4, 9)
+    items = [(*resp.cursors(p), np.concatenate([resp.xtalk_cursors(1, p, 0.01), resp.xtalk_cursors(2, p, -0.02)])) for p in phases]
+    batch = isi_models(items, cfg.sim.stat_isi_bin_v)
+    for (c, i_main, extra), m in zip(items, batch):
+        single = isi_model(c, i_main, cfg.sim.stat_isi_bin_v, extra)
+        assert np.array_equal(m.pmf, single.pmf) and np.array_equal(m.grid_v, single.grid_v) and m.main == single.main
+    eng = StatisticalEngine(cfg)
+    n = eng.prefetch(phases)
+    assert n > 0 and eng.prefetch(phases) == 0                                   # all cached now
+    rng = np.random.default_rng(5)
+    pulse = resp.pulse.y
+    for _ in range(50):
+        pos = resp.main_index + (rng.random() - 0.5) * 3.0 * resp.osr
+        c, i = read_cursors(pulse, pos, resp.osr, 256, peak=float(np.max(np.abs(pulse))))
+        ks = np.arange(-256, 257)
+        ref = np.interp(pos + ks * resp.osr, np.arange(pulse.size), pulse, left=0.0, right=0.0)
+        keep = np.abs(ref) > 1e-6 * np.max(np.abs(pulse))
+        keep[256] = True
+        lo, hi = int(np.argmax(keep)), int(keep.size - np.argmax(keep[::-1]))
+        assert np.array_equal(c, ref[lo:hi]) and i == 256 - lo
