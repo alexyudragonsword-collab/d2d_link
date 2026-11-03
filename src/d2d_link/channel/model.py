@@ -88,6 +88,16 @@ class ChannelModel:
             l_int = np.zeros_like(f)
             np.divide(p["r_skin"], 2.0 * np.pi * np.sqrt(f), out=l_int, where=f > 0.0)
             l = l + l_int
+        if cfg.channel.dielectric == "djordjevic_sarkar" and p["loss_tangent"] > 0.0:
+            # a constant tan d on a constant C is not causal either (the
+            # dielectric side of what 9b fixed for the skin effect): the loss
+            # comes with a permittivity that falls with frequency. Wideband
+            # Debye (Djordjevic-Sarkar, poles 1e3..1e12 rad/s), matched to the
+            # preset C (eps_eff) and tan d at loss_tangent_ref_hz; the DC
+            # conductance g_s_m stays. x1: 209.7 mV / 0.761 UI -> see LOG (phase 15)
+            eps = djordjevic_sarkar(f, p["loss_tangent"], cfg.channel.loss_tangent_ref_hz)
+            g = np.full_like(f, p["g_s_m"])
+            c = p["c_f_m"] * eps
         abcd = analytic.tline_abcd(r, l, g, c, length, f)
         H = analytic.abcd_to_transfer(abcd, zs, zl) / (zl / (zs + zl))
         return cls(H, f, name=f"{cfg.package.kind}_rlgc_{cfg.channel.length_mm:g}mm")
@@ -143,6 +153,24 @@ def fill_dc(H: np.ndarray, f: np.ndarray) -> np.ndarray:
     elif f.size > 1 and f[0] == 0.0 and H[0] == 0.0:
         H[0] = abs(H[1])
     return H
+
+
+def djordjevic_sarkar(f: np.ndarray, tan_d: float, f_ref: float, m1: float = 3.0, m2: float = 12.0) -> np.ndarray:
+    """Relative complex permittivity eps(f) / eps'(f_ref) of a wideband Debye
+    dielectric (Djordjevic & Sarkar, IEEE Trans. EMC 2001): a flat loss
+    tangent between 10^m1 and 10^m2 rad/s with the dispersion Kramers-Kronig
+    requires, scaled so eps'(f_ref) = 1 and -eps''/eps' = ``tan_d`` there.
+    Multiplying a line's C by it gives jwC eps = jwC eps' + wC(-eps''): the
+    capacitance and the dielectric conductance of one causal material."""
+    w = 2.0 * np.pi * np.asarray(f, dtype=np.float64)
+
+    def shape(wv):
+        return np.log10((10.0 ** m2 + 1j * wv) / (10.0 ** m1 + 1j * wv)) / (m2 - m1)
+
+    s_ref = shape(np.array([2.0 * np.pi * f_ref]))[0]
+    de = tan_d / (-s_ref.imag)                 # -eps''(f_ref) = tan_d with eps'(f_ref) = 1
+    e_inf = 1.0 - de * s_ref.real
+    return e_inf + de * shape(w)
 
 
 def extend_band(H: np.ndarray, f: np.ndarray, f_edge: float) -> np.ndarray:

@@ -184,11 +184,22 @@ def test_block_seam_is_measured():
 
 # -------------------------------------------------------------------- Tx DCD
 def test_tx_duty_cycle_error_is_common_mode_until_a_local_pll_regenerates_the_clock():
+    def dcd(ck):
+        return ForwardedClock(LinkConfig(clocking=ck)).sampling_dcd_ui()
+
     base = ClockingConfig(pll_profile=PROFILE, tx_dcd_ui=0.1)
-    assert base.sampling_dcd_ui == 0.0
+    assert dcd(base) == 0.0                                   # ideal tree: the forwarded edges carry it exactly
     with_pll = dataclasses.replace(base, local_pll_profile=LOCAL, local_pll_fn_hz=1e6)
-    assert with_pll.sampling_dcd_ui == pytest.approx(0.1)
-    assert dataclasses.replace(with_pll, dcd_ui=0.02).sampling_dcd_ui == pytest.approx(0.12)
+    assert dcd(with_pll) == pytest.approx(0.1)
+    assert dcd(dataclasses.replace(with_pll, dcd_ui=0.02)) == pytest.approx(0.12)
+    # a tree of ~1 UI puts the forwarded clock in anti-phase at fs/2: the Tx
+    # DCD reaches the sampler through Re E(1 - G) ~ 1.7, not zero (0.12 took
+    # it as nothing; third health check)
+    treed = dataclasses.replace(base, tree_delay_ps=30.0, tree_bw_hz=20e9)
+    fc = ForwardedClock(LinkConfig(clocking=treed))
+    f = np.array([0.5 * fc.fs])
+    leak = abs(float((fc.e_track(f) * (1.0 - fc.g_clock(f)))[0].real))
+    assert 1.0 < leak < 2.0 and dcd(treed) == pytest.approx(0.1 * leak)
     sim = SimConfig(stat_phase_points=16)
     plain = run_statistical(LinkConfig(clocking=ClockingConfig(pll_profile=PROFILE), sim=sim))
     cm = run_statistical(LinkConfig(clocking=base, sim=sim))

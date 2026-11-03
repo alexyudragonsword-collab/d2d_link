@@ -94,17 +94,26 @@ class ClockProfile:
         return p
 
     # ------------------------------------------------------------ spectra
-    def s_phi(self, f: np.ndarray) -> np.ndarray:
+    def s_phi(self, f: np.ndarray, above: str = "zero") -> np.ndarray:
         """S_phi(f) [rad^2/Hz]: L(f) interpolated in (log f, dB); the first
-        value held below the grid, zero above f0/2 (a clock's phase noise is
-        defined to its own Nyquist and no further)."""
+        value held below the grid. Above the grid's last point (the clock's
+        f0/2) ``above`` decides: ``"zero"`` -- the Halo convention, a clock's
+        phase noise defined to its own Nyquist and no further -- or
+        ``"floor"``, the last level held flat (np.interp's clamp). The
+        forwarded-clock model integrates to the *edge* rate's Nyquist, fs/2,
+        and its common-mode leak is a high-pass largest exactly up there: on
+        the x1 link the zero dropped the 5-16 GHz floor and with it half the
+        leak (59 -> 223 fs; third health check, phase 15)."""
         f = np.asarray(f, dtype=np.float64)
         l_dbc = np.interp(np.log10(np.maximum(f, 1e-300)), np.log10(self.f_hz), self.l_dbc_hz)
-        return np.where(f > self.f_hz[-1], 0.0, sphi_from_ldbc(l_dbc))
+        s = sphi_from_ldbc(l_dbc)
+        if above == "floor":
+            return s
+        return np.where(f > self.f_hz[-1], 0.0, s)
 
-    def s_timing(self, f: np.ndarray) -> np.ndarray:
+    def s_timing(self, f: np.ndarray, above: str = "zero") -> np.ndarray:
         """One-sided PSD of the timing jitter [s^2/Hz]: S_phi / (2 pi f0)^2."""
-        return self.s_phi(f) / (TWOPI * self.f0_hz) ** 2
+        return self.s_phi(f, above) / (TWOPI * self.f0_hz) ** 2
 
     def rms_jitter_s(self, f1: float, f2: float | None = None) -> float:
         """RMS timing jitter [s] of the continuous part over [f1, f2] (f2 default f0/2)."""

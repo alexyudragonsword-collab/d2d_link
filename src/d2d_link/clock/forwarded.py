@@ -176,12 +176,12 @@ class ForwardedClock:
     def _profile_plus_white(self, prof: ClockProfile | None, rj_s: float, f: np.ndarray) -> np.ndarray:
         s = np.zeros_like(f)
         if prof is not None:
-            s += prof.s_timing(f)
+            s += prof.s_timing(f, self.cfg.clocking.profile_above)
         return s + self.white_psd(rj_s)
 
     def pll_timing_psd(self, f: np.ndarray) -> np.ndarray:
         """One-sided PSD [s^2/Hz] of the Tx PLL's timing jitter on ``f``: the
-        profile (zero above its f0/2) plus the white part."""
+        profile (above its last point per ``clocking.profile_above``) plus the white part."""
         return self._profile_plus_white(self.profile, self.cfg.clocking.pll_rj_s, np.asarray(f, dtype=np.float64))
 
     def local_timing_psd(self, f: np.ndarray) -> np.ndarray:
@@ -344,7 +344,28 @@ class ForwardedClock:
     def quantisation_sigma_s(self) -> float:
         """What the phase-interpolator step adds (uniform, step^2/12), kept
         apart from the linear budget because it is not Gaussian."""
-        return self.cfg.clocking.pi_step_ui * self.ui / math.sqrt(12.0) if self.alpha > 0.0 else 0.0
+        return self.cfg.pi_step_ui * self.ui / math.sqrt(12.0) if self.alpha > 0.0 else 0.0
+
+    def sampling_dcd_ui(self) -> float:
+        """The odd/even sampling offset the sampler sees [UI]: the receiver's
+        own duty-cycle error plus what reaches it of the Tx PLL's. A Tx DCD is
+        the edge sequence (-1)^k d/2 -- a tone at exactly fs/2 -- and reaches
+        the sampler like any other Tx timing: wholly once a local PLL has
+        regenerated the clock (the forwarded edges no longer carry it), else
+        through the common-mode leak E (1 - rho G) at fs/2, read at the edges
+        (the real part: a tone at the sampling Nyquist has no other phase).
+        0.12 took the leak as nothing (``sampling_dcd_ui`` in the schema),
+        while the tree's ~1 UI delay makes it ~1.7 (third health check). The
+        two DCDs are independent: their magnitudes add (the worse pairing)."""
+        ck = self.cfg.clocking
+        if ck.tx_dcd_ui == 0.0:
+            return ck.dcd_ui
+        if ck.has_local_pll:
+            leak = 1.0
+        else:
+            f = np.array([0.5 * self.fs])
+            leak = float(abs((self.e_track(f) * (1.0 - self.rho * self.g_clock(f)))[0].real))
+        return ck.dcd_ui + leak * ck.tx_dcd_ui
 
     def pll_rms_s(self, n: int | None = None) -> float:
         """The Tx PLL's own jitter over the same band (what an independent clock
@@ -385,7 +406,7 @@ class ForwardedClock:
         a = self.alpha
         b_coef, a_coef = self._tracker_coefficients()
         zi = np.zeros((n_lanes, max(len(b_coef), len(a_coef)) - 1)) if a > 0.0 else None
-        step_s = ck.pi_step_ui * self.ui
+        step_s = self.cfg.pi_step_ui * self.ui
         # the spurs' starting phases: drawn once per run (only when there are
         # any, so a spur-free profile keeps its noise realisation bit for bit)
         tx_spurs = self.profile.spur_amplitudes_s() if self.profile is not None else []

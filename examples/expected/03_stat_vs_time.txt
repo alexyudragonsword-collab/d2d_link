@@ -1,10 +1,10 @@
-noise-dominated: noise 32.09 mV, jitter 295 fs (0.009 UI), phase -0.0040 UI
-  statistical BER 1.000e-06 [~s]   time BER 1.450e-06 (29 errors / 2.0e+07 symbols, 95% 9.2e-07..2.1e-06) [~s]
-  ratio time / statistical = 1.45  -> within 0.5-2x
-jitter-dominated: noise 3.00 mV, jitter 3274 fs (0.105 UI), phase +0.0000 UI
-  statistical BER 1.018e-06 [~s]   time BER 1.050e-06 (21 errors / 2.0e+07 symbols, 95% 6.0e-07..1.6e-06) [~s]
-  ratio time / statistical = 1.03  -> within 0.5-2x
-mixed: noise 35.78 mV, jitter 2040 fs (0.065 UI), phase +0.0000 UI
-  statistical BER 1.000e-05 [~s]   time BER 8.000e-06 (16 errors / 2.0e+06 symbols, 95% 4.1e-06..1.3e-05) [~s]
-  ratio time / statistical = 0.80  -> within 0.5-2x
+noise-dominated: noise 31.52 mV, jitter 366 fs (0.012 UI), phase -0.0171 UI
+  statistical BER 1.000e-06 [~s]   time BER 1.500e-06 (30 errors / 2.0e+07 symbols, 95% 9.6e-07..2.2e-06) [~s]
+  ratio time / statistical = 1.50  -> within 0.5-2x
+jitter-dominated: noise 3.00 mV, jitter 3224 fs (0.103 UI), phase -0.0156 UI
+  statistical BER 7.150e-07 [~s]   time BER 8.000e-07 (16 errors / 2.0e+07 symbols, 95% 4.1e-07..1.3e-06) [~s]
+  ratio time / statistical = 1.12  -> within 0.5-2x
+mixed: noise 34.99 mV, jitter 2051 fs (0.066 UI), phase -0.0156 UI
+  statistical BER 1.000e-05 [~s]   time BER 9.000e-06 (18 errors / 2.0e+06 symbols, 95% 4.8e-06..1.5e-05) [~s]
+  ratio time / statistical = 0.90  -> within 0.5-2x
 wrote examples/output/03_stat_vs_time.png

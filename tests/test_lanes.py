@@ -124,3 +124,20 @@ def test_identical_lanes_share_one_statistical_run():
     direct = run_statistical(LinkConfig(lanes=LaneConfig(count=6), channel=ChannelConfig(xtalk="fext"), clocking=ck, sim=sim),
                              lane=2, aggressors=((1, 0.0), (2, 0.0), (1, 0.0), (2, 0.0)))
     assert direct.eye_height_v == inner[0].eye_height_v
+
+
+
+def test_deskew_step_is_the_pi_step_under_a_tracker():
+    """Phase 15: with a tracker the skew is followed exactly and only the
+    phase interpolator's step remains -- and the step the deskew is made
+    with is that interpolator's. 0.12 read clocking.pi_step_ui = 0 as an
+    ideal PI while x16 repair / x64 spare declare a 1/16 UI deskew."""
+    import dataclasses
+
+    from d2d_link.config import ClockingConfig, LaneConfig, LinkConfig
+
+    cfg = LinkConfig(lanes=LaneConfig(deskew_step_ps=1.95), clocking=ClockingConfig(track_bw_hz=2e6))
+    assert cfg.pi_step_ui == pytest.approx(1.95e-12 / cfg.ui)
+    assert dataclasses.replace(cfg, clocking=dataclasses.replace(cfg.clocking, pi_step_ui=1 / 64)).pi_step_ui == 1 / 64
+    assert dataclasses.replace(cfg, lanes=dataclasses.replace(cfg.lanes, deskew_with_tracker="ideal")).pi_step_ui == 0.0
+    assert dataclasses.replace(cfg, clocking=ClockingConfig()).pi_step_ui == 0.0          # no tracker: the modulo rule

@@ -68,14 +68,24 @@ def test_correlation_zero_is_two_independent_clocks():
 
 
 def test_tree_delay_leaks_the_common_part_as_a_differentiator():
+    """|1 - e^(-j 2 pi f tau)|^2 on the PLL's timing PSD. Forwarding beats an
+    independent clock only below ~1/(6 tau): with the profile's in-band noise
+    alone (zero above its last point) the residual is below the PLL's own
+    RMS; with the floor held to fs/2 (phase 15) a 50 ps tree puts the clock
+    in anti-phase across most of the floor's band and the residual exceeds
+    it -- forwarding *doubles* jitter it cannot track in time."""
     tau = 50e-12
-    fc = ForwardedClock(_cfg(tree_delay_ps=tau * 1e12))
-    f = fc.fft_grid()
-    df = f[1] - f[0]
-    expect = math.sqrt(float(np.sum(np.abs(1 - np.exp(-2j * np.pi * f * tau)) ** 2 * fc.pll_timing_psd(f)) * df))
-    assert fc.residual_sigma_s() == pytest.approx(expect, rel=1e-9)
-    assert 0.0 < fc.residual_sigma_s() < fc.pll_rms_s()
-    assert _rms(fc) == pytest.approx(fc.residual_sigma_s(), rel=0.05)
+    for above in ("zero", "floor"):
+        fc = ForwardedClock(_cfg(tree_delay_ps=tau * 1e12, profile_above=above))
+        f = fc.fft_grid()
+        df = f[1] - f[0]
+        expect = math.sqrt(float(np.sum(np.abs(1 - np.exp(-2j * np.pi * f * tau)) ** 2 * fc.pll_timing_psd(f)) * df))
+        assert fc.residual_sigma_s() == pytest.approx(expect, rel=1e-9)
+        assert _rms(fc) == pytest.approx(fc.residual_sigma_s(), rel=0.05)
+        if above == "zero":
+            assert 0.0 < fc.residual_sigma_s() < fc.pll_rms_s()
+        else:
+            assert fc.pll_rms_s() < fc.residual_sigma_s() < 2.0 * fc.pll_rms_s()
 
 
 def test_tree_bandwidth_leaks_the_high_frequency_common_part():

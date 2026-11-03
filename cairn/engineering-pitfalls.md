@@ -109,3 +109,11 @@ authoring_mode: ai_generated
 - 修法:`config.with_data_rate(cfg, rate)` 改速率时按 rate_old/rate_new 缩放 osr,网格顶不动;示例 07、GUI 速率扫描与标题句的速率控件都走它。`LinkResponse.grid_top_response`
   进 extras / 报告,> 0.2 告警。4 GT/s 先进 2 mm:主光标 182.3 → 189.5 mV,眼 293 → 311 mV;标准 25 mm 几乎不变(线本身把顶频压到 0.3)。
 - 教训:**"在 X 处有多少响应被网格切掉"要像"到达前的能量"一样成为固定探针**;两个归因错误(非因果走线、RC 主导)都是没量就写进了 ROADMAP。
+
+## 剖面在载波 Nyquist 以上置零,吞掉了时钟树泄漏的主体(段 15,2026-11-03)
+
+- 现象:x1 共模泄漏 59 fs,前向时钟看起来几乎完美;第三次体检把剖面底噪平延到 fs/2 后 223 fs,32 GT/s 每个 bundled 配置都不过。
+- 原因:剖面(借来的 10.24 GHz PLL)只定义到它自己的 f0/2 = 5.12 GHz,`s_phi` 在那以上返回 0;前向时钟模型积到边沿率的 fs/2 = 16 GHz,
+  而 |1 − ρG|²(30 ps ≈ 1 UI 的树)是高通,在 fs/2 附近 ≈ 4。被丢的恰是权重最大的一段。
+- 修法:`clocking.profile_above`(默认 `floor`);`test_tree_delay_leaks_the_common_part_as_a_differentiator` 两种口径都测,floor 时残余 > PLL 自身。
+- 教训:**积分上下限要和被积函数的定义域一起看** —— 剖面的定义域(载波 Nyquist)与模型的积分域(边沿 Nyquist)不同,任何一边的"自然约定"都会静默决定结论。

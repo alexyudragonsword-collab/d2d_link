@@ -200,7 +200,8 @@ def test_analytic_line_is_causal():
     l_int = p["r_skin"] / (2 * np.pi * np.sqrt(cfg.f_nyquist))
     assert 0.01 < l_int / p["l_h_m"] < 0.2            # a few percent of the geometry's inductance at 16 GHz
     z_new = analytic.tline_abcd(r_, l_ + np.array([0.0, l_int]), g_, c_, 0.025, f)
-    z_ref = ChannelModel.from_rlgc(cfg, f).H
+    const = dataclasses.replace(cfg, channel=dataclasses.replace(cfg.channel, dielectric="constant"))   # tan d as the vendored RLGC has it
+    z_ref = ChannelModel.from_rlgc(const, f).H
     assert abs(analytic.abcd_to_transfer(z_new, 50.0, 50.0)[1] / 0.5) == pytest.approx(abs(z_ref[1]), rel=1e-9)
 
 
@@ -344,10 +345,12 @@ def test_touchstone_coupling_follows_the_through_path_past_the_band(tmp_path):
     out = f_all > 50e9
     assert np.all(np.abs(ch.xtalk_H[1][out]) > 0.0)                                    # no brick wall on the coupling
     i100 = int(np.searchsorted(f_all, 100e9))
-    assert abs(20 * np.log10(abs(ch.xtalk_H[1][i100]) / abs((kx * ana.H)[i100]))) < 2.0   # within 2 dB an octave out
+    assert abs(20 * np.log10(abs(ch.xtalk_H[1][i100]) / abs((kx * ana.H)[i100]))) < 2.5   # within 2.5 dB an octave out (2.1 on the dispersive line)
     r = run_link(cut).stat[1]
-    assert abs(r.eye_height_v - truth.eye_height_v) < 3e-4
-    assert abs(r.eye_width_ui - truth.eye_width_ui) < 0.006
+    assert abs(r.eye_height_v - truth.eye_height_v) < 5e-4                            # 0.4 mV on the dispersive line
+    # 0.005 UI on 0.12's constant-tan d line; 0.009 on the dispersive one (0.13), where the coupling's
+    # extension no longer moves the eye at all -- what is left is the through path's own extrapolation
+    assert abs(r.eye_width_ui - truth.eye_width_ui) < 0.012
     # the helper: nothing beyond the edge is left alone; the ratio to the through path is frozen at the edge
     H = np.array([1.0, 0.5, 0.25, 0.125]); X = np.array([0.1, 0.1, 0.0, 0.0]); f = np.array([0.0, 1.0, 2.0, 3.0])
     assert np.allclose(extend_band_like(X, f, 1.0, H), [0.1, 0.1, 0.05, 0.025])
@@ -382,3 +385,29 @@ def test_grid_top_truncation_is_measured_and_warned():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         assert link_response(base).grid_top_response < 0.1                                                 # 32 GT/s: clean
+
+
+
+def test_dielectric_is_causal_and_matched_at_its_reference():
+    """Phase 15: a constant tan d on a constant C is the dielectric side of the
+    non-causality 9b fixed for the skin effect. The Djordjevic-Sarkar
+    permittivity has the preset eps' and tan d at loss_tangent_ref_hz, rises
+    towards DC and falls above, and the line built from it carries less
+    energy before its LC delay than the constant-tan d one."""
+    from d2d_link.channel.model import djordjevic_sarkar
+
+    f = np.array([1e8, 1e9, 1e10, 1e11])
+    eps = djordjevic_sarkar(f, 0.01, 1e10)
+    assert eps[2].real == pytest.approx(1.0, rel=1e-12) and -eps[2].imag / eps[2].real == pytest.approx(0.01, rel=1e-12)
+    assert eps[0].real > eps[1].real > eps[2].real > eps[3].real                   # dispersion, as KK requires
+    assert np.all(eps.imag < 0.0)                                                   # loss everywhere
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0), tx=TxConfig(bw_hz=60e9))
+    const = dataclasses.replace(cfg, channel=dataclasses.replace(cfg.channel, dielectric="constant"))
+    p = cfg.rlgc()
+    n = int(cfg.channel.length_mm * 1e-3 * np.sqrt(p["l_h_m"] * p["c_f_m"]) / cfg.dt) - cfg.sim.osr
+
+    def early(c):
+        r = link_response(c)
+        return float(np.max(np.abs(r.pulse.y[:n])) / r.main_amplitude)
+
+    assert early(cfg) < 1e-3 < early(const)          # 6e-5 against 3e-3 of the main cursor before the LC delay

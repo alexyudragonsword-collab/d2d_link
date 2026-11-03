@@ -63,8 +63,8 @@ def x1_result():
 def test_run_result_is_json_and_matches_the_example(x1_result):
     json.dumps(x1_result)                     # plain data across the process boundary
     lane = x1_result["lanes"][0]
-    assert x1_result["passes"] and abs(1e3 * lane["eye_height_v"] - 209.7) < 0.1
-    assert abs(lane["eye_width_ui"] - 0.761) < 0.001
+    assert not x1_result["passes"] and abs(1e3 * lane["eye_height_v"] - 204.1) < 0.1      # FAIL since 0.13.0 (the clock tree)
+    assert abs(lane["eye_width_ui"] - 0.709) < 0.001
     assert x1_result["report"]["jitter_budget"][-1]["term"].startswith("total")
 
 
@@ -77,7 +77,7 @@ def test_sections_render_the_report_numbers(x1_result):
     cfg = load_config(REPO / "configs" / "standard_32g_x1.yaml")
     text = json.dumps([headline(cfg, x1_result).to_plotly_json(), verdict(x1_result).to_plotly_json(),
                        jitter(x1_result).to_plotly_json(), lanes(x1_result).to_plotly_json()], default=str)
-    for needle in ("209.7", "0.761", "295.3", "survey", "PASS" if x1_result["passes"] else "FAIL", "Every lane passes"):
+    for needle in ("204.1", "0.709", "365.5", "survey", "PASS" if x1_result["passes"] else "FAIL"):
         assert needle in text
 
 
@@ -85,7 +85,7 @@ def test_export_markdown_is_the_cli_report(x1_result):
     from d2d_link.report import to_markdown
 
     assert export.markdown(x1_result) == to_markdown(x1_result["report"])
-    assert json.loads(export.report_json(x1_result))["link"]["verdict"] == "PASS"
+    assert json.loads(export.report_json(x1_result))["link"]["verdict"] == ("PASS" if x1_result["passes"] else "FAIL")
     assert "channel.length_mm: 30.0" in export.overrides_yaml("x.yaml", {"channel.length_mm": 30.0})
 
 
@@ -108,7 +108,7 @@ def test_job_manager_inline_caches_by_config(x1_result):
     cfg = load_config(REPO / "configs" / "standard_32g_x1.yaml")
     m = JobManager(workers=0)
     a = m.submit("run", cfg, label="x1", scope="1 lanes")
-    assert a.status == "done" and a.result["passes"]
+    assert a.status == "done" and a.result["report"]["link"]["length_mm"] == 25.0
     b = m.submit("run", cfg, label="x1 again", scope="1 lanes")
     assert b.status == "done" and b.result is a.result          # the cache, not a second run
     assert m.latest_done(config_hash(cfg)) is b
@@ -122,7 +122,7 @@ def test_app_builds_and_edits_queue_runs(tmp_path):
     result, stale = core.current_result()
     assert result is not None and not stale
     page = json.dumps(core.page().to_plotly_json(), default=str)
-    assert "209.7" in page and "PASS" in page
+    assert "204.1" in page and "FAIL" in page
     assert core.apply_edit("channel.length_mm", 30.0) and core.state.overrides == {"channel.length_mm": 30.0}
     assert not core.apply_edit("channel.length_mm", 30.0)          # unchanged: no new run
     assert not core.apply_edit("lanes.count", -4)                   # invalid: dropped, config intact
@@ -181,7 +181,7 @@ def test_g2_sections_and_figures(x1_result):
     assert len(fig.data) == 2            # the lane and its sampling marker
     text = json.dumps([eyes(x1_result, 0).to_plotly_json(), lanes(x1_result, 0).to_plotly_json(),
                        floor_plan(x1_result, 0).to_plotly_json(), inspector(x1_result, 0).to_plotly_json()], default=str)
-    assert "fp-eye" in text and "0.761" in text and "Inspector" in text
+    assert "fp-eye" in text and "0.709" in text and "Inspector" in text
     cfg = _small()
     m = JobManager(workers=0)
     s = m.submit("sensitivity", cfg)
@@ -365,13 +365,13 @@ def test_scenario_list_matches_the_files_own_run():
     '+1' suffix). Matching is by config hash now."""
     app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0)
     core = app.d2d
-    assert "209.7 mV" in _text(core.left())
+    assert "204.1 mV" in _text(core.left())
     core.apply_edit("channel.length_mm", 30.0)
     core.run()
     r30, _ = core.current_result()
     assert r30["report"]["link"]["length_mm"] == 30.0
     left = _text(core.left())
-    assert "209.7 mV" in left and f"{1e3 * r30['lanes'][0]['eye_height_v']:.1f} mV" not in left
+    assert "204.1 mV" in left and f"{1e3 * r30['lanes'][0]['eye_height_v']:.1f} mV" not in left
     assert set(core.scenario_hashes()) == {str(p) for p in sorted((REPO / "configs").glob("*.yaml"))}
 
 

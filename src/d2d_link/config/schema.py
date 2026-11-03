@@ -109,6 +109,12 @@ class ChannelConfig:
     # C default to the values z0_ohm and the stack-up's eps_eff imply
     rdc_ohm_m: Optional[float] = None
     r_skin: Optional[float] = None     # R(f) = rdc + r_skin sqrt(f)  [ohm/(m sqrt(Hz))]
+    dielectric: Literal["djordjevic_sarkar", "constant"] = "djordjevic_sarkar"
+                                       # loss tangent with the permittivity dispersion Kramers-Kronig ties to it
+                                       # (wideband Debye, matched to eps_eff and tan d at loss_tangent_ref_hz), or
+                                       # a constant tan d on a constant C ("constant": non-causal, the 0.12 model)
+    loss_tangent_ref_hz: float = 1.0e10   # where the preset tan d and eps_eff hold (source: model -- the presets
+                                          # cite 10-20 GHz datasheet values)
     skin_inductance: bool = True       # the skin effect's internal inductance r_skin / (2 pi sqrt(f)) rides with R(f):
                                        # the surface impedance is (1 + j) r_skin sqrt(f), and R(f) alone is non-causal
                                        # (phase 9b); False reproduces the 0.11 model
@@ -210,6 +216,9 @@ class LaneConfig:
     skew_sigma_ps: float = 0.0
     skew_seed: int = 0
     deskew_step_ps: float = 0.0
+    deskew_with_tracker: Literal["pi_step", "ideal"] = "pi_step"   # with a tracker the deskew step is the phase
+                                                                   # interpolator's step when clocking.pi_step_ui is 0
+                                                                   # ("ideal": an unquantised PI, the 0.12 reading)
     spare_count: int = 0
     failed: tuple[int, ...] = ()
     repair: Literal["none", "spare", "width_degrade"] = "none"
@@ -222,6 +231,7 @@ class LaneConfig:
 
     def __post_init__(self):
         _require(self.count >= 1, f"lanes.count must be >= 1, got {self.count}")
+        _require_in(self.deskew_with_tracker, {"pi_step", "ideal"}, "lanes.deskew_with_tracker")
         n_phys = self.count + self.spare_count
         for i in self.reverse_adjacent:
             _require(0 <= i < n_phys, f"lanes.reverse_adjacent names lane {i}, module has {n_phys} physical lanes")
@@ -284,7 +294,10 @@ class ClockingConfig:
     tree_rj_s: float = 0.0                # jitter the Rx tree adds [s RMS]
     track_bw_hz: Optional[float] = None   # per-lane phase tracker bandwidth; None = no tracker
     track_delay_ui: int = 0               # tracker loop latency [UI]; 0 = the zero-latency abstraction
-    pi_step_ui: float = 0.0               # phase-interpolator step the tracker's output is quantised to [UI]
+    pi_step_ui: float = 0.0               # phase-interpolator step the tracker's output is quantised to [UI];
+                                          # 0 with a tracker -> lanes.deskew_step_ps (phase 15; LinkConfig.pi_step_ui)
+    profile_above: Literal["floor", "zero"] = "floor"   # PLL profile above its last point: the last level held
+                                                         # flat to fs/2 ("floor", phase 15) or zero ("zero", 0.12)
     dcd_ui: float = 0.0                   # receiver-side DDR duty-cycle error: odd/even sampling offset [UI]
     tx_dcd_ui: float = 0.0                # Tx PLL duty-cycle error, common to data and forwarded clock [UI]:
                                           # cancels at a receiver that samples on the forwarded clock's own
@@ -312,18 +325,12 @@ class ClockingConfig:
     def has_local_pll(self) -> bool:
         return self.local_pll_profile is not None or self.local_pll_rj_s > 0.0
 
-    @property
-    def sampling_dcd_ui(self) -> float:
-        """The odd/even sampling offset the sampler sees: the receiver's own
-        duty-cycle error, plus the Tx PLL's once a local PLL has regenerated
-        the clock and so stopped the forwarded edges from carrying it along."""
-        return self.dcd_ui + (self.tx_dcd_ui if self.has_local_pll else 0.0)
-
     def __post_init__(self):
         _require_in(self.scheme, {"forwarded_ddr"}, "clocking.scheme")
         _require(self.track_delay_ui >= 0, f"clocking.track_delay_ui must be >= 0, got {self.track_delay_ui}")
         _finite_nonneg(self.pi_step_ui, "clocking.pi_step_ui")
         _require(self.pi_step_ui < 0.5, f"clocking.pi_step_ui must be < 0.5 UI, got {self.pi_step_ui}")
+        _require_in(self.profile_above, {"floor", "zero"}, "clocking.profile_above")
         for name in ("local_pll_rj_s", "data_path_wander_s", "clock_path_wander_s"):
             _finite_nonneg(getattr(self, name), f"clocking.{name}")
         _finite_pos(self.wander_corner_hz, "clocking.wander_corner_hz")
@@ -460,7 +467,9 @@ class SimConfig:
     stat_phase_points: int = 64        # bathtub phases per UI
     stat_jitter_sigmas: float = 12.0   # jitter quadrature reach [sigma]; 1e-27 needs 10.8
     stat_cursor_reach: int = 256       # cursors the statistical engine reads on each side of the main one [UI]
-                                       # (a hard-coded 64 until phase 9b; the pulse window above bounds it anyway)
+                                       # (a hard-coded 64 until 9b). The 256 UI past +256 hold 0.6 % of the DC sum
+                                       # in ~250 cursors of < 40 uV: reading them (512) moved the bundled eyes by
+                                       # <= 0.18 mV / 1e-4 UI and took a module 18 -> 75 s (phase 15), so they stay out
     stat_cursor_floor: float = 1.0e-6  # end cursors below this fraction of a pulse's peak are dropped (was 1e-9)
     engine: Literal["statistical", "time", "both"] = "statistical"
     time_mode: Literal["waveform", "samples"] = "waveform"   # time engine: full waveform, or sampled values only
@@ -568,6 +577,21 @@ class LinkConfig:
         adj = PACKAGE_XTALK_DB[self.package.kind] if adj is None else adj
         sec = self.channel.xtalk_second_db
         return adj, (adj - 12.0 if sec is None else sec)
+
+    @property
+    def pi_step_ui(self) -> float:
+        """The phase interpolator's step [UI] the tracker's output lands on:
+        ``clocking.pi_step_ui``, or -- when that is 0 and a tracker runs -- the
+        lanes' ``deskew_step_ps`` (the step the deskew is made with is the PI
+        the tracker drives; 0.12 read 0 as an ideal interpolator while the
+        x16 repair and x64 spare configs declared a 1/16 UI deskew, and both
+        PASSes rested on it -- third health check). ``lanes.deskew_with_tracker:
+        ideal`` keeps the 0.12 reading."""
+        step = self.clocking.pi_step_ui
+        tracked = (self.clocking.track_bw_hz or 0.0) > 0.0
+        if step == 0.0 and tracked and self.lanes.deskew_with_tracker == "pi_step" and self.lanes.deskew_step_ps > 0.0:
+            return min(self.lanes.deskew_step_ps * 1e-12 / self.ui, 0.49)
+        return step
 
     @property
     def tx_bw_hz(self) -> float:

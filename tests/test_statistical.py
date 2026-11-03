@@ -89,7 +89,7 @@ def test_isi_grid_converges_with_hundreds_of_crosstalk_cursors():
     assert fine.extras["n_cursors"] > 300 and fine.extras["isi_bins"] > coarse.extras["isi_bins"]
     assert abs(fine.eye_width_ui - coarse.eye_width_ui) < 0.002
     assert abs(fine.eye_height_v - coarse.eye_height_v) < 1e-3
-    assert fine.eye_width_ui == pytest.approx(0.632, abs=0.01)      # 0.699 with the non-causal line (0.11); 0.685 before the geometry-derived L / C (0.5.0); 0.671 with 12 cursors enumerated
+    assert fine.eye_width_ui == pytest.approx(0.590, abs=0.01)      # 0.632 on 0.12 (constant tan d, PLL floor zeroed); 0.699 with the non-causal line (0.11); 0.685 before the geometry-derived L / C (0.5.0); 0.671 with 12 cursors enumerated
 
 
 def test_tails_live_in_the_log_domain():
@@ -204,7 +204,7 @@ def test_bathtub_window_follows_the_eye_wherever_the_reference_sits():
     # the milestone-1 link keeps its +-0.5 UI window and its numbers
     r1 = run_statistical(load_config(REPO / "configs" / "standard_32g_x1.yaml"))
     assert r1.bathtub_phase_ui[0] == -0.5 and r1.bathtub_phase_ui[-1] == 0.5 and r1.bathtub_ber.size == 65
-    assert r1.eye_width_ui == pytest.approx(0.7614, abs=0.0005)     # 0.7741 with the non-causal line (0.11)
+    assert r1.eye_width_ui == pytest.approx(0.7094, abs=0.0005)     # 0.7614 on 0.12; 0.7741 with the non-causal line (0.11)
 
 
 def test_eye_width_does_not_depend_on_the_phase_grid():

@@ -5,7 +5,7 @@ summary: "前向时钟模型的方程、带宽/相关度/树延时三个极限�
 tags: [forwarded-clock, jitter, core-mechanism]
 contains: [decision, lesson]
 created: "2026-10-12"
-updated: "2026-10-13"
+updated: "2026-11-03"
 related: [architecture-invariants.md, engines.md]
 authoring_mode: ai_generated
 ---
@@ -54,6 +54,15 @@ t_rx[k]   = (h_tree ⊛ t_pll)[k − τ] + n_t[k]                   树:延时 �
 - 树的延时把共模部分按 |1 − e^{−jωτ}| 泄漏(微分器),树带宽按 |1 − H_tree| 泄漏高频共模;两者在 ρ = 1 时是残余的唯一共模来源。
 - 闭式(`ForwardedClock.budget`)与合成(`synthesize`)用**同一张 FFT 网格**(块长 `sim.jitter_block`,频带 [fs/N, fs/2]),
   统计引擎与时域引擎因此看同一段谱。全开(ρ 0.9、三路噪声、树 40 ps / 12 GHz、2 MHz 跟踪)时合成 RMS 与闭式差 < 5%。
+
+- **剖面最后频点以上**(段 15,`clocking.profile_above`):默认 `floor` —— 最后的电平平延到 fs/2;0.12 及以前是 `zero`(Halo 的约定:时钟相噪只定义到它自己的 f0/2)。
+  模型积到**边沿率**的 Nyquist fs/2,而共模泄漏 |1 − ρG|² 是高通、恰在被丢的 5–16 GHz 最大:x1(30 ps / 20 GHz 树)泄漏 59 → 223 fs、总抖动 295 → 366 fs。
+  **后果:32 GT/s 的判定由时钟树决定**——x1 在 2 mm 也只有 0.745 UI(< 0.75);理想树时 25 mm 0.751 UI 过。前向时钟只在 f < ~1/(6τ) 有利,
+  再往上把它跟不上的抖动**加倍**(树 ≈ 1 UI 时 G(fs/2) ≈ −1):`test_tree_delay_leaks_the_common_part_as_a_differentiator`。
+  这条结论依赖借来的 Markulic 剖面 −145 dBc/Hz 底噪(10.24 GHz 载波)在 5–16 GHz 的形状,是模型估计,不是实测。
+- **PI 步长**(段 15):`LinkConfig.pi_step_ui` = `clocking.pi_step_ui`,为 0 且有跟踪器时取 `lanes.deskew_step_ps`(`lanes.deskew_with_tracker: ideal` 复现 0.12 的理想 PI)。
+  量化核的两端节点带小数权重,使方差正好是 w²/12(0.12 取整到整数个节点,x5 的 1/64 UI 多 11 % 方差)。
+- **发端 DCD**(段 15,`ForwardedClock.sampling_dcd_ui()`):fs/2 的单音,无本地 PLL 时经 Re E(1 − ρG)(fs/2) 到达采样器(30 ps 树 ≈ 1.7),有本地 PLL 时全额;0.12 当作完全抵消。
 
 ## 决策记录
 

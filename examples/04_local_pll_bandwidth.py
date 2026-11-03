@@ -87,11 +87,14 @@ print(f"\nper-lane tracker: latency and phase-interpolator step at 2 MHz (module
       f"{1e15 * ck.data_path_wander_s:.0f} fs wander per path):")
 print(f"{'latency [UI]':>12s} {'PI step [UI]':>12s} {'linear [fs]':>12s} {'+quantisation [fs]':>19s} {'eye width [UI]':>15s}")
 for d, step in ((0, 0.0), (4, 0.0), (32, 0.0), (0, 1 / 64), (4, 1 / 64), (4, 1 / 16)):
-    c = dataclasses.replace(base, clocking=dataclasses.replace(ck, track_delay_ui=d, pi_step_ui=step))
+    # step 0 is the ideal interpolator: since 0.13 a 0 with a tracker means
+    # "the lanes' deskew step", so the ideal case says so explicitly
+    c = dataclasses.replace(base, clocking=dataclasses.replace(ck, track_delay_ui=d, pi_step_ui=step),
+                            lanes=dataclasses.replace(base.lanes, deskew_with_tracker="ideal"))
     f2 = ForwardedClock(c)
     s = run_statistical(c)
     lin, q = f2.residual_sigma_s(), f2.quantisation_sigma_s()
-    print(f"{d:12d} {step:12.4f} {1e15 * lin:12.1f} {1e15 * math.hypot(lin, q):19.1f} {s.eye_width_ui:15.3f}")
+    print(f"{d:12d} {c.pi_step_ui:12.4f} {1e15 * lin:12.1f} {1e15 * math.hypot(lin, q):19.1f} {s.eye_width_ui:15.3f}")
 
 plt = plt_or_none()
 if plt is not None:

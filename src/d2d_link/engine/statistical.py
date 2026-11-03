@@ -291,6 +291,27 @@ def tail_probability(m: IsiModel, sigma_noise: float, v: float) -> float:
     return float(10.0 ** log10_tail(m, sigma_noise, v))
 
 
+def _box_kernel(width: float, h: float) -> np.ndarray:
+    """A uniform of ``width`` on the grid of step ``h``: 2M + 1 nodes, the
+    interior ones weight 1 and the two end ones weight e in (0, 1], with M
+    and e chosen so the kernel's variance is exactly width^2 / 12. A whole
+    number of full-weight nodes (0.12) rounded 4.24 steps to 4 and gave 11 %
+    more variance (x5's 1/64 UI step; third health check)."""
+    v = width * width / 12.0
+    m_f = 0.5 * width / h
+    for m in sorted({max(1, int(round(m_f))), int(round(m_f)) + 1, max(1, int(round(m_f)) - 1)}):
+        s = (m - 1) * m * (2 * m - 1) / 3.0                 # 2 sum_{k<m} k^2
+        den = 2.0 * (m * m * h * h - v)
+        if den <= 0.0:
+            continue
+        e = (v * (2 * m - 1) - h * h * s) / den
+        if 0.0 < e <= 1.0:
+            k = np.ones(2 * m + 1)
+            k[0] = k[-1] = e
+            return k
+    return np.ones(2 * max(1, int(round(m_f))) + 1)          # unreachable for the grids jitter_quadrature builds
+
+
 def jitter_quadrature(sigma_ui: float, phase_points: int, n_sigmas: float,
                       uniform_width_ui: float = 0.0,
                       sinusoid_amplitudes_ui: tuple[float, ...] = ()) -> tuple[np.ndarray, np.ndarray]:
@@ -336,8 +357,7 @@ def jitter_quadrature(sigma_ui: float, phase_points: int, n_sigmas: float,
         return full[off:off + a.size]
 
     if uniform_width_ui > 0.0:
-        m = int(round(0.5 * uniform_width_ui / h))
-        w = centred(w, np.ones(2 * m + 1))
+        w = centred(w, _box_kernel(uniform_width_ui, h))
     for amp in spurs:
         m = int(math.ceil(amp / h)) + 1
         xa = np.arange(-m, m + 1) * h
@@ -425,7 +445,8 @@ class StatisticalEngine:
         self.budget = self.clock.budget()
         self.sigma_j_ui = self.budget.gaussian_s / cfg.ui          # the Gaussian part; spurs are arcsine terms
         self.spurs_ui = tuple(a / cfg.ui for a in self.clock.spur_amplitudes_s())
-        self.quant_ui = cfg.clocking.pi_step_ui if self.clock.alpha > 0.0 else 0.0
+        self.quant_ui = cfg.pi_step_ui if self.clock.alpha > 0.0 else 0.0
+        self.dcd_ui = self.clock.sampling_dcd_ui()
         self.nodes, self.weights = jitter_quadrature(self.sigma_j_ui, cfg.sim.stat_phase_points,
                                                      cfg.sim.stat_jitter_sigmas, self.quant_ui, self.spurs_ui)
         self.bin_v = cfg.sim.stat_isi_bin_v
@@ -453,7 +474,7 @@ class StatisticalEngine:
     def sampling_phases(self, phase_ui: float) -> list[tuple[float, float]]:
         """``(phase, weight)`` pairs the sampler really lands on: the jitter
         quadrature's offsets, split again by the DDR duty-cycle error."""
-        dcd = self.cfg.clocking.sampling_dcd_ui
+        dcd = self.dcd_ui
         offs = (-0.5 * dcd, 0.5 * dcd) if dcd > 0.0 else (0.0,)
         out = []
         for x, w in zip(self.nodes, self.weights):

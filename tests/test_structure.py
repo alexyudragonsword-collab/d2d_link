@@ -100,14 +100,15 @@ def test_engine_integrates_over_normalised_measures(bundled):
     """The ISI distribution and the jitter quadrature are probability
     measures, and the quadrature's variance is the budget's: Gaussian sigma^2
     + the PI step's w^2/12 + each spur's A^2/2. The step's box on the fine
-    grid is a whole number of nodes wide, which puts the variance up to a few
-    percent high (x5: +2.0 %, the third health check's finding M2)."""
+    grid was a whole number of nodes wide, which put the variance 2 % high on
+    x5 (the third health check's finding M2); since phase 15 the box's end
+    nodes carry the fraction that makes its variance exact."""
     cfg, r = bundled
     eng = StatisticalEngine(cfg, r)
     assert eng.weights.sum() == pytest.approx(1.0, abs=1e-12)
     expected = eng.sigma_j_ui ** 2 + eng.quant_ui ** 2 / 12.0 + sum(0.5 * a ** 2 for a in eng.spurs_ui)
     if expected > 0.0:
-        assert float(np.sum(eng.weights * eng.nodes ** 2)) == pytest.approx(expected, rel=0.03)
+        assert float(np.sum(eng.weights * eng.nodes ** 2)) == pytest.approx(expected, rel=2e-3)
     m = eng.model_at(0.0)
     assert m.pmf.sum() == pytest.approx(1.0, abs=1e-12)
     assert np.all(m.pmf >= 0.0)

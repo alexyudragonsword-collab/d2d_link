@@ -7,10 +7,13 @@ that matters -- the eye at BER 1e-27 against the survey targets -- and the
 time engine draws the eye the sampler sees and confirms it counts no errors
 where the statistics say there are none to count.
 
-The jitter budget printed here is the point of the library: the PLL carries
-~186 fs RMS in band, and the sampler sees none of it, because the forwarded
-clock carries the same phase. What is left is the two paths' own jitter, the
-receive tree, and the leak the tree's delay and bandwidth open.
+The jitter budget printed here is the point of the library: the PLL's
+jitter reaches the sampler only through the leak the tree's delay and
+bandwidth open, because the forwarded clock carries the same phase. Since
+0.13.0 the profile's floor is held to fs/2, and a ~1 UI tree turns most of
+that floor's band into leak: on this link the leak is as large as the PLL's
+own jitter and decides the eye width. The rest is the two paths' own
+jitter and the receive tree.
 """
 
 import time

@@ -15,12 +15,12 @@ source: "pllsim preset ..., pllsim 0.9.6, commit ..."
 
 1. **L(f) 是单边带**:S_φ = 2·10^(L/10)。丢掉这个 2 就是所有抖动数上的 √2。
 2. **秒数按文件的 f0 算**,不从数据率推。10.24 GHz 的 PLL 经倍频做 16 GHz DDR 前向时钟,秒数不变。`clocking.pll_f0_hz` 只改比例。
-3. **f0/2 以上 S_φ = 0**,网格以下按首值保持(Halo 同)。
+3. **最后一个频点以上**:默认按最后的电平平延到 fs/2(`clocking.profile_above: floor`,0.13.0);`zero` 是 Halo 的约定(f0/2 以上 S_φ = 0)。网格以下按首值保持(Halo 同)。
 
 本库读它的地方只有 `clock/profile.py`;`clock/forwarded.py` 把它变成数据路径与前向时钟**共享**的定时抖动(铁律 2),
 同一格式的第二个文件可以作收端本地 PLL(`clocking.local_pll_profile`,锁到前向时钟)。随库附带两个 Halo 从 pll_simulator ex22
-导出的文件:`bench_markulic16_sspll_40m_10p24g.yaml`(Markulic 2016 SSPLL,10.24 GHz,带内 100 Hz..f0/2 约 186 fs,默认发端)
-与 `bench_wu19_spll_frac_52m_6p253g.yaml`(Wu 2019 分数 SPLL,6.25 GHz,约 88 fs,示例 04 的本地 PLL)。
+导出的文件:`bench_markulic16_sspll_40m_10p24g.yaml`(Markulic 2016 SSPLL,10.24 GHz,带内 100 Hz..f0/2 约 186 fs、底噪延到 16 GHz 时 226.5 fs,默认发端)
+与 `bench_wu19_spll_frac_52m_6p253g.yaml`(Wu 2019 分数 SPLL,6.25 GHz,约 88 fs、底噪延到 16 GHz 时 119.9 fs,示例 04 的本地 PLL)。
 
 vendored 的 `synth_from_psd` / `integrate_pn` 来自 pll_simulator@00e48a2f(`src/d2d_link/vendor/pllsim/`),
 `tools/vendor_check.py` 守着与上游逐字节一致。

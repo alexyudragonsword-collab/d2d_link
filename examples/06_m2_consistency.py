@@ -80,7 +80,8 @@ results.append(point("quantised, delayed tracker", c, 4_000_000))
 # handful of bursts). The receiver's noise decorrelates the errors; the
 # wander is kept to a share of the margin.
 c = dataclasses.replace(one, clocking=dataclasses.replace(one.clocking, data_path_wander_s=2.5e-12,
-                                                          clock_path_wander_s=2.5e-12, wander_corner_hz=3e6, pi_step_ui=0.0))
+                                                          clock_path_wander_s=2.5e-12, wander_corner_hz=3e6, pi_step_ui=0.0),
+                        lanes=dataclasses.replace(one.lanes, deskew_with_tracker="ideal"))   # an ideal PI: wander alone
 c = tuned(c, 1e-5)
 results.append(point("path wander through the tracker", c, 4_000_000))
 

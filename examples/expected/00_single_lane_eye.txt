@@ -1,21 +1,21 @@
 link: standard package, 32 GT/s, 25 mm, 1 lane, forwarded clock 16 GHz DDR
-channel: insertion loss -2.77 dB at Nyquist (16 GHz), main cursor 164.5 mV of 200 mV; RLGC preset (source: model): Z0 50 ohm, eps_eff 2.54, tan d 0.01
-cursors at the peak [mV]: pre 0.15 0.33 1.65 | main 164.53 | post 14.06 4.26 2.22 1.40
+channel: insertion loss -2.75 dB at Nyquist (16 GHz), main cursor 164.6 mV of 200 mV; RLGC preset (source: model): Z0 50 ohm, eps_eff 2.54, tan d 0.01
+cursors at the peak [mV]: pre 0.00 -0.00 -0.03 | main 164.58 | post 15.47 4.67 2.42 1.52
 
 jitter budget at the sampler (RMS, closed form):
-  Tx PLL in band 122.1 kHz .. 16 GHz : 186.2 fs  (what an independent clock would add)
-  common-mode leak (tree delay 30 ps, bandwidth 20 GHz)        : 59.4 fs
+  Tx PLL in band 122.1 kHz .. 16 GHz : 226.5 fs  (what an independent clock would add)
+  common-mode leak (tree delay 30 ps, bandwidth 20 GHz)        : 223.4 fs
   data path 200 fs after the 2 MHz tracker              : 199.9 fs
   clock path 200 fs through tree and tracker                : 183.6 fs
   receive tree 100 fs                                         : 100.0 fs
-  total residual                                            : 295.3 fs = 0.0095 UI
+  total residual                                            : 365.5 fs = 0.0117 UI
 
 statistical engine [~s]:
-  sampling phase -0.0040 UI from the pulse's reference sample (eye centre), BER there 10^-412.3
-  eye height at BER 1e-27: 209.7 mV  vs target 40 mV (source: survey) -> margin +169.7 mV
-  eye width  at BER 1e-27: 0.761 UI  vs target 0.75 UI (source: survey) -> margin +0.011 UI
-  BER target 1e-27 (source: survey); 260 ISI cursors, 15.23 mV RMS, exact distribution on 1733 bins of 50 uV
-  verdict: PASS
+  sampling phase -0.0171 UI from the pulse's reference sample (eye centre), BER there 10^-371.7
+  eye height at BER 1e-27: 204.1 mV  vs target 40 mV (source: survey) -> margin +164.1 mV
+  eye width  at BER 1e-27: 0.709 UI  vs target 0.75 UI (source: survey) -> margin -0.041 UI
+  BER target 1e-27 (source: survey); 260 ISI cursors, 17.06 mV RMS, exact distribution on 1769 bins of 50 uV
+  verdict: FAIL
 
-time engine [~s]: 0 errors in 400000 symbols (statistics predict 10^-406.7); sampled eye opening 261.2 mV; jitter the sampler saw 295.0 fs RMS
+time engine [~s]: 0 errors in 400000 symbols (statistics predict 10^-366.1); sampled eye opening 254.0 mV; jitter the sampler saw 365.8 fs RMS
 wrote examples/output/00_single_lane_eye.png

@@ -41,7 +41,26 @@ for L in lengths:
 targets = run_statistical(cfg).targets
 eh_t, ber_t = targets["eye_height_mv"], targets["ber"]
 if last_pass is None:
-    print("\nno length passes")
+    # since 0.13.0 the clock tree, not the line, fails the link at every
+    # length: the PLL's floor held to fs/2 leaks through the 30 ps tree. The
+    # channel's own reach is the same sweep with an ideal tree (no leak).
+    ideal = dataclasses.replace(cfg, clocking=dataclasses.replace(cfg.clocking, tree_delay_ps=0.0, tree_bw_hz=None))
+    chan_pass, w_ideal = None, {}
+    for L in lengths:
+        s = run_statistical(dataclasses.replace(ideal, channel=dataclasses.replace(ideal.channel, length_mm=float(L))))
+        w_ideal[L] = s.eye_width_ui
+        if s.passes:
+            chan_pass = L
+    w5 = rows[0][3]
+    print(f"\nno length passes: at {lengths[0]:.0f} mm the eye is {w5:.3f} UI already -- the clock tree "
+          f"(tree delay {cfg.clocking.tree_delay_ps:g} ps) fails the {targets['eye_width_ui'][0]:g} UI target on its own")
+    if chan_pass is None:
+        print("with an ideal tree no length passes either")
+    else:
+        ratio = chan_pass / reach.value
+        print(f"with an ideal tree (no common-mode leak) the channel's reach is {chan_pass:.0f} mm "
+              f"(eye width {w_ideal[chan_pass]:.3f} UI); survey reach {reach.value:g} mm -> ratio {ratio:.2f}x"
+              + ("  (within 2x)" if 0.5 <= ratio <= 2.0 else "  (MORE THAN 2x APART: see cairn/LOG.md)"))
 else:
     ratio = last_pass / reach.value
     print(f"\nmodel reach: {last_pass:.0f} mm is the last length that clears eye height "

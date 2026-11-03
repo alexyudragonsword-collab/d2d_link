@@ -240,7 +240,7 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
     feed = _JitterFeed(cfg, clock, jitter_s, n)
     pulse = resp.pulse.y
     i0 = resp.main_index
-    dcd = cfg.clocking.sampling_dcd_ui
+    dcd = clock.sampling_dcd_ui()
     # past symbols whose postcursors reach the chunk, and future ones whose
     # precursors do, each with one more UI of slack; a sampling instant that
     # the phase, the skew, the duty-cycle offset and the jitter carry further
