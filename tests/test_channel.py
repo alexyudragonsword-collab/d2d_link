@@ -352,3 +352,33 @@ def test_touchstone_coupling_follows_the_through_path_past_the_band(tmp_path):
     H = np.array([1.0, 0.5, 0.25, 0.125]); X = np.array([0.1, 0.1, 0.0, 0.0]); f = np.array([0.0, 1.0, 2.0, 3.0])
     assert np.allclose(extend_band_like(X, f, 1.0, H), [0.1, 0.1, 0.05, 0.025])
     assert np.array_equal(extend_band_like(X, f, 3.0, H), X)
+
+
+def test_grid_top_truncation_is_measured_and_warned():
+    """The 2 mm advanced line at 4 GT/s on the 32x grid: the grid's top is
+    64 GHz, where the 60 GHz driver pole and the line still pass 58 % of the
+    signal. The brick wall there rings the impulse (alternating samples) and
+    reads the main cursor 7 mV low -- what ROADMAP P2 #1 blamed on the RDL
+    line's RC character (phase 12). link_response measures and warns; the
+    same config through with_data_rate (osr 256) is clean."""
+    import warnings
+
+    from d2d_link.config import PackageConfig, with_data_rate
+
+    base = LinkConfig(package=PackageConfig(kind="advanced"), channel=ChannelConfig(length_mm=2.0), tx=TxConfig(bw_hz=60e9))
+    slow = dataclasses.replace(base, data_rate_gtps=4.0)
+    with pytest.warns(UserWarning, match="grid's top frequency 64 GHz"):
+        r_bad = link_response(slow)
+    assert r_bad.grid_top_response > 0.5
+    good = with_data_rate(base, 4.0)
+    assert good.sim.osr == 256
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        r_good = link_response(good)
+    assert r_good.grid_top_response < 0.1
+    assert r_good.main_amplitude - r_bad.main_amplitude > 5e-3
+    assert np.sum(r_good.cursors(0.0)[0]) == pytest.approx(0.5 * 0.4 * abs(r_good.channel.H[0]), rel=2e-3)   # cursor sum = DC
+    assert np.sum(r_bad.cursors(0.0)[0]) < 0.5 * 0.4 * abs(r_bad.channel.H[0]) * 0.97                        # the wall eats it
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert link_response(base).grid_top_response < 0.1                                                 # 32 GT/s: clean

@@ -80,7 +80,7 @@ def execute(kind: str, cfg_dict: dict, params: dict | None = None, progress=None
     """The worker's body. Importable at module level so a process pool can
     pickle it; ``progress[key] = (done, total)`` reports where it is."""
     from ..clock.forwarded import ForwardedClock
-    from ..config import apply_overrides
+    from ..config import apply_overrides, with_data_rate
     from ..engine import run_link
     from ..report import report, sensitivity
     from ..spec import survey
@@ -113,7 +113,7 @@ def execute(kind: str, cfg_dict: dict, params: dict | None = None, progress=None
         rows = []
         tick(0, len(rates))
         for i, rate in enumerate(rates):
-            c = apply_overrides(cfg, {"data_rate_gtps": rate})
+            c = with_data_rate(cfg, rate)          # the grid's top frequency stays where the config put it
             res = run_link(c)
             w = res.worst
             rows.append({"rate_gtps": rate, "passes": bool(res.passes), "worst_lane": w.lane,

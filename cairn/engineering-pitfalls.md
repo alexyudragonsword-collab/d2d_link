@@ -100,3 +100,12 @@ authoring_mode: ai_generated
 - 修法:`channel/model.py::extend_band` —— 直通路径带边以上 log|H| 按最后十倍频的斜率线性延拓(不升)、相位按同一段的群延时延拓。50 GHz 截断眼宽差 +0.002 UI,100 GHz −0.0002。
   段 11 补上耦合项(`extend_band_like`:沿直通路径的衰减,X(f_edge)·H(f)/H(f_edge));9b 时给耦合项留的 0 填充在有损耦合的合成文件上量出 −3.5 mV / +0.010 UI,
   按耦合项自己的斜率延拓 +0.006 UI、沿直通 +0.005 UI(眼高差 0.1 mV),取后者。`test_touchstone_band_is_extended_past_the_file`、`test_touchstone_coupling_follows_the_through_path_past_the_band`。
+
+## 波形网格的顶频是一面砖墙,速率扫描把它拖下来了(段 12,2026-11-03)
+
+- 现象:先进 2 mm 在 4 GT/s 主光标 182 mV、8 GT/s 188、32 GT/s 184;段 2 归因于 RDL 线低频 RC 主导(ROADMAP P2 #1),一直没验证。
+- 原因:网格顶 f_max = osr·f_N 随速率缩:32 GT/s 512 GHz,4 GT/s 只有 64 GHz,|H_tx·H_line(64 GHz)| = 0.58。频域截断是砖墙,冲激响应在网格 Nyquist 处正负交替振铃
+  (−118, 377, 647, −65, 74, −43 …),振铃的非因果一半循环卷绕到窗末尾、光标读不到 —— 光标和 183.8 对直流 192.3 mV,少 4 %。32 GT/s 时 |H|(512 GHz) 只剩 0.07,看不出来。
+- 修法:`config.with_data_rate(cfg, rate)` 改速率时按 rate_old/rate_new 缩放 osr,网格顶不动;示例 07、GUI 速率扫描与标题句的速率控件都走它。`LinkResponse.grid_top_response`
+  进 extras / 报告,> 0.2 告警。4 GT/s 先进 2 mm:主光标 182.3 → 189.5 mV,眼 293 → 311 mV;标准 25 mm 几乎不变(线本身把顶频压到 0.3)。
+- 教训:**"在 X 处有多少响应被网格切掉"要像"到达前的能量"一样成为固定探针**;两个归因错误(非因果走线、RC 主导)都是没量就写进了 ROADMAP。

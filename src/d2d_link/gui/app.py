@@ -226,6 +226,12 @@ class App:
         old = self.state.overrides.get(path)
         try:
             value = bool(raw) if fld["kind"] == "bool" else values_to_overrides({path: raw})[path]
+            if path == "data_rate_gtps":
+                # the waveform grid's top frequency (osr x f_N) stays where the
+                # file put it: the rate edit carries an osr override with it
+                # (config.with_data_rate; phase 12)
+                cur = self.state.cfg
+                self.state.set("sim.osr", max(4, int(round(cur.sim.osr * cur.data_rate_gtps / float(value)))))
             self.state.set(path, value)
             after = config_hash(self.state.cfg)       # builds the frozen config: validation happens here
         except Exception as exc:                      # noqa: BLE001 -- an invalid edit is dropped, the page stays

@@ -21,7 +21,7 @@ import sys
 
 from _common import CONFIGS, OUT, REPO, plt_or_none
 from d2d_link.channel.coupled import describe
-from d2d_link.config import load_config
+from d2d_link.config import load_config, with_data_rate
 from d2d_link.engine import run_link
 from d2d_link.spec import survey
 
@@ -53,7 +53,7 @@ for name, cfg in cases.items():
           f"{'eye width [UI]':>15s} {'log10 BER':>10s} {'lane':>5s} {'pass':>5s}")
     rows = []
     for rate in rates.value:
-        c = dataclasses.replace(cfg, data_rate_gtps=float(rate))
+        c = with_data_rate(cfg, rate)      # the waveform grid's top stays at the config's 512 GHz (phase 12)
         res = run_link(c)
         w = res.worst
         rows.append((rate, w, res.passes))

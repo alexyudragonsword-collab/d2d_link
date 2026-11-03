@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from conftest import REPO
-from d2d_link.config import (ChannelConfig, ClockingConfig, LaneConfig, LinkConfig, SimConfig,
+from d2d_link.config import (ChannelConfig, ClockingConfig, LaneConfig, LinkConfig, SimConfig, with_data_rate,
                              apply_overrides, dump_config, load_config)
 from d2d_link.config.form import FIELDS, config_to_values, schema_paths, values_to_overrides
 from d2d_link.config.schema import PACKAGE_RLGC
@@ -158,3 +158,16 @@ def test_package_version_matches_pyproject():
 
     text = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
     assert re.search(r'^version = "([^"]+)"', text, re.M).group(1) == d2d_link.__version__
+
+
+def test_with_data_rate_keeps_the_grid_top():
+    """A rate sweep that only changed data_rate_gtps dragged the waveform grid's
+    top (osr x f_Nyquist) down with it: 64 GHz at 4 GT/s on the 32x grid.
+    with_data_rate scales osr so the top stays."""
+    cfg = LinkConfig(data_rate_gtps=32.0, sim=SimConfig(osr=32))
+    for rate in (4.0, 8.0, 12.0, 16.0, 24.0, 32.0):
+        c = with_data_rate(cfg, rate)
+        assert c.data_rate_gtps == rate
+        assert c.sim.osr * c.f_nyquist == pytest.approx(cfg.sim.osr * cfg.f_nyquist, rel=0.05)
+    assert with_data_rate(cfg, 4.0).sim.osr == 256 and with_data_rate(cfg, 64.0).sim.osr == 16
+    assert with_data_rate(cfg, 1000.0).sim.osr == 4                     # the floor

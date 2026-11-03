@@ -724,6 +724,7 @@ class StatisticalEngine:
                     "noise_gain": float(self.noise_gain), "sigma_noise_input_v": float(cfg.rx.noise_rms_v),
                     "eye_width_raw_ui": float(ew_raw), "eye_width_clipped": bool(clipped),
                     "insertion_loss_nyquist_db": self.resp.channel.insertion_loss_db(cfg.f_nyquist),
+                    "grid_top_response": float(self.resp.grid_top_response),
                     "xtalk_adjacent_db": (self.resp.channel.xtalk_db(cfg.f_nyquist, 1) if cfg.channel.xtalk == "touchstone"
                                           else cfg.xtalk_db()[0] if cfg.channel.xtalk != "none" else None),
                     "xtalk_source": ("file" if cfg.channel.xtalk == "touchstone" else "model" if cfg.channel.xtalk == "coupled"

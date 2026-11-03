@@ -17,6 +17,7 @@ front end and CTLE do to white input noise (``rx.noise_at: input``).
 from __future__ import annotations
 
 import math
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -197,6 +198,11 @@ def extend_band_like(X: np.ndarray, f: np.ndarray, f_edge: float, H: np.ndarray)
     return X
 
 
+#: |H_total(f_max)| / |H_total(0)| above which link_response warns: a grid whose
+#: top still passes a fifth of the signal is a brick-wall filter of its own
+GRID_TOP_WARN = 0.2
+
+
 def tx_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
     """The driver's first-order pole at ``cfg.tx_bw_hz`` (twice the Nyquist
     frequency unless the config says otherwise); ``inf`` is the ideal edge."""
@@ -320,6 +326,8 @@ class LinkResponse:
     noise_impulse: Waveform | None = None   # front end x CTLE impulse (sum = 1) for rx.noise_at: input
     cursor_reach: int = 64      # cursors read on each side of the main one (sim.stat_cursor_reach)
     cursor_floor: float = 1e-6  # end cursors below this fraction of the pulse's peak are dropped (sim.stat_cursor_floor)
+    grid_top_response: float = 0.0   # |H_total| at the grid's top frequency osr x f_N, relative to its DC value: what the
+                                     # brick wall there cuts off (0.58 at 4 GT/s on the 32x grid rang the pulse, phase 12)
 
     @property
     def main_index(self) -> int:
@@ -369,6 +377,11 @@ def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkR
     f = ch.f
     rx_front = rx_response(cfg, f) * ctle_response(cfg, f)
     H = ch.H * tx_response(cfg, f) * rx_front
+    top = float(abs(H[-1]) / max(abs(H[0]), 1e-300))
+    if top > GRID_TOP_WARN:
+        warnings.warn(f"the waveform grid's top frequency {f[-1] / 1e9:.0f} GHz (sim.osr x f_Nyquist) still passes "
+                      f"{top:.0%} of the response: the brick wall there rings the pulse. Raise sim.osr (config.with_data_rate "
+                      f"keeps the grid's top when the rate changes).", stacklevel=2)
     h = freq2impulse(H, f)
     if not np.isclose(h.dt, cfg.dt, rtol=1e-6):
         raise ValueError(f"impulse dt {h.dt:.3e} does not match the waveform grid {cfg.dt:.3e}")
@@ -390,7 +403,8 @@ def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkR
         xt["next"] = Waveform(np.convolve(hn.y, np.ones(osr))[: hn.y.size] * amp, hn.dt)
     noise_h = freq2impulse(rx_front, f) if cfg.rx.noise_at == "input" else None
     return LinkResponse(Waveform(pulse, h.dt), h, ch, H, osr, xt, noise_h,
-                        cursor_reach=cfg.sim.stat_cursor_reach, cursor_floor=cfg.sim.stat_cursor_floor)
+                        cursor_reach=cfg.sim.stat_cursor_reach, cursor_floor=cfg.sim.stat_cursor_floor,
+                        grid_top_response=top)
 
 
 __all__ = ["ChannelModel", "LinkResponse", "link_response", "tx_response", "rx_response", "ctle_response",

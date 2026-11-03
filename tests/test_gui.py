@@ -455,3 +455,11 @@ def test_main_parses_binds_and_shuts_down(monkeypatch, capsys):
     assert "http://0.0.0.0:8123" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         main(["--also", "bogus"])
+
+
+def test_rate_edit_keeps_the_grid_top():
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0, autorun=False)
+    core = app.d2d
+    assert core.apply_edit("data_rate_gtps", 8.0)
+    assert core.state.overrides == {"data_rate_gtps": 8.0, "sim.osr": 128}
+    assert core.apply_edit("data_rate_gtps", 32.0) and core.state.overrides == {}      # back to the file: both go

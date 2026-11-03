@@ -57,6 +57,8 @@ def report(cfg, res, clock) -> dict:
                  "lanes_requested": lm.requested_width, "lanes_active": lm.active_width,
                  "repair": lm.mode, "failed": list(lm.failed), "unrepaired": list(lm.unrepaired),
                  "insertion_loss_nyquist_db": res.stat[0].extras["insertion_loss_nyquist_db"] if res.stat else None,
+                 "grid_top_ghz": cfg.sim.osr * cfg.f_nyquist / 1e9,
+                 "grid_top_response": res.stat[0].extras.get("grid_top_response") if res.stat else None,
                  "tx_pll_rms_fs": 1e15 * clock.pll_rms_s(),
                  "local_pll_rms_fs": 1e15 * clock.local_pll_rms_s(),
                  "local_pll_fn_hz": cfg.clocking.local_pll_fn_hz, "local_pll_bw_3db_hz": clock.local_pll_bw_3db_hz(),

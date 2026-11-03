@@ -29,10 +29,11 @@
    剩下的热点(x16 模块 23 s 的剖析):`small_kernel` 7 s(块核相卷 `np.convolve` 3 s)、`_shift_add` 5.7 s(每模型 45 次 12 µs)、`eye_edge` 的离网格模型 5 s、`log10_tail` 3.7 s、`read_cursors` 2.9 s。
    时域波形路径每 1e6 符号约 6 s,1e-8 的 25 误码点要 2.5e9 符号 ≈ 5 h(手动触发);`samples` 模式在有损线上不更快(脉冲尾 130 UI 内都 > 1e-6 主光标)。
    分块合成的缝(`block_step_ratio` ≈ 2,x16 模块)未折算到 BER。亚 bin 光标逐个 `np.convolve` 的问题在性能轮 II 关闭(分块核)。
-1. **先进封装的 RDL 线在低 GHz 是 RC 主导的,"Z0 = 50 Ω" 只是高频渐近值**(段 2 发现):预设 R_dc 2000 Ω/m + R_skin 给 2 GHz 处 R ≈ 3100 Ω/m,
-   与 ωL ≈ 3200 Ω/m 同量级;终端按 50 Ω 匹配时低速档出现反射与幅度损失(示例 07 先进 2 mm 4 GT/s 主光标 178 mV,8 GT/s 起 187 mV)。
-   需要决定:(a) 终端按实际 |Z0(f)| 匹配,或 (b) 用 RDL 的实测 / 场解 RLGC(拿不到),或 (c) 在 `--sensitivity` 里把 R_dc 列为低速档的决定参数。
-   复现:`python tools/budget_report.py` 对 `advanced_32g_x64_spare.yaml` 把 `data_rate_gtps` 改 4,看 lane 表眼高;对比 `channel.rdc_ohm_m: 200`。
+1. **先进封装 RDL 线的低频终端口径**(段 2 发现,段 12 更正):段 2 把先进 2 mm 在 4 GT/s 的主光标 178 mV(对 8 GT/s 的 187)归因于 RDL 线 R_dc 2000 Ω/m 在低 GHz 的 RC 主导、
+   "Z0 = 50 Ω 只是高频渐近值"。**这个归因是错的**:那 9 mV 是波形网格顶频 osr·f_N 的砖墙 —— 速率扫描只改速率不改 osr,4 GT/s 时网格顶是 64 GHz,60 GHz 驱动极点加 2 mm 线在那里还过 58 %,
+   冲激响应正负交替振铃、主光标偏低 4 %;网格顶回到 512 GHz(`with_data_rate`,osr 256)后 4 GT/s 主光标 189.5 mV,与 8 / 32 GT/s 的 188 / 184 mV 一致。
+   RC 问题本身仍在但量级小:H(0) = 0.9615(R_dc·L = 4 Ω 对 100 Ω 的终端对),|Z0(2 GHz)| ≈ 59 Ω 的反射在 2 mm 上可忽略;终端口径不改,R_dc 已在敏感性报告里。
+   `grid_top_response` 进 extras 与报告;> 0.2 时 `link_response` 告警。
 
 2. **bundled 配置的接收机仍是平坦前端、噪声在采样点**(段 7 给了字段,没有给基线数字):`rx.bw_hz` 没有规范值,是设计的主张。
    示例 09(0.12.0):x1 的眼高随前端 48 / 32 / 24 GHz 从 209.7 → 204.1 / 192.9 / 177.9 mV(噪声在采样点),噪声改到输入(同一 3 mV)则 135.5 / 148.8 / 148.2 mV;

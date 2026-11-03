@@ -4,6 +4,17 @@
 
 ---
 
+## [0.12.4] — 2026-11-03 — 段 12:波形网格顶频不随速率缩(示例 07 的低速档数字会变)
+
+### 修正
+- **速率扫描的低速档偏低是网格砖墙,不是 RC**:`config.with_data_rate(cfg, rate)` 改速率时缩放 `sim.osr`,网格顶 osr·f_N 保持(32 GT/s 配置的 512 GHz);
+  示例 07、GUI `rate_sweep` 任务与标题句的速率控件都走它。先进 2 mm 4 GT/s:主光标 182.3 → 189.5 mV,眼 293 → 311 mV;8 GT/s +0.6 mV;标准 25 mm 低速档 ≤ 1.6 mV。
+- `LinkResponse.grid_top_response`(|H_total(f_max)| / |H_total(0)|)进 `extras` 与报告 `link` 段(`grid_top_ghz` 一并);> 0.2 时 `link_response` 告警。
+- ROADMAP P2 #1 改写:段 2 的"RDL 线 RC 主导、Z0 只是高频渐近"归因撤回,RC 的真实量级(H(0) 0.9615)记入;终端口径不改。
+- 测试 +3(`with_data_rate`、网格顶测量与告警、GUI 速率编辑带 osr)。bundled 配置都在 32 GT/s,指纹 3100 项逐位相同,新增 94 个 `x.grid_top_response` 键。
+
+---
+
 ## [0.12.3] — 2026-11-03 — 段 11:Touchstone 耦合项带外(bundled 指纹逐位相同)
 
 ### 修正

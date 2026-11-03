@@ -113,6 +113,18 @@ def apply_overrides(cfg: LinkConfig, overrides: dict[str, Any]) -> LinkConfig:
     return _replace_tree(cfg, tree)
 
 
+def with_data_rate(cfg: LinkConfig, rate_gtps: float) -> LinkConfig:
+    """``cfg`` at another data rate with the waveform grid's top frequency
+    kept: ``sim.osr`` scales as rate_old / rate_new (a whole number >= 4).
+    The grid's top is osr x f_Nyquist, and a sweep that only changed the rate
+    dragged it down with it -- at 4 GT/s on the 32x grid it is 64 GHz, where
+    a 60 GHz driver pole and a 2 mm line still pass 58 % of the signal; the
+    brick wall there rang the pulse and read the main cursor 4 % low, which
+    ROADMAP P2 #1 had put down to the RDL line's RC character (phase 12)."""
+    osr = max(4, int(round(cfg.sim.osr * cfg.data_rate_gtps / float(rate_gtps))))
+    return apply_overrides(cfg, {"data_rate_gtps": float(rate_gtps), "sim.osr": osr})
+
+
 def _replace_tree(obj: Any, tree: dict[str, Any]) -> Any:
     names = {f.name for f in dataclasses.fields(obj)}
     hints = typing.get_type_hints(type(obj))
@@ -153,4 +165,4 @@ def _tuples_to_lists(obj: Any) -> Any:
     return obj
 
 
-__all__ = ["load_config", "dump_config", "apply_overrides", "config_from_dict", "config_to_dict"]
+__all__ = ["load_config", "dump_config", "apply_overrides", "with_data_rate", "config_from_dict", "config_to_dict"]
