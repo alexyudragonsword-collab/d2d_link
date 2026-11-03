@@ -97,5 +97,6 @@ authoring_mode: ai_generated
 
 - 现象:有损文件截到 50 GHz,眼宽比闭式同一条线少 0.016 UI(x1 裕度的三分之二);100 GHz 截断眼高 +7 mV。vendored `interp_s2p` 把带外传输项填 0,
   本库网格到 512 GHz。ROADMAP 一直写"只测过无损文件",无损线带边本来就振铃,看不出砖墙。
-- 修法:`channel/model.py::extend_band` —— 直通路径带边以上 log|H| 按最后十倍频的斜率线性延拓(不升)、相位按同一段的群延时延拓;耦合项保留 0 填充(可能向上穿过带边,0 是保守值)。
-  50 GHz 截断眼宽差 +0.002 UI,100 GHz −0.0002。`test_touchstone_band_is_extended_past_the_file`。
+- 修法:`channel/model.py::extend_band` —— 直通路径带边以上 log|H| 按最后十倍频的斜率线性延拓(不升)、相位按同一段的群延时延拓。50 GHz 截断眼宽差 +0.002 UI,100 GHz −0.0002。
+  段 11 补上耦合项(`extend_band_like`:沿直通路径的衰减,X(f_edge)·H(f)/H(f_edge));9b 时给耦合项留的 0 填充在有损耦合的合成文件上量出 −3.5 mV / +0.010 UI,
+  按耦合项自己的斜率延拓 +0.006 UI、沿直通 +0.005 UI(眼高差 0.1 mV),取后者。`test_touchstone_band_is_extended_past_the_file`、`test_touchstone_coupling_follows_the_through_path_past_the_band`。

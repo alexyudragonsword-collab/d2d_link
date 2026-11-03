@@ -44,20 +44,20 @@ def read_single_ended(path: str, f: np.ndarray, zs: float, zl: float, lane: int,
     norm = zl / (zs + zl)
 
     f_edge = float(ntwk.f[-1])
+    from .model import extend_band, extend_band_like, fill_dc
 
-    def transfer(p_in: int, p_out: int, through: bool) -> np.ndarray:
-        from .model import extend_band, fill_dc
+    def raw(p_in: int, p_out: int) -> np.ndarray:
+        return terminate_renormalize(interp_s2p(ntwk.subnetwork([p_in, p_out]), f), zs, zl) / norm
 
-        sub = ntwk.subnetwork([p_in, p_out])
-        h = terminate_renormalize(interp_s2p(sub, f), zs, zl) / norm
-        # the through path is continued past the file's band (extend_band);
-        # a coupling term keeps the interpolation's 0 fill out there
-        return fill_dc(extend_band(h, f, f_edge) if through else h, f)
-
-    H = transfer(lane, n + lane, True)
+    # the through path is continued past the file's band with its own
+    # log|H| slope and group delay (extend_band); a coupling term follows the
+    # through path's decay from its value at the edge (extend_band_like) --
+    # both replace the interpolation's 0 fill, a brick wall on this grid
+    H_ext = extend_band(raw(lane, n + lane), f, f_edge)
+    H = fill_dc(H_ext, f)
     xt: dict[int, np.ndarray] = {}
     for d in neighbours:
-        cands = [transfer(j, n + lane, False) for j in (lane - d, lane + d) if 0 <= j < n]
+        cands = [fill_dc(extend_band_like(raw(j, n + lane), f, f_edge, H_ext), f) for j in (lane - d, lane + d) if 0 <= j < n]
         if cands:
             xt[d] = max(cands, key=lambda h: float(np.sqrt(np.mean(np.abs(h) ** 2))))
     return H, xt

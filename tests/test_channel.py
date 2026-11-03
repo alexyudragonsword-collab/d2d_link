@@ -301,3 +301,54 @@ def test_report_labels_touchstone_crosstalk_as_the_files(tmp_path):
     assert res.stat[0].extras["xtalk_source"] == "file"
     fext = report(LinkConfig(channel=ChannelConfig(xtalk="fext"), lanes=LaneConfig(count=2)), res, ForwardedClock(ts))["crosstalk"]
     assert fext["adjacent_source"] == "model"
+
+
+def test_touchstone_coupling_follows_the_through_path_past_the_band(tmp_path):
+    """The coupling terms kept the 0 fill beyond the file's band after 9b (the
+    through path alone was extended): the 25 mm line as a 3-lane file with
+    FEXT-shaped coupling (-20 / -30 dB at Nyquist, times the line), cut at
+    50 GHz, read the middle lane 3.5 mV / 0.010 UI off the full-band file.
+    With the coupling following the through path's decay the eye height is
+    back within 0.3 mV and the width within 0.006 UI (the through path's own
+    extension accounts for that)."""
+    skrf = pytest.importorskip("skrf")
+    from d2d_link.channel.model import extend_band_like
+    from d2d_link.config import LaneConfig
+    from d2d_link.engine import run_link
+
+    base = LinkConfig(channel=ChannelConfig(length_mm=25.0), tx=TxConfig(bw_hz=60e9), sim=SimConfig(stat_phase_points=32),
+                      lanes=LaneConfig(count=3))
+    ana = ChannelModel.from_config(base)
+    f_all = ana.f
+    kx = 0.1 * np.sqrt(2) * (1j * f_all / base.f_nyquist) / (1 + 1j * f_all / base.f_nyquist)
+
+    def write(f_max, name):
+        keep = (f_all > 0) & (f_all <= f_max)
+        f = f_all[keep]
+        s = np.zeros((f.size, 6, 6), dtype=complex)
+        for i in range(3):
+            s[:, 3 + i, i] = s[:, i, 3 + i] = ana.H[keep]
+            for j in range(3):
+                if abs(i - j) == 1:
+                    s[:, 3 + i, j] = s[:, j, 3 + i] = (kx * ana.H)[keep]
+                elif abs(i - j) == 2:
+                    s[:, 3 + i, j] = s[:, j, 3 + i] = (0.3 * kx * ana.H)[keep]
+        skrf.Network(f=f, s=s, z0=50.0, f_unit="Hz").write_touchstone(str(tmp_path / name), form="ri")
+        return dataclasses.replace(base, channel=ChannelConfig(kind="touchstone", file=str(tmp_path / name) + ".s6p",
+                                                               touchstone_mode="single_ended", lane=1, xtalk="touchstone",
+                                                               coupled_length_mm=25.0))
+
+    truth = run_link(write(f_all[-1], "full")).stat[1]
+    cut = write(50e9, "cut50")
+    ch = ChannelModel.from_config(cut)
+    out = f_all > 50e9
+    assert np.all(np.abs(ch.xtalk_H[1][out]) > 0.0)                                    # no brick wall on the coupling
+    i100 = int(np.searchsorted(f_all, 100e9))
+    assert abs(20 * np.log10(abs(ch.xtalk_H[1][i100]) / abs((kx * ana.H)[i100]))) < 2.0   # within 2 dB an octave out
+    r = run_link(cut).stat[1]
+    assert abs(r.eye_height_v - truth.eye_height_v) < 3e-4
+    assert abs(r.eye_width_ui - truth.eye_width_ui) < 0.006
+    # the helper: nothing beyond the edge is left alone; the ratio to the through path is frozen at the edge
+    H = np.array([1.0, 0.5, 0.25, 0.125]); X = np.array([0.1, 0.1, 0.0, 0.0]); f = np.array([0.0, 1.0, 2.0, 3.0])
+    assert np.allclose(extend_band_like(X, f, 1.0, H), [0.1, 0.1, 0.05, 0.025])
+    assert np.array_equal(extend_band_like(X, f, 3.0, H), X)

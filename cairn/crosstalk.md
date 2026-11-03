@@ -5,7 +5,7 @@ summary: "lane 间串扰怎么建:FEXT 的行为级 / 耦合线估计、带状�
 tags: [crosstalk, fext, next, stripline, touchstone]
 contains: [decision, lesson]
 created: "2026-10-13"
-updated: "2026-11-02"
+updated: "2026-11-03"
 related: [architecture-invariants.md, engines.md, spec-sources.md]
 authoring_mode: ai_generated
 ---
@@ -22,7 +22,7 @@ authoring_mode: ai_generated
 - **`xtalk: touchstone`**(段 6):单端 2N 端口文件自己的耦合项 —— 端口 1..N 是 lane 0..N−1 的近端、N+1..2N 远端;`channel/touchstone_se.py`
   对每个 2 端口子网络用 vendored 的内插与端接(其余端口按文件参考阻抗端接,这是唯一近似),距离 d 取两侧较强的那条。合成无损 3 lane 文件上
   读回 |H| = 1、耦合 Nyquist 处 0.0707 对 0.0707、lane 间互易。**真实封装 S 参数仍然没有**(ROADMAP P1 #2):读法就位,数据缺位。
-  段 9b:文件带边以上直通路径不再是砖墙(`extend_band`,见 `engineering-pitfalls.md`),耦合项带外仍填 0(保守);报告层的 crosstalk 段对这种模式
+  段 9b:文件带边以上直通路径不再是砖墙(`extend_band`,见 `engineering-pitfalls.md`);段 11:耦合项带外沿直通路径的衰减延拓(`extend_band_like`:X(f) = X(f_edge)·H(f)/H(f_edge),耦合形状在带边附近饱和、自身斜率不可信,与直通共享的衰减可信)—— 有损耦合的合成 3 lane 文件截到 50 GHz,中间 lane 眼从差 3.5 mV / 0.010 UI 到差 0.1 mV / 0.005 UI,剩下的是直通路径自己的延拓误差;报告层的 crosstalk 段对这种模式
   给文件自己的 Nyquist 耦合、`adjacent_source: file`(之前打的是预设 −30 dB 的 "model" 标签)—— 数字来自 lane 的 `extras["xtalk_adjacent_db"]`。
 
 **带状线**(`channel.routing: stripline`):均匀介质,ε_eff = ε_r,奇偶模同速,一阶 FEXT 为 0(估计给 −300 dB 下限);同几何的线更慢

@@ -176,6 +176,27 @@ def extend_band(H: np.ndarray, f: np.ndarray, f_edge: float) -> np.ndarray:
     return H
 
 
+def extend_band_like(X: np.ndarray, f: np.ndarray, f_edge: float, H: np.ndarray) -> np.ndarray:
+    """A coupling term past the file's band: the through path ``H`` (already
+    extended) sets the decay, X(f) = X(f_edge) H(f) / H(f_edge) beyond
+    ``f_edge``. A coupled line's far-end term is the through path times a
+    coupling shape that saturates near the band edge, so its own log|X|
+    slope there says nothing about what follows, while the attenuation it
+    shares with the through path does. On the 25 mm line written as a 3-lane
+    file cut at 50 GHz the middle lane's eye read 3.5 mV / 0.010 UI off the
+    full-band file with the 0 fill, 0.1 mV / 0.005 UI with this (the rest is
+    the through path's own extension). A file covering the grid is left alone."""
+    X = np.asarray(X, dtype=complex).copy()
+    out = f > f_edge * (1.0 + 1e-9)
+    if not out.any():
+        return X
+    i_edge = int(np.flatnonzero(~out)[-1])
+    if H[i_edge] == 0.0:
+        return X
+    X[out] = X[i_edge] * (H[out] / H[i_edge])
+    return X
+
+
 def tx_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
     """The driver's first-order pole at ``cfg.tx_bw_hz`` (twice the Nyquist
     frequency unless the config says otherwise); ``inf`` is the ideal edge."""

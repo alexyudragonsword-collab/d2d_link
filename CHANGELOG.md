@@ -4,6 +4,17 @@
 
 ---
 
+## [0.12.3] — 2026-11-03 — 段 11:Touchstone 耦合项带外(bundled 指纹逐位相同)
+
+### 修正
+- `channel/touchstone_se.py`:单端多端口文件的耦合项在文件带边以上不再填 0,而是沿直通路径的衰减延拓(`model.extend_band_like`:X(f) = X(f_edge)·H(f)/H(f_edge))。
+  有损耦合的合成 3 lane 文件(FEXT −20 / −30 dB × 线)截到 50 GHz:中间 lane 对全带文件从差 −3.5 mV / +0.010 UI 到 +0.1 mV / +0.005 UI;截到 100 GHz 差 +0.1 mV / +0.001 UI。
+  按耦合项自身斜率延拓是 +0.006 UI,沿直通略好且有物理依据(耦合形状在带边饱和,衰减与直通共享)。ROADMAP P2 #3 相应改写。
+- 文档引用数核对(9b 之后):`cairn/engines.md` 网格无关性一行标注 0.11 的数;其余历史数字都已带版本标注。
+- 测试 +1(`test_touchstone_coupling_follows_the_through_path_past_the_band`)。bundled 配置没有 Touchstone 信道,指纹逐位相同。
+
+---
+
 ## [0.12.2] — 2026-11-03 — 性能轮 II(指纹只差末位)
 
 ### 变更
