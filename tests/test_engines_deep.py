@@ -2,7 +2,7 @@
 
 A 2.5e9-symbol run at exactly 1e-8 takes ~5 h on one core (the waveform
 engine does ~6 s per 1e6 symbols); the weekly job runs 1e9 symbols with the
-noise tuned to 3e-8, ~30 errors, in under three hours. The full 1e-8 point
+noise tuned to 3e-8, ~30 errors, in about 40 minutes on the CI runner. The full 1e-8 point
 is the same test with ``D2D_DEEP_SYMBOLS=2500000000 D2D_DEEP_BER=1e-8``.
 """
 
@@ -36,7 +36,11 @@ def test_deep_point_within_2x():
             hi = mid
         else:
             lo = mid
-    tuned = dataclasses.replace(cfg, rx=RxConfig(noise_rms_v=(lo * hi) ** 0.5))
+    # both engines sample where the noise was tuned: left to re-centre, the
+    # closed eye's best phase moves to +0.22 UI and the statistics predict
+    # 3.4e-9 there -- 3 errors in 1e9 symbols against the floor of 15 (third
+    # health check; 9b pinned the 1e-6 point and the examples, not this one)
+    tuned = dataclasses.replace(cfg, rx=RxConfig(noise_rms_v=(lo * hi) ** 0.5, sampling_phase_ui=phase))
     s = run_statistical(tuned)
     t = run_time(tuned, phase_ui=s.phase_ui)          # jitter streamed block by block above 2^24 symbols
     print(f"deep point: statistical {s.ber:.3e}, time {t.ber:.3e} ({t.n_errors} errors in {t.error_bursts} bursts "

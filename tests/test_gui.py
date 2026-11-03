@@ -14,6 +14,7 @@ pytest.importorskip("dash")
 from d2d_link.config import load_config  # noqa: E402
 from d2d_link.gui import export  # noqa: E402
 from d2d_link.gui.app import create_app  # noqa: E402
+from d2d_link.config.loader import config_to_dict  # noqa: E402
 from d2d_link.gui.jobs import JobManager, config_hash, execute  # noqa: E402
 from d2d_link.gui.state import PageState, source_of  # noqa: E402
 
@@ -186,7 +187,7 @@ def test_g2_sections_and_figures(x1_result):
     s = m.submit("sensitivity", cfg)
     small = execute("run", __import__("d2d_link.config.loader", fromlist=["config_to_dict"]).config_to_dict(cfg))
     sec = json.dumps(flips(small, s, 9, None).to_plotly_json(), default=str)
-    assert "flips this" in sec and "tornado" not in sec.lower() or "Bar" in sec
+    assert "flips this" in sec
     assert len(tornado_figure(s.result["sensitivity"]).data) == 2
     assert "Run sensitivity" in json.dumps(flips(small, None, 9, 3.0).to_plotly_json(), default=str)
     r = m.submit("rate_sweep", cfg)
@@ -350,7 +351,7 @@ def test_rejected_edits_say_why():
     core = app.d2d
     assert not core.apply_edit("lanes.count", 4.5) and "whole number" in core.edit_error
     assert "lanes.count" not in core.state.overrides
-    assert not core.apply_edit("channel.length_mm", "abc") and "Length" in core.edit_error or "length" in core.edit_error.lower()
+    assert not core.apply_edit("channel.length_mm", "abc") and "length" in core.edit_error.lower()
     assert not core.apply_edit("lanes.count", -4) and "lanes.count" in core.edit_error
     assert "rejected" in _text(core.drawer()) and "rejected" in _text(core.right())
     assert core.apply_edit("channel.length_mm", 30.0) and core.edit_error is None
@@ -428,7 +429,8 @@ def test_process_pool_runs_and_takes_queued_jobs_back():
             m.poll()
             time.sleep(0.2)
         assert a.status == "done", a.error
-        assert a.result["passes"] in (True, False) and a.elapsed_s is not None
+        assert a.result["report"]["link"]["length_mm"] == 2.0 and a.elapsed_s is not None
+        assert a.result["passes"] == execute("run", config_to_dict(cfg))["passes"]          # the pool ran what inline runs
         jobs = m.poll()                    # b may already be done (CI's runner finished it inside a's loop)
         while b.status not in ("done", "failed") and time.time() < deadline:
             jobs = m.poll()
@@ -449,10 +451,13 @@ def test_main_parses_binds_and_shuts_down(monkeypatch, capsys):
 
     seen = {}
     monkeypatch.setattr(Dash, "run", lambda self, **kw: seen.update(kw))
+    shut = []
+    monkeypatch.setattr(JobManager, "shutdown", lambda self: shut.append(self))
     rc = main([str(REPO / "configs" / "standard_32g_x1.yaml"), "--no-autorun", "--workers", "0", "--no-cache",
                "--port", "8123", "--host", "0.0.0.0"])
     assert rc == 0 and seen["port"] == 8123 and seen["host"] == "0.0.0.0"
     assert "http://0.0.0.0:8123" in capsys.readouterr().out
+    assert shut                                         # the worker pool went down with the server
     with pytest.raises(SystemExit):
         main(["--also", "bogus"])
 
@@ -463,3 +468,98 @@ def test_rate_edit_keeps_the_grid_top():
     assert core.apply_edit("data_rate_gtps", 8.0)
     assert core.state.overrides == {"data_rate_gtps": 8.0, "sim.osr": 128}
     assert core.apply_edit("data_rate_gtps", 32.0) and core.state.overrides == {}      # back to the file: both go
+
+
+
+# ----------------------------------------------------------------- phase 14
+def test_dead_worker_does_not_strand_a_job():
+    """A worker killed while the tab is hidden (no poll yet): the next submit
+    met a broken pool, raised, and left its job queued with no future for
+    good; dedup then returned that ghost for the same config forever. Now
+    the submit revives the pool once and runs."""
+    import os
+    import signal
+    import time
+
+    m = JobManager(workers=1)
+    try:
+        a = m.submit("sensitivity", _small(), label="a")
+        deadline = time.time() + 60
+        while a.status != "running" and time.time() < deadline:
+            m.poll()
+            time.sleep(0.05)
+        for pid in list(m._pool._processes):
+            os.kill(pid, signal.SIGKILL)
+        time.sleep(0.5)
+        from d2d_link.config import ChannelConfig, LinkConfig, RxConfig, SimConfig
+        c = m.submit("run", LinkConfig(channel=ChannelConfig(length_mm=4.0), rx=RxConfig(noise_rms_v=0.02),
+                                       sim=SimConfig(stat_phase_points=16)), label="c")
+        assert c.future is not None
+        while c.status not in ("done", "failed") and time.time() < deadline:
+            m.poll()
+            time.sleep(0.1)
+        assert c.status == "done", c.error
+        assert a.status == "failed" and "worker process died" in a.error
+        assert m.pool_restarts == 1                     # once for the dead pool, not once per job in it
+    finally:
+        m.shutdown()
+
+
+def test_broken_scenario_files_are_said_not_raised(tmp_path):
+    import shutil
+
+    shutil.copy(REPO / "configs" / "standard_32g_x1.yaml", tmp_path / "good.yaml")
+    (tmp_path / "broken.yaml").write_text(
+        (REPO / "configs" / "standard_32g_x1.yaml").read_text(encoding="utf-8").replace("length_mm: 25.0", "length_mm: -3.0"),
+        encoding="utf-8")
+    app = create_app(tmp_path, tmp_path / "good.yaml", workers=0, autorun=False)
+    core = app.d2d
+    trig = {"type": "compare", "name": "with"}
+    lst = _inputs()
+    lst[12] = [{"id": trig, "property": "value", "value": str(tmp_path / "broken.yaml")}]
+    core.handle(trig, lst)
+    assert core.state.compare_path is None and "broken.yaml does not load" in core.edit_error
+    core.handle("tick", _inputs())                      # later renders do not raise
+    trig = {"type": "scenario", "path": str(tmp_path / "broken.yaml")}
+    core.handle(trig, _inputs(trig))
+    assert core.state.config_path == tmp_path / "good.yaml" and "does not load" in core.edit_error
+
+
+def test_rate_edit_is_validated_first_and_history_free():
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0, autorun=False)
+    core = app.d2d
+    assert not core.apply_edit("data_rate_gtps", -8.0)
+    assert core.state.overrides == {}                   # no stray sim.osr left by a rejected rate
+    for r in (12.0, 24.0):
+        core.apply_edit("data_rate_gtps", r)
+    from d2d_link.config import with_data_rate
+    direct = with_data_rate(core.state.file_cfg, 24.0).sim.osr
+    assert core.state.overrides == {"data_rate_gtps": 24.0, "sim.osr": direct}
+
+
+def test_this_page_follows_the_running_job():
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0, autorun=False)
+    core = app.d2d
+    core.state.file_cfg = _small()
+    core.run()
+    assert core.state.job_id is not None and core.manager.get(core.state.job_id).kind == "run"
+
+
+def test_no_live_lane_says_why():
+    from d2d_link.config import LaneConfig, LinkConfig
+    from d2d_link.engine import run_link
+
+    res = run_link(LinkConfig(lanes=LaneConfig(count=1, failed=(0,), repair="none")))
+    with pytest.raises(ValueError, match="no live lane"):
+        res.worst
+
+
+def test_every_gui_asset_ships_in_the_wheel():
+    """keys.js (phase 10) was missing from package-data: a non-editable install
+    lost keyboard activation."""
+    import re
+
+    text = (REPO / "pyproject.toml").read_text(encoding="utf-8")
+    globs = re.search(r'^d2d_link = \[(.*)\]', text, re.M).group(1)
+    for f in (GUI / "assets").iterdir():
+        assert f'"gui/assets/*{f.suffix}"' in globs, f.name

@@ -121,6 +121,8 @@ class LinkResult:
         equal to 1e-9 are a tie (identical lanes differ in the last bits from
         machine to machine: a stripline module's "worst lane" flipped between
         runners); the tie goes to the lowest lane."""
+        if not self.stat:
+            raise ValueError("no live lane: every lane failed and none was repaired (see lanes.failed / lanes.repair)")
         return min(self.stat, key=lambda r: (round(r.margin, 9), r.lane))
 
     @property

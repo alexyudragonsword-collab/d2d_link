@@ -4,7 +4,21 @@
 
 ---
 
-## [Unreleased] — 段 13:结构性探针进测试(只加测试)
+## [0.12.6] — 2026-11-03 — 段 14:第三次体检的工程修复(指纹逐位相同)
+
+### 修复
+- **每周深测下周一会红**:`test_engines_deep.py` 调好噪声后钉住相位(不钉时统计引擎移到 +0.22 UI,期望 3.4 个误码对门槛 15)。`slow` 标记与 docstring 的时长改对(1e9 符号 ~40 min)。
+- **指纹 CI(铁律 6)**:放行条件改为推送带来的**每个**提交里有 `(numbers-move` 标记(只看 head 时,段 11 快进 main 红过;head 写了又会豁免更早未声明的变动);
+  推送不再被 `cancel-in-progress` 取消(性能轮 III 的 run 被取消后没人比对);新分支首推与 force-push 跟 main 的 merge base 比,不再静默跳过,找不到 base 报错。
+- **`example_drift accept` 拦截**:引用该示例的表格里还有旧值时拒绝写入(`--force` 越过);段 12 的 README "194.7 mV" 就是这样漏的。派生数检查进测试;比较短语识别 UI / mV / fs / ps。
+- GUI:worker 死后的提交不再永远 queued(提交时遇到坏池就重建一次;每个死池只重建一次);坏的场景 yaml 在 Compare with 与场景栏都只报错不抛异常;速率编辑先校验再写、
+  osr 由文件的速率与 osr 经 `with_data_rate` 算出(与编辑历史无关);This page 卡跟住运行中的任务;无活 lane 时 `worst` 报清楚的原因。
+- 打包:`gui/assets/*.js` 进 package-data(非 editable 安装丢了键盘激活),测试守每个 asset 后缀。
+- 文档:README 194.7 → 194.6、表头版本;CHANGELOG 0.12.4 的误引(≤ 2.2 mV、292.3 → 311.3);cairn/gui.md 三处过期(加更正说明);receiver.md 69.07 / 0.87;USAGE 重复行;错字。
+  ROADMAP:已结的 P2 #1 移到边界,P1 #2 的前后矛盾改正。
+- 测试 +9(GUI 6、drift 2、package asset 1),弱断言三处改实(`A and B or C`、`passes in (True, False)`、main() 的 shutdown)。
+
+## [0.12.6 之前] — 段 13:结构性探针进测试(只加测试)
 
 - `tests/test_structure.py`:对 `configs/` 下每个配置检查因果(LC 到达前一个 UI 的能量 < 0.6 % 主光标,今天最大 0.30 %;串扰脉冲同样)、无源(|H| ≤ 1、H(0) 实正)、
   网格顶残余响应 < 0.15(今天最大 0.076)、脉冲窗末尾 < 2e-3 主光标(防循环卷绕;今天 6.3e-4)、全部波特采样和 = 直流(1e-3 内)与光标窗和(1e-2 内)、
@@ -29,7 +43,7 @@
 
 ### 修正
 - **速率扫描的低速档偏低是网格砖墙,不是 RC**:`config.with_data_rate(cfg, rate)` 改速率时缩放 `sim.osr`,网格顶 osr·f_N 保持(32 GT/s 配置的 512 GHz);
-  示例 07、GUI `rate_sweep` 任务与标题句的速率控件都走它。先进 2 mm 4 GT/s:主光标 182.3 → 189.5 mV,眼 293 → 311 mV;8 GT/s +0.6 mV;标准 25 mm 低速档 ≤ 1.6 mV。
+  示例 07、GUI `rate_sweep` 任务与标题句的速率控件都走它。先进 2 mm 4 GT/s:主光标 182.3 → 189.5 mV,眼 292.3 → 311.3 mV;8 GT/s +0.6 mV;标准 25 mm 低速档 ≤ 2.2 mV(更正:初稿写 ≤ 1.6 mV、眼 293 → 311,第三次体检对出)。
 - `LinkResponse.grid_top_response`(|H_total(f_max)| / |H_total(0)|)进 `extras` 与报告 `link` 段(`grid_top_ghz` 一并);> 0.2 时 `link_response` 告警。
 - ROADMAP P2 #1 改写:段 2 的"RDL 线 RC 主导、Z0 只是高频渐近"归因撤回,RC 的真实量级(H(0) 0.9615)记入;终端口径不改。
 - 测试 +3(`with_data_rate`、网格顶测量与告警、GUI 速率编辑带 osr)。bundled 配置都在 32 GT/s,指纹 3100 项逐位相同,新增 94 个 `x.grid_top_response` 键。

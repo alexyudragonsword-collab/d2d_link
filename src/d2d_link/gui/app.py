@@ -65,7 +65,9 @@ class App:
         if kind.startswith("sweep:"):
             kind, axis = "sweep", kind.split(":", 1)[1]
             params = {"axis": axis}
-        self.manager.submit(kind, cfg, params=params, label=self.label(), scope=f"{cfg.lanes.count} lanes")
+        job = self.manager.submit(kind, cfg, params=params, label=self.label(), scope=f"{cfg.lanes.count} lanes")
+        if kind == "run":
+            self.state.job_id = job.id          # the This page card follows it (it read "not run" while running)
 
     def sweep_jobs(self) -> dict:
         """axis -> latest done or pending sweep job for the current config."""
@@ -83,7 +85,11 @@ class App:
             return None, None
         from ..config import load_config
 
-        cfg = load_config(path)
+        try:
+            cfg = load_config(path)
+        except Exception:                       # noqa: BLE001 -- handle() refuses such a file; one edited since is dropped here
+            self.state.compare_path = None
+            return None, None
         h = config_hash(cfg)
         done = self.manager.latest_done(h)
         if done is not None:
@@ -224,14 +230,22 @@ class App:
         before = config_hash(self.state.cfg)
         had = path in self.state.overrides
         old = self.state.overrides.get(path)
+        had_osr, old_osr = "sim.osr" in self.state.overrides, self.state.overrides.get("sim.osr")
         try:
             value = bool(raw) if fld["kind"] == "bool" else values_to_overrides({path: raw})[path]
             if path == "data_rate_gtps":
                 # the waveform grid's top frequency (osr x f_N) stays where the
-                # file put it: the rate edit carries an osr override with it
-                # (config.with_data_rate; phase 12)
-                cur = self.state.cfg
-                self.state.set("sim.osr", max(4, int(round(cur.sim.osr * cur.data_rate_gtps / float(value)))))
+                # file put it: the rate edit carries the osr with_data_rate
+                # gives from the file's own rate and osr -- validated before
+                # anything is set, and the same osr whatever rates were tried
+                # before (it read 42 after 32 -> 12 -> 24 and 43 directly)
+                from ..config import apply_overrides, with_data_rate
+
+                st = self.state
+                rest = {k: v for k, v in st.overrides.items() if k not in ("data_rate_gtps", "sim.osr")}
+                base = apply_overrides(st.file_cfg, rest) if st.file_cfg is not None else st.cfg
+                moved = with_data_rate(base, value)
+                st.set("sim.osr", moved.sim.osr)
             self.state.set(path, value)
             after = config_hash(self.state.cfg)       # builds the frozen config: validation happens here
         except Exception as exc:                      # noqa: BLE001 -- an invalid edit is dropped, the page stays
@@ -239,6 +253,11 @@ class App:
                 self.state.overrides[path] = old
             else:
                 self.state.overrides.pop(path, None)
+            if path == "data_rate_gtps":
+                if had_osr:
+                    self.state.overrides["sim.osr"] = old_osr
+                else:
+                    self.state.overrides.pop("sim.osr", None)
             self.edit_error = f"{fld['label']}: {exc}"
             return False
         self.edit_error = None
@@ -272,10 +291,14 @@ class App:
         if isinstance(trig, dict):
             kind = trig["type"]
             if kind == "scenario" and _clicked(inputs_list, trig, 1):
-                st.open(Path(trig["path"]))
-                self.shown = None
-                self.edit_error = None
-                self.run()
+                try:
+                    st.open(Path(trig["path"]))
+                except Exception as exc:          # noqa: BLE001 -- a broken file is said, the page stays
+                    self.edit_error = f"{Path(trig['path']).name} does not load: {exc}"
+                else:
+                    self.shown = None
+                    self.edit_error = None
+                    self.run()
             elif kind in ("headline", "field"):
                 raw = _value_of(inputs_list, trig)
                 if raw is not None and self.apply_edit(trig["path"], raw) and kind == "headline":
@@ -290,7 +313,15 @@ class App:
                 self.run(trig["name"])
             elif kind == "compare":
                 value = next((i.get("value") for i in inputs_list[12] if i["id"] == trig), None)
-                st.compare_path = Path(value) if value else None
+                st.compare_path = None
+                if value:
+                    from ..config import load_config
+
+                    try:
+                        load_config(value)
+                        st.compare_path = Path(value)
+                    except Exception as exc:      # noqa: BLE001 -- every later render raised on a broken file
+                        self.edit_error = f"{Path(value).name} does not load: {exc}"
         elif trig in ("btn-rerun", "btn-rerun-drawer"):
             self.run()
         elif trig == "btn-discard":

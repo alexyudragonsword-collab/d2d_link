@@ -12,7 +12,6 @@ python examples/06_m2_consistency.py         # 新机制上的统计 / 时域一
 python examples/07_rate_sweep.py             # 规范表全部速率档 × 两种封装,耦合串扰,预算报表
 python examples/08_crosstalk_physics.py      # 布线、反向 lane 的 NEXT、单端 Touchstone 读法
 python examples/09_receiver_front_end.py     # 收端前端带宽、噪声口径、CTLE 代价、训练 BER
-python examples/08_crosstalk_physics.py      # 布线方式 / 反向 lane NEXT / 单端 Touchstone 文件
 pytest -q
 ```
 

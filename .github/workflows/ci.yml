@@ -11,7 +11,10 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # pushes are never cancelled: each run's fingerprint job judges the commits
+  # its push brought (before..head), and a cancelled run left a range nobody
+  # compared (performance round III, third health check)
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -116,8 +119,9 @@ jobs:
   # means the same machine and library versions: a committed baseline would
   # differ in the last bits between machines) and compared. On a pull request
   # the base is the PR's base commit and the escape hatch is the label
-  # `numbers-move`; on a push the base is the previous head of the branch and
-  # the escape hatch is `numbers-move` in the head commit's message. Either
+  # `numbers-move`; on a push the base is the previous head of the branch (a
+  # first push or a force-push: the merge base with main) and the escape hatch
+  # is "(numbers-move" in the message of any commit the push brings. Either
   # way the diff is kept as an artifact for the CHANGELOG to explain.
   fingerprint:
     runs-on: ubuntu-latest
@@ -138,34 +142,47 @@ jobs:
         run: python tools/fingerprint.py record head.json
       - name: Pick the base
         id: base
+        # PR: its base. Push: the previous head. A new branch's first push or a
+        # force-push (before unreachable) compares with the merge base on main
+        # -- never skipped silently; no base at all is an error
         run: |
+          before="${{ github.event.before }}"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
-            echo "sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+            sha="${{ github.event.pull_request.base.sha }}"
+          elif [ -n "$before" ] && [ "$before" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$before^{commit}" 2>/dev/null; then
+            sha="$before"
           else
-            echo "sha=" >> "$GITHUB_OUTPUT"
+            git fetch --no-tags origin main >/dev/null 2>&1 || true
+            sha="$(git merge-base HEAD origin/main 2>/dev/null || true)"
+            if [ "$sha" = "$(git rev-parse HEAD)" ]; then sha="$(git rev-parse HEAD^ 2>/dev/null || true)"; fi
+            echo "::notice::no previous head for this push; comparing with $sha"
           fi
+          if [ -z "$sha" ]; then echo "::error::no base to compare the fingerprint with"; exit 1; fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
       - name: Record the base
-        if: steps.base.outputs.sha != ''
         run: |
           git worktree add ../base ${{ steps.base.outputs.sha }}
           pip install --no-deps -e ../base
           (cd ../base && python tools/fingerprint.py record "$GITHUB_WORKSPACE/base.json")
           pip install --no-deps -e .
       - name: Compare
-        if: steps.base.outputs.sha != ''
         env:
           PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
-          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+          BASE: ${{ steps.base.outputs.sha }}
         run: |
           python tools/fingerprint.py compare base.json head.json > diff.txt || moved=1
           cat diff.txt
           if [ "${moved:-0}" = "1" ]; then
-            if echo "$PR_LABELS" | grep -q '"numbers-move"' || echo "$HEAD_MESSAGE" | grep -q 'numbers-move'; then
-              echo "numbers moved and the change says so (numbers-move): the diff is kept as an artifact"
+            # every commit the push (or PR) brings is read, not just the head:
+            # a fast-forward of main carrying an earlier numbers-move commit
+            # went red, and a head saying so waived any earlier unannounced move.
+            # The marker is "(numbers-move" -- "(numbers-move)", "(numbers-move:
+            # why)" -- so prose mentioning the word does not count.
+            if echo "$PR_LABELS" | grep -q '"numbers-move"' || git log --format=%B "$BASE..HEAD" | grep -qE '\(numbers-move[:,)]'; then
+              echo "numbers moved and a commit in $BASE..HEAD says so: the diff is kept as an artifact"
+              git log --format='  %h %s' "$BASE..HEAD" | grep -E '\(numbers-move[:,)]' || true
             else
-              echo "::error::numbers moved without numbers-move (PR label, or the word in the head commit message); explain them in CHANGELOG"
+              echo "::error::numbers moved and no commit in $BASE..HEAD carries (numbers-move) (or the PR label); explain them in CHANGELOG"
               exit 1
             fi
           fi

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "d2d-link"
-version = "0.12.5"
+version = "0.12.6"
 description = "Behavioural simulation of die-to-die / UCIe short-reach parallel links: forwarded-clock jitter tracking, multi-lane, statistical BER to 1e-27"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,11 +33,11 @@ where = ["src"]
 [tool.setuptools.package-data]
 # the specification table, the model presets and the bundled clock profiles
 # travel with the package (configs name them as data/...)
-d2d_link = ["data/spec/*.yaml", "data/clock_profiles/*.yaml", "gui/assets/*.css"]
+d2d_link = ["data/spec/*.yaml", "data/clock_profiles/*.yaml", "gui/assets/*.css", "gui/assets/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["slow: the weekly deep-consistency run (a 1e-8 point, ~1 h); excluded by default"]
+markers = ["slow: the weekly deep-consistency run (a 3e-8 point at 1e9 symbols, ~40 min); excluded by default"]
 addopts = "-m 'not slow'"
 
 [tool.ruff]

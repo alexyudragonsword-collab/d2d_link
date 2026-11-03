@@ -17,7 +17,7 @@ authoring_mode: ai_generated
   标题句 → 1 Verdict → 3 Clock-path jitter → 5 Lanes & repair → 6 Crosstalk → 7 Receiver(2 What flips、4 Eye & bathtub、附录 sweeps 在 G2 / G3)。
   导出的 Markdown 与 CLI 输出逐字相同(`tests/test_gui.py::test_export_markdown_is_the_cli_report`)。
 - **标题句里带下划线的值是控件**(封装、速率、长度、lane 数、串扰模式、布线):改一个 = 一条 override + 入队重跑;旧页面置灰保留到新结果落地。
-  抽屉 "All fields" 由 `config/form.py::SECTIONS` 生成,改动只写 overrides、按 Re-run 才跑(93 个字段逐个自动重跑会刷爆队列)。
+  抽屉 "All fields" 由 `config/form.py::SECTIONS` 生成,改动只写 overrides、按 Re-run 才跑(当时 93 个字段、0.12.5 是 96 个,逐个自动重跑会刷爆队列)。
 - **铁律 1 在代码里怎么守**:`gui/` 只 import `config`、`config.form`、`config.loader`、`engine`(`run_link`)、`report`、`spec`、`clock.forwarded`(worker 里建闭式预算)、
   `channel.coupled.describe`;`test_gui_imports_only_the_public_surface` 用 AST 扫每个文件。worker(`gui/jobs.py::execute`)返回纯 dict(可 pickle、可 JSON),
   页面永远拿不到 `LinkResult` 对象。
@@ -41,6 +41,7 @@ authoring_mode: ai_generated
 - Compare with:另一个场景的运行按需入队(同一配置哈希只排一次),落地前显示"running",不阻塞本页。
 - 磁盘缓存只存 worker 返回的纯 dict(JSON),文件名 `<kind>-<配置哈希>-<参数哈希>.json`;写入走临时文件再 replace;写不了就当没有缓存。
   缓存不跟库版本走 —— 数字会变的版本(性能轮那种)要手动清 `~/.cache/d2d_link/gui`,记在 docs/gui.md。
+  (更正,段 10:缓存文件已带库版本号,别的版本写的自动忽略;这句只对 0.12.1 之前成立。)
 - 字符串 id 的 Input 只用于**初始 layout 里就有**的控件(顶栏按钮、tick);栏里渲染出来的全部用模式匹配 id —— 左栏在第一次回调之前是空的,`compare-with` 用字符串 id 时整页空白(G3 第一次截图)。
 
 ## 段 10:健壮性(0.12.1)
@@ -58,7 +59,7 @@ authoring_mode: ai_generated
 ## 决策记录
 
 - Dash 锁 `>=3,<5`(PyPI 4.4.1):Dash 4 的 Dropdown 换成了 `button.dash-dropdown` 结构,行内控件的 CSS 针对它写;不用 dash-bootstrap / dash-mantine,
-  一个 `assets/light.css` 够了。只做浅色。
+  一个 `assets/light.css` 够了(段 10 加了 `assets/keys.js` 做键盘激活)。只做浅色。
 - 页面语言英文(与报表、导出同文),文档中文。
 - 不用 Dash background callback(要 diskcache / celery):自管进程池更小、可测,也便于以后多用户时换成服务。
 - `apply_overrides` 的类型转换没加:表单层 `values_to_overrides` 已经按字段 kind 转换,GUI 走它;CLI / API 的 overrides 仍要求正确类型。

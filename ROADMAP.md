@@ -16,7 +16,7 @@
 
 2. **串扰的耦合线估计是一阶猜测,却决定了 32 GT/s 标准封装的结论**。`channel/coupled.py`:κ = 1/(1 + (s/h)²)、速度差 (1 − ε_eff/ε_r)、
    线性长度增长;h = 30 µm 微带、ε_r 3.5 全是 `PACKAGE_STACKUP` 的模型值。给出 −18.6 dB(示例 07),模块因此在 32 GT/s 不过;
-   示例 05 的 x16 / 20 mm 模块在 M2 的行为级 −30 dB 预设下能过(另一个模块)。封装的耦合线 S 参数拿不到(用户确认)。
+   示例 05 的 x16 / 20 mm 模块在 M2 的行为级 −30 dB 预设下 0.11 时能过、0.12 起不过(另一个模块)。封装的耦合线 S 参数拿不到(用户确认)。
    段 6 已给出带状线选项(同几何一阶 FEXT 为 0;0.11 的非因果线上模块因此能过,0.12.0 因果化后带状线也差 0.002 UI 不过 —— 示例 08)、反向 lane 的 NEXT 与单端多端口文件读法
    (`xtalk: touchstone`),见 `cairn/crosstalk.md`;真实文件到了用它对比 `coupled`,目标 6 dB 内。段 2 的敏感性报告:
    复现:`python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity`。段 8 G1 实跑的结果:**没有任何单个 ±20 % 的估计能翻转这个 FAIL**
@@ -28,20 +28,14 @@
    (b) 有跟踪器时 `lanes.deskew_step_ps` 被忽略、`pi_step_ui` 默认 0 —— x16 repair / x64 spare 声明 1/16 UI deskew 却按理想 PI 算,按 1/16 UI 量化 0.7735 / 0.7923 → 0.7171 / 0.7357(都 FAIL);
    (c) 介质损耗常数 tanδ 无 KK 色散(与 9b 皮肤效应同类)—— Djordjevic–Sarkar 下 x1 204.85 mV / 0.7532 UI。另:行为级 FEXT 形状 √2·u/(1+u) 与耦合线一阶 j2πfτ 不符,
    x5 中间 lane 眼高差 60 mV、x16 最差 lane 换人。(a)(b) 需要用户定口径。复现:scratchpad `audit3_code/p05b_profile_white_spread.py`、`p07_deskew_ignored.py`、`p09_dielectric_causality.py`、`p04_fext_shape.py`。
-4. **铁律 3 / 6 的守卫有洞**(第三次体检):每周深测 `test_engines_deep.py` 调噪声后没钉相位,下次(2026-11-09)期望 3.4 个误码对门槛 15,会红;
-   指纹 CI 只看 head 的提交信息、被 `cancel-in-progress` 取消的 run 不补比对、首推 / force-push 静默跳过 —— 段 11 快进 main 时 `fingerprint/Compare` 红过(run 41645041677)。
 
 ## P2 — 一致性与能力
 
 0. **性能**(性能轮 III,0.12.5 之后):统计引擎每 lane 1.0 s(x1),x5 耦合模块 ~14 s、x16 模块 ~18 s(空闲机器;0.11 的 128 UI 窗是 21 / 29 s),示例 05 / 07 见 LOG。
    剩下的热点(cProfile x16 23.8 s):`_shift_add` 6.3 s(每模型 45 次,Python 开销界)、块核相卷 3.6 s、`log10_tail` 4.1 s、`eye_edge` 5.3 s;numpy 层面到头,再快要 C 扩展 / numba,不做。
    时域波形路径每 1e6 符号约 6 s,1e-8 的 25 误码点要 2.5e9 符号 ≈ 5 h(手动触发);`samples` 模式在有损线上不更快(脉冲尾 130 UI 内都 > 1e-6 主光标)。
-   分块合成的缝(`block_step_ratio` ≈ 2,x16 模块)未折算到 BER。亚 bin 光标逐个 `np.convolve` 的问题在性能轮 II 关闭(分块核)。
-1. **先进封装 RDL 线的低频终端口径**(段 2 发现,段 12 更正):段 2 把先进 2 mm 在 4 GT/s 的主光标 178 mV(对 8 GT/s 的 187)归因于 RDL 线 R_dc 2000 Ω/m 在低 GHz 的 RC 主导、
-   "Z0 = 50 Ω 只是高频渐近值"。**这个归因是错的**:那 9 mV 是波形网格顶频 osr·f_N 的砖墙 —— 速率扫描只改速率不改 osr,4 GT/s 时网格顶是 64 GHz,60 GHz 驱动极点加 2 mm 线在那里还过 58 %,
-   冲激响应正负交替振铃、主光标偏低 4 %;网格顶回到 512 GHz(`with_data_rate`,osr 256)后 4 GT/s 主光标 189.5 mV,与 8 / 32 GT/s 的 188 / 184 mV 一致。
-   RC 问题本身仍在但量级小:H(0) = 0.9615(R_dc·L = 4 Ω 对 100 Ω 的终端对),|Z0(2 GHz)| ≈ 59 Ω 的反射在 2 mm 上可忽略;终端口径不改,R_dc 已在敏感性报告里。
-   `grid_top_response` 进 extras 与报告;> 0.2 时 `link_response` 告警。
+   分块合成的缝(`block_step_ratio` ≈ 1.4–2,x16 模块)未折算到 BER。
+
 
 2. **bundled 配置的接收机仍是平坦前端、噪声在采样点**(段 7 给了字段,没有给基线数字):`rx.bw_hz` 没有规范值,是设计的主张。
    示例 09(0.12.0):x1 的眼高随前端 48 / 32 / 24 GHz 从 209.7 → 204.1 / 192.9 / 177.9 mV(噪声在采样点),噪声改到输入(同一 3 mV)则 135.5 / 148.8 / 148.2 mV;
@@ -64,6 +58,8 @@
 
 
 ## 边界(有意不做)
+
+- 先进封装 RDL 线的低频终端口径:段 12 量过,H(0) = 0.9615、|Z0(2 GHz)| ≈ 59 Ω 的反射在 2 mm 上可忽略,终端按 50 Ω 不改;R_dc 在敏感性报告里(段 2 的"RC 主导"归因已撤回,见 CHANGELOG 0.12.4)。
 
 - 均衡器与 CDR 的深度(Halo_Serdes 的领域);本库只有一个可选的 1 级 CTLE 行为模型。
 - 协议层:flit、CRC、retry 只留 `target.ber` 一个参数位(规范表另有 `raw_ber_with_retry`,未用)。

@@ -164,6 +164,7 @@ class Job:
     future: Future | None = field(default=None, repr=False)
     scope: str = ""                  # "8 / 16 lanes" etc., for the queue panel
     progress: tuple[int, int] | None = None
+    generation: int = 0              # which process pool ran it (a dead pool is replaced once, not once per job)
 
     @property
     def elapsed_s(self) -> float | None:
@@ -184,6 +185,8 @@ class JobManager:
         self.workers = workers
         self.cache_dir = Path(cache_dir) if cache_dir else None     # None: memory only
         self._pool = ProcessPoolExecutor(max_workers=workers) if workers > 0 else None
+        self._generation = 0
+        self.pool_restarts = 0
         self._mgr = multiprocessing.Manager() if workers > 0 else None
         self._progress = self._mgr.dict() if self._mgr is not None else {}
         self._jobs: dict[str, Job] = {}
@@ -229,7 +232,16 @@ class JobManager:
             job.finished = time.time()
             job.progress = self._progress.get(job.id)
             return job
-        job.future = self._pool.submit(execute, kind, job.cfg_dict, job.params, self._progress, job.id)
+        try:
+            job.future = self._pool.submit(execute, kind, job.cfg_dict, job.params, self._progress, job.id)
+        except BrokenProcessPool:
+            # a worker died and no poll has noticed yet: the pool refuses new
+            # work, and the job, already registered, sat queued with no future
+            # for good -- the dedup above then handed it back for every later
+            # submit of the same config (third health check)
+            self._revive_pool()
+            job.future = self._pool.submit(execute, kind, job.cfg_dict, job.params, self._progress, job.id)
+        job.generation = self._generation
         return job
 
     def _remember(self, job: Job) -> None:
@@ -307,9 +319,10 @@ class JobManager:
                     if isinstance(exc, BrokenProcessPool):
                         # a worker died (killed, out of memory): the executor is
                         # unusable from then on, so a new one takes its place
-                        # and the jobs that were in it report the loss
+                        # (once per dead pool) and its jobs report the loss
                         job.error = "a worker process died; the pool was restarted, run again"
-                        self._revive_pool()
+                        if job.generation == self._generation:
+                            self._revive_pool()
                 else:
                     job.status, job.result = "done", job.future.result()
                     self._remember(job)
@@ -323,7 +336,8 @@ class JobManager:
         except Exception:               # noqa: BLE001 -- a broken pool may refuse even that
             pass
         self._pool = ProcessPoolExecutor(max_workers=self.workers)
-        self.pool_restarts = getattr(self, "pool_restarts", 0) + 1
+        self._generation += 1
+        self.pool_restarts = self._generation
 
     @staticmethod
     def cancellable(job: Job) -> bool:

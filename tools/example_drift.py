@@ -494,7 +494,7 @@ def report_derived(outputs: dict[str, str], repo: Path = REPO, entries=None, out
 # "-18.2 dB" is left out: in these docs that is a loss or a level (RIN, SNR).
 _COMPARE = re.compile(
     r"(?:多|差|省|掉|亏|赚|高出?|低|再加|相差|代价|buys?|more|apart|gains?|costs?|saves?|penalty|better|worse)"
-    r"\s*(?:约|~|≈)?\s*[+-]?(\d+(?:\.\d+)?)\s*(?:dB|m\b|倍|×|x\b)"
+    r"\s*(?:约|~|≈)?\s*[+-]?(\d+(?:\.\d+)?)\s*(?:dB|m\b|倍|×|x\b|UI\b|mV\b|fs\b|ps\b)"
     r"|(?<![\w.])\+(\d+(?:\.\d+)?)\s*(?:dB|m\b)"
     r"|(?<![\w.])(\d+(?:\.\d+)?)\s*(?:×|倍)", re.I)
 
@@ -598,6 +598,32 @@ def compare(expected: Path, new: Path, repo: Path = REPO, out=None) -> int:
     return 1
 
 
+def blocking_quotes(expected: Path, new: Path, repo: Path = REPO, only=()) -> list[tuple]:
+    """Doc numbers in a table or block that cites the example and still quote
+    a value the new output moved: ``(path, line, token, old, new)``. ``accept``
+    refuses while there are any -- phase 12 accepted example 07 with README's
+    "194.7 mV" flagged and nothing stopped it (third health check). Quotes
+    elsewhere in a doc are often history ("0.11: 0.774") and only reported."""
+    exp = {p.stem: p for p in expected.glob("*.txt")}
+    docs = None
+    out = []
+    for p in sorted(new.glob("*.txt")):
+        if (only and not any(p.stem.startswith(o) for o in only)) or p.stem not in exp:
+            continue
+        a = normalise(exp[p.stem].read_text(encoding="utf-8"))
+        b = normalise(p.read_text(encoding="utf-8"))
+        if a == b:
+            continue
+        docs = docs if docs is not None else DocIndex(all_doc_numbers(repo))
+        for ch in changes(p.stem, a, b):
+            if ch.old_line is None:
+                continue
+            for d, o, nn, where in stale(ch, docs):
+                if where == "block":
+                    out.append((d.path, d.lineno, d.tok, o, nn))
+    return out
+
+
 def accept(new: Path, expected: Path, only=()) -> list[str]:
     """Copy (normalised) outputs into the expected set; returns the names written."""
     expected.mkdir(parents=True, exist_ok=True)
@@ -620,6 +646,8 @@ def main(argv=None) -> int:
     a.add_argument("new", type=Path)
     a.add_argument("only", nargs="*", help="number prefixes (default: all)")
     a.add_argument("--expected", type=Path, default=EXPECTED)
+    a.add_argument("--force", action="store_true",
+                   help="accept although a doc table citing the example still quotes a moved number")
     d = sub.add_parser("derived", help="check every quote in examples/derived.yaml; exit 1 on any that fails")
     d.add_argument("outputs", type=Path, nargs="?", default=EXPECTED,
                    help="outputs to derive from (default: the expected ones)")
@@ -645,6 +673,13 @@ def main(argv=None) -> int:
         print(f"{len(entries)} derived number(s), {n_quotes} quote(s): "
               + (f"{n} problem(s)" if n else "all hold"))
         return 1 if n else 0
+    blocking = blocking_quotes(args.expected, args.new, REPO, args.only)
+    if blocking and not args.force:
+        for path, line, tok, old, new in blocking:
+            print(f"  {path}:{line}  '{tok}'  ({old} -> {new if new is not None else '?'})")
+        print(f"{len(blocking)} doc number(s) in tables citing these examples still quote moved values: "
+              "fix them (or --force)")
+        return 1
     names = accept(args.new, args.expected, args.only)
     print(f"wrote {len(names)} expected output(s) to {args.expected}")
     return 0

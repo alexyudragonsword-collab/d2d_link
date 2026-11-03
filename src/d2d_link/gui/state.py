@@ -63,8 +63,9 @@ class PageState:
         return apply_overrides(base, self.overrides) if self.overrides else base
 
     def open(self, path: Path) -> None:
+        file_cfg = load_config(path)            # a file that does not load leaves the page as it was
         self.config_path = Path(path)
-        self.file_cfg = load_config(path)
+        self.file_cfg = file_cfg
         self.overrides = {}
         self.job_id = None
         self.selected_lane = None

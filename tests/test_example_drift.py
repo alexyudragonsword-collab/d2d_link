@@ -57,3 +57,30 @@ def test_stale_quotes_are_found_by_scope(drift, tmp_path):
     ch = drift.Change("00_x", "", "", [("93.21", "93.50")])
     hits = sorted((d.lineno, where) for d, _, _, where in drift.stale(ch, index))
     assert hits == [(3, "block"), (7, "elsewhere")]
+
+
+def test_every_registered_derived_quote_holds(drift):
+    """The tool's docstring promised this and no test did it (third health
+    check): every quote in examples/derived.yaml against the expected outputs."""
+    entries = drift.load_derived()
+    assert entries
+    bad, broken = drift.check_derived(entries, drift._outputs(drift.EXPECTED), drift.REPO)
+    assert not broken, broken
+    assert not bad, [(e.name, doc, ln, tok, value) for e, doc, ln, tok, value in bad]
+
+
+def test_accept_refuses_while_a_citing_table_quotes_a_moved_number(drift, tmp_path):
+    """Phase 12 accepted example 07 with README's "194.7 mV" still quoting the
+    old output; accept now refuses until the table is fixed (or --force)."""
+    exp = tmp_path / "expected"
+    new = tmp_path / "new"
+    exp.mkdir()
+    new.mkdir()
+    doc = tmp_path / "README.md"
+    doc.write_text("| `07_rate_sweep.py` | rate sweep | first failing rate 24 GT/s, eye 194.7 mV |\n", encoding="utf-8")
+    (exp / "07_rate_sweep.txt").write_text("first failing rate 24 GT/s: eye 194.7 mV / 0.737 UI\n", encoding="utf-8")
+    (new / "07_rate_sweep.txt").write_text("first failing rate 24 GT/s: eye 194.6 mV / 0.737 UI\n", encoding="utf-8")
+    hits = drift.blocking_quotes(exp, new, tmp_path)
+    assert [(h[0], h[2]) for h in hits] == [("README.md", "194.7")]
+    doc.write_text("| `07_rate_sweep.py` | rate sweep | first failing rate 24 GT/s, eye 194.6 mV |\n", encoding="utf-8")
+    assert drift.blocking_quotes(exp, new, tmp_path) == []
