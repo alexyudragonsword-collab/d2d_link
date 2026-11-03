@@ -23,6 +23,14 @@
    (0.12.2 重跑:名义裕度 −0.161;最接近 0 的是介质厚 24 µm 的 −0.095、眼宽目标 0.70 UI 的 −0.101、bump 间距 138 µm 的 −0.107;0.11 时 −0.118 与 −0.054 / −0.061 / −0.071)。
    0.11 时布线假设(带状线,示例 08)能翻转它;0.12.0 起带状线也不过(0.748 UI),**32 GT/s 标准封装 25 mm 在本库的所有模型变体下都不过**,x16 / 20 mm 模块(−30 dB 预设)也从 PASS 变 FAIL(示例 05)。
 
+3. **第三次体检(2026-11-03)挂出的三条会翻转 bundled 判定的建模选择**,全文在会话 scratchpad `health_check_2026-11-03.md`:
+   (a) 发端 PLL 相噪在剖面最后频点(5.12 GHz)以上置零,共模泄漏的高通恰在被丢的 5–16 GHz 最大 —— 同方差摊到 fs/2 时 x1 眼宽 0.7614 → 0.7484 UI(FAIL),底噪平延 0.7163;
+   (b) 有跟踪器时 `lanes.deskew_step_ps` 被忽略、`pi_step_ui` 默认 0 —— x16 repair / x64 spare 声明 1/16 UI deskew 却按理想 PI 算,按 1/16 UI 量化 0.7735 / 0.7923 → 0.7171 / 0.7357(都 FAIL);
+   (c) 介质损耗常数 tanδ 无 KK 色散(与 9b 皮肤效应同类)—— Djordjevic–Sarkar 下 x1 204.85 mV / 0.7532 UI。另:行为级 FEXT 形状 √2·u/(1+u) 与耦合线一阶 j2πfτ 不符,
+   x5 中间 lane 眼高差 60 mV、x16 最差 lane 换人。(a)(b) 需要用户定口径。复现:scratchpad `audit3_code/p05b_profile_white_spread.py`、`p07_deskew_ignored.py`、`p09_dielectric_causality.py`、`p04_fext_shape.py`。
+4. **铁律 3 / 6 的守卫有洞**(第三次体检):每周深测 `test_engines_deep.py` 调噪声后没钉相位,下次(2026-11-09)期望 3.4 个误码对门槛 15,会红;
+   指纹 CI 只看 head 的提交信息、被 `cancel-in-progress` 取消的 run 不补比对、首推 / force-push 静默跳过 —— 段 11 快进 main 时 `fingerprint/Compare` 红过(run 41645041677)。
+
 ## P2 — 一致性与能力
 
 0. **性能**(性能轮 III,0.12.5 之后):统计引擎每 lane 1.0 s(x1),x5 耦合模块 ~14 s、x16 模块 ~18 s(空闲机器;0.11 的 128 UI 窗是 21 / 29 s),示例 05 / 07 见 LOG。
@@ -48,6 +56,9 @@
    单端 Touchstone 文件里距离 d 的左右两个邻 lane 取较强的一条(引擎按距离索引攻击 lane);带状线只做了一阶(FEXT = 0)。
 2. 前向时钟的四分之一速率变体(`clocking.scheme` 目前只有 `forwarded_ddr`)。随机占空比误差有意不加(与白抖动不可区分,段 3 / 段 7 两次确认)。
 3. 收端(段 7 之后还没有的):训练的 deskew 分辨率与眼监视器的样本数(`rx.training_ber` 只给了居中的 BER,没有给它的统计误差)、前端的非线性与失调、噪声在时域里的符号间相关对簇统计的影响(波形路径已带相关,`error_bursts` 没有按它解读)。
+5. **第三次体检的中低项**(工程,不动数):GUI 杀 worker 后提交的任务永远 queued(去重让同配置再也跑不了)、坏 yaml 让 Compare / 场景栏抛错、速率编辑先写 osr 再校验且 osr 依赖编辑历史、
+   This page 卡运行中显示 not run、无活 lane 时 `worst` 抛错;wheel 缺 `gui/assets/keys.js`;派生数检查不进测试且不认 UI / mV / fs;第二邻 −12 dB 无 `source: model`;
+   Tx DCD 无本地 PLL 时当作完全抵消;光标窗少读 0.6 % 直流;PI 量化箱方差 +11 %;NEXT K_b 系数;dB 旋钮 ±20 %。
 4. Android:段 8 的浏览器 GUI(`d2d_link.gui`,Dash)在手机上只差一个跑在服务器上的后端;本机 APK 要把 numpy / scipy 打进 Chaquopy,未排期。
    GUI 本身还没有的:多用户共享(缓存与 worker 没按用户隔离)、真实 bump map(平面图是一维物理编号)、深色主题(有意不做)。
 
