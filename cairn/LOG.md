@@ -3,6 +3,17 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短(数字原值、被推翻的判断、下一步),
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-11-03 · 段 10:GUI 健壮性(ccr-a2094794-9qa40v,0.12.1)
+
+- 做了 ROADMAP P3 #5 的全部:渲染键(tick 不重绘)、失败横幅 + stale 口径、缓存版本键、编辑拒绝原因、场景按哈希匹配、✕ 只给排队任务、导出模式 id、
+  `shutdown()` 挂 atexit、进程池死后重建、键盘 / 焦点 / 单栏;`__version__` 与 pyproject 对齐并加测试。测试 +9(GUI 8 + 版本 1)。
+- 数字原值:无头 Chromium 实跑 x1(1 worker):空闲 tick 的回包 28 B(`{"multi":true,"response":{}}`;0.11 每 tick 整页约 55 KB、服务端 ~70 ms);控制台 0 错误;Markdown 下载文件名 `standard_32g_x1.budget.md`;Enter 打开场景 `standard_32g_x16_module`。
+  `workers=1` 的进程池测试(run + sensitivity + 取消一个排队任务)0.6 s(fork 启动快)。
+- 被推翻的判断:(1) "没有 pending 任务时上一个结果就是当前的"(`current_result` 的 stale 只看 pending)—— 改抽屉字段不跑时页面照常亮着旧数;
+  (2) 运行中任务的 ✕ 一直在,但 `future.cancel()` 对已开始的任务永远 False;(3) 第一次用 Python Playwright 起服务后脚本崩了,服务成了孤儿占着端口,
+  第二次的 Node 脚本连到了旧服务 —— 起服务的脚本要用 try / finally 收尸,`pkill -f` 又一次杀到自己的 shell(按 PID 列表杀)。
+- 下一步:段 5(规范原文,等用户)、接收机基线(等 `rx.bw_hz` 与噪声口径)、ROADMAP P2 #3 的 Touchstone 耦合项带外。
+
 ## 2026-11-02 · 段 9b:可信度 C —— 走线因果化等六项,数字会变(ccr-a2094794-9qa40v,0.12.0)
 
 - 做了:`from_rlgc` 补皮肤效应内电感 r_skin/(2π√f)(`channel.skin_inductance`,默认开);`channel.n_freq` 2048 → 8192、`sim.stat_cursor_reach` 256、

@@ -43,7 +43,8 @@ def floor_plan(result: dict, selected: int | None) -> html.Div:
             html.Div(f"{r['eye_width_ui']:.3f} UI · {1e3 * r['eye_height_v']:.0f} mV", className="fp-num"),
             html.Div(html.Div(className="fp-mbar " + ("ok" if ok else "fail"),
                               style={"width": f"{100.0 * min(max(r['margin'], 0.0), 0.2) / 0.2:.0f}%"}), className="fp-mtrk"),
-        ], className=cls, id={"type": "lane-cell", "lane": r["lane"]}, n_clicks=0))
+        ], className=cls, id={"type": "lane-cell", "lane": r["lane"]}, n_clicks=0, role="button", tabIndex="0",
+            title=f"select lane {r['lane']}"))
     legend = html.Div([
         html.Span([html.I(className="lg-eye"), " eye at the target BER, to scale (width = UI, height = fraction of ±main cursor)"]),
         html.Span([html.I(className="lg-mask"), f" target mask {ew_t:g} UI × {eh_t:g} mV"]),
@@ -70,7 +71,7 @@ def lanes_table(result: dict, selected: int | None) -> html.Table:
             html.Td(f"{r['eye_width_ui']:.3f}"), html.Td(f"{r['eye_height_margin_mv']:+.1f}"),
             html.Td(f"{r['eye_width_margin_ui']:+.3f}"), html.Td(f"{r['log10_ber']:.1f}"),
             html.Td("✔ yes" if r["passes"] else "✘ no", className="ok" if r["passes"] else "fail"),
-        ], className=cls.strip(), id={"type": "lane-row", "lane": r["lane"]}, n_clicks=0))
+        ], className=cls.strip(), id={"type": "lane-row", "lane": r["lane"]}, n_clicks=0, role="button", tabIndex="0"))
     return html.Table([html.Thead(head), html.Tbody(body)], className="lanes clickable")
 
 

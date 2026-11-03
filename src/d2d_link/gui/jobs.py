@@ -25,9 +25,11 @@ import os
 import time
 import uuid
 from concurrent.futures import Future, ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .. import __version__
 from ..config import LinkConfig
 from ..config.loader import config_from_dict, config_to_dict
 
@@ -248,10 +250,16 @@ class JobManager:
         if p is None or not p.is_file():
             return None
         try:
-            data = json.loads(p.read_text(encoding="utf-8"))
+            wrapped = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
-        if data.get("kind") != kind:
+        # a result written by another version of the package is not this
+        # version's number (0.12.0 moved every eye); a file without the
+        # version key is from before the key existed and is ignored too
+        if not isinstance(wrapped, dict) or wrapped.get("version") != __version__:
+            return None
+        data = wrapped.get("result")
+        if not isinstance(data, dict) or data.get("kind") != kind:
             return None
         self._cache[self._key(kind, cfg_hash, params)] = data
         return data
@@ -263,7 +271,7 @@ class JobManager:
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
             tmp = p.with_suffix(".tmp")
-            tmp.write_text(json.dumps(job.result), encoding="utf-8")
+            tmp.write_text(json.dumps({"version": __version__, "result": job.result}), encoding="utf-8")
             tmp.replace(p)
         except OSError:
             pass                                 # a cache that cannot be written is just no cache
@@ -296,10 +304,32 @@ class JobManager:
                 exc = job.future.exception()
                 if exc is not None:
                     job.status, job.error = "failed", f"{type(exc).__name__}: {exc}"
+                    if isinstance(exc, BrokenProcessPool):
+                        # a worker died (killed, out of memory): the executor is
+                        # unusable from then on, so a new one takes its place
+                        # and the jobs that were in it report the loss
+                        job.error = "a worker process died; the pool was restarted, run again"
+                        self._revive_pool()
                 else:
                     job.status, job.result = "done", job.future.result()
                     self._remember(job)
         return [self._jobs[j] for j in self._order]
+
+    def _revive_pool(self) -> None:
+        if self._pool is None:
+            return
+        try:
+            self._pool.shutdown(wait=False, cancel_futures=True)
+        except Exception:               # noqa: BLE001 -- a broken pool may refuse even that
+            pass
+        self._pool = ProcessPoolExecutor(max_workers=self.workers)
+        self.pool_restarts = getattr(self, "pool_restarts", 0) + 1
+
+    @staticmethod
+    def cancellable(job: Job) -> bool:
+        """Only a queued job can be taken back: a process pool cannot interrupt
+        a task its worker already started (the page hides the button)."""
+        return job.status == "queued" and job.future is not None and not job.future.running()
 
     def cancel(self, jid: str) -> bool:
         job = self._jobs.get(jid)
@@ -325,6 +355,15 @@ class JobManager:
             return None
         est = sum(hist[-3:]) / len(hist[-3:])
         return max(0.0, est - el)
+
+    def latest_failed(self, cfg_hash: str, kind: str = "run") -> Job | None:
+        """The newest failed job of ``kind`` for the config when no done or
+        pending one is newer: what the page must say instead of a result."""
+        for jid in reversed(self._order):
+            job = self._jobs[jid]
+            if job.cfg_hash == cfg_hash and job.kind == kind:
+                return job if job.status == "failed" else None
+        return None
 
     def latest_done(self, cfg_hash: str, kind: str = "run") -> Job | None:
         for jid in reversed(self._order):

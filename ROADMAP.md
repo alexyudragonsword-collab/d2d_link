@@ -49,10 +49,7 @@
 3. 收端(段 7 之后还没有的):训练的 deskew 分辨率与眼监视器的样本数(`rx.training_ber` 只给了居中的 BER,没有给它的统计误差)、前端的非线性与失调、噪声在时域里的符号间相关对簇统计的影响(波形路径已带相关,`error_bursts` 没有按它解读)。
 4. Android:段 8 的浏览器 GUI(`d2d_link.gui`,Dash)在手机上只差一个跑在服务器上的后端;本机 APK 要把 numpy / scipy 打进 Chaquopy,未排期。
    GUI 本身还没有的:多用户共享(缓存与 worker 没按用户隔离)、真实 bump map(平面图是一维物理编号)、深色主题(有意不做)。
-5. **GUI 健壮性**(第二次体检,段 10):每秒整页重绘(每客户端每 tick ~70 ms + 55 KB,`dcc.Graph` 每 tick 换 figure,一 tick 内 `poll()` 10 次);
-   任务失败时旧结果照常显示、不标 stale、错误只在 Queue 卡;磁盘缓存无版本键(动数字的版本会端旧数);非数字文本编辑在回调里抛错、非法编辑静默弹回、
-   场景栏按 label 匹配看不到带 override 的运行、运行中的 ✕ 对已跑进程无效、`shutdown()` 无人调用、导出按钮仍是字符串 id;
-   上线路径零测试(`refresh` / `downloads` / `main()`、`workers>0` 的队列);可点 Div 无键盘 / 焦点样式。
+
 
 ## 边界(有意不做)
 

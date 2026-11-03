@@ -11,9 +11,10 @@ result (invariant #1).
 from __future__ import annotations
 
 import argparse
+import atexit
 from pathlib import Path
 
-from dash import ALL, Dash, Input, Output, State, ctx, dcc, html, no_update
+from dash import ALL, Dash, Input, Output, ctx, dcc, html, no_update
 
 from ..config.form import FIELDS, values_to_overrides
 from . import export
@@ -46,6 +47,9 @@ class App:
         self.open_groups: set[str] = set()
         self.drawer_open = False
         self.shown: dict | None = None          # the last result rendered (kept while a re-run is pending)
+        self.edit_error: str | None = None      # why the last edit was rejected, until the next edit
+        self._scenario_hashes: dict[str, tuple[float, str]] = {}   # path -> (mtime, config hash)
+        self._keys: tuple = (None, None, None, None)                # what the last render was made of
 
     # --------------------------------------------------------------- runs
     def label(self) -> str:
@@ -101,9 +105,10 @@ class App:
 
     def current_result(self) -> tuple[dict | None, bool]:
         """(result to show, stale): the run of the current config if done,
-        else the last shown one flagged stale while a run is pending."""
+        else the last shown one flagged stale -- whether a run is pending or
+        the config was edited without one (it used to read as current then)."""
         h = config_hash(self.state.cfg)
-        jobs = self.manager.poll()
+        self.manager.poll()
         done = self.manager.latest_done(h)
         if done is not None:
             sens = self.manager.latest_done(h, "sensitivity")
@@ -111,15 +116,47 @@ class App:
                 done.result["sensitivity"] = sens.result["sensitivity"]
             self.shown = done.result
             return done.result, False
-        pending = any(j.cfg_hash == h and j.status in ("queued", "running") for j in jobs)
-        return self.shown, pending
+        return self.shown, self.shown is not None
+
+    def current_failure(self):
+        """The failed run of the current config when nothing newer succeeded
+        or is pending: the page says so instead of showing an older result."""
+        return self.manager.latest_failed(config_hash(self.state.cfg))
+
+    def scenario_hashes(self) -> dict[str, str]:
+        """path -> config hash of every scenario file (re-read when its mtime
+        changes), so the scenario list finds the file's own run and not a
+        run with overrides on top of it."""
+        from ..config import load_config
+
+        out = {}
+        for p in sorted(self.configs_dir.glob("*.yaml")):
+            try:
+                mtime = p.stat().st_mtime
+            except OSError:
+                continue
+            cached = self._scenario_hashes.get(str(p))
+            if cached is None or cached[0] != mtime:
+                try:
+                    cached = (mtime, config_hash(load_config(p)))
+                except Exception:        # noqa: BLE001 -- a file that does not load has no run to show
+                    cached = (mtime, "")
+                self._scenario_hashes[str(p)] = cached
+            if cached[1]:
+                out[str(p)] = cached[1]
+        return out
 
     # ------------------------------------------------------------- render
     def page(self) -> html.Div:
         cfg = self.state.cfg
         result, stale = self.current_result()
+        failed = self.current_failure()
         kids = [html.Div("Timing budget · statistical engine" + (f" · run in {result['elapsed_s']:.1f} s" if result else ""),
                          className="kicker"), headline(cfg, result), lede(cfg, result)]
+        if failed is not None:
+            kids.append(html.Div([html.B("This configuration's run failed: "), html.Span(failed.error or "no detail"),
+                                  html.Span("  The numbers below are the last successful run's." if result else "")],
+                                 className="banner fail", role="alert"))
         if result:
             rep = result["report"]
             sel = self.state.selected_lane
@@ -137,9 +174,9 @@ class App:
                      section("crosstalk", "6", "Crosstalk", rep["crosstalk"]["mode"], html.P(_crosstalk_text(rep), className="note")),
                      section("receiver", "7", "Receiver", None, html.P(_receiver_text(rep), className="note")),
                      sweeps(result, self.sweep_jobs(), cfg)]
-        else:
+        elif failed is None:
             kids.append(html.P("Pick a scenario on the left or press Run.", className="note"))
-        return html.Div(kids, className="page" + (" stale" if stale else ""))
+        return html.Div(kids, className="page" + (" stale" if stale or (failed is not None and result) else ""))
 
     def left(self) -> list:
         result, _ = self.current_result()
@@ -161,7 +198,7 @@ class App:
                 elif anchor == "eyes":
                     aside = str(len(result["lanes"]))
             toc.append(html.A([f"{num} {title}", html.Span(aside, className="aside")], href=f"#sec-{anchor}"))
-        return [rails.scenarios(self.configs_dir, self.state.config_path, self.manager),
+        return [rails.scenarios(self.configs_dir, self.state.config_path, self.manager, self.scenario_hashes()),
                 rails.compare_picker(self.configs_dir, self.state.config_path, self.state.compare_path),
                 html.Div([html.H4("On this page")] + toc, className="card toc")]
 
@@ -169,30 +206,118 @@ class App:
         result, _ = self.current_result()
         jobs = self.manager.poll()
         job = self.manager.get(self.state.job_id) if self.state.job_id else None
-        return [rails.this_page(self.state, result, job), rails.queue(jobs, self.manager),
+        return [rails.this_page(self.state, result, job, self.current_failure(), self.edit_error), rails.queue(jobs, self.manager),
                 rails.inspector(result, self.state.selected_lane),
                 rails.rates(result, self.state.cfg, self.job_for("rate_sweep"), self.manager),
                 rails.exports(result), rails.unverified(result)]
 
     def drawer(self) -> html.Div:
-        return drawer(self.state, self.open_groups)
+        return drawer(self.state, self.open_groups, self.edit_error)
 
     # ------------------------------------------------------------- edits
     def apply_edit(self, path: str, raw) -> bool:
-        """An input's new value as an override; True when the config changed."""
+        """An input's new value as an override; True when the config changed.
+        A value the form cannot convert or the schema rejects is dropped and
+        the reason kept in ``edit_error`` (shown in the drawer and the This
+        page card) until the next edit; the page never raises on an edit."""
         fld = FIELDS[path]
-        if fld["kind"] == "bool":
-            value = bool(raw)
-        else:
-            value = values_to_overrides({path: raw})[path]
         before = config_hash(self.state.cfg)
+        had = path in self.state.overrides
+        old = self.state.overrides.get(path)
         try:
+            value = bool(raw) if fld["kind"] == "bool" else values_to_overrides({path: raw})[path]
             self.state.set(path, value)
             after = config_hash(self.state.cfg)       # builds the frozen config: validation happens here
-        except Exception:                             # noqa: BLE001 -- an invalid edit is dropped, the page stays
-            self.state.overrides.pop(path, None)
+        except Exception as exc:                      # noqa: BLE001 -- an invalid edit is dropped, the page stays
+            if had:
+                self.state.overrides[path] = old
+            else:
+                self.state.overrides.pop(path, None)
+            self.edit_error = f"{fld['label']}: {exc}"
             return False
+        self.edit_error = None
         return after != before
+
+    # ----------------------------------------------------------- handlers
+    def render_keys(self) -> tuple:
+        """(page/left key, right key, drawer key, label): what each output is
+        made of. A tick that changes none of them re-renders nothing -- the
+        browser keeps its figures (hover, zoom) and the server does no work."""
+        st = self.state
+        jobs = self.manager.poll()
+        statuses = tuple((j.id, j.status, j.progress) for j in jobs)
+        running = tuple((j.id, int(j.elapsed_s or 0)) for j in jobs if j.status == "running")
+        base = (str(st.config_path), tuple(sorted(st.overrides.items(), key=lambda kv: kv[0])), st.selected_lane,
+                str(st.compare_path), statuses, self.edit_error)
+        page_key = base
+        right_key = (base, running)
+        drawer_key = (str(st.config_path), tuple(sorted(st.overrides.items(), key=lambda kv: kv[0])),
+                      tuple(sorted(self.open_groups)), self.edit_error)
+        label = (str(st.config_path) if st.config_path else "no config") + (
+            f"  · {len(st.overrides)} override(s)" if st.overrides else "")
+        return page_key, right_key, drawer_key, label
+
+    def handle(self, trig, inputs_list: list, force: bool = False) -> tuple:
+        """The refresh callback's body: apply what ``trig`` asks, then render
+        what changed. ``inputs_list`` is Dash's ``ctx.inputs_list`` (position
+        = the Input's position in the callback). Returns the five outputs,
+        ``no_update`` where nothing moved."""
+        st = self.state
+        if isinstance(trig, dict):
+            kind = trig["type"]
+            if kind == "scenario" and _clicked(inputs_list, trig, 1):
+                st.open(Path(trig["path"]))
+                self.shown = None
+                self.edit_error = None
+                self.run()
+            elif kind in ("headline", "field"):
+                raw = _value_of(inputs_list, trig)
+                if raw is not None and self.apply_edit(trig["path"], raw) and kind == "headline":
+                    self.run()
+            elif kind == "group" and _clicked(inputs_list, trig, 4):
+                self.open_groups ^= {trig["key"]}
+            elif kind == "cancel" and _clicked(inputs_list, trig, 5):
+                self.manager.cancel(trig["id"])
+            elif kind in ("lane-cell", "lane-row") and _clicked(inputs_list, trig, 9 if kind == "lane-cell" else 10):
+                st.selected_lane = None if st.selected_lane == trig["lane"] else trig["lane"]
+            elif kind == "action" and _clicked(inputs_list, trig, 11):
+                self.run(trig["name"])
+            elif kind == "compare":
+                value = next((i.get("value") for i in inputs_list[12] if i["id"] == trig), None)
+                st.compare_path = Path(value) if value else None
+        elif trig in ("btn-rerun", "btn-rerun-drawer"):
+            self.run()
+        elif trig == "btn-discard":
+            st.overrides.clear()
+            self.edit_error = None
+
+        page_key, right_key, drawer_key, label = self.render_keys()
+        last_page, last_right, last_drawer, last_label = self._keys
+        self._keys = (page_key, right_key, drawer_key, label)
+        full = force or trig != "tick"
+        page = left = right = drawer_out = label_out = no_update
+        if full or page_key != last_page:
+            page, left = self.page(), self.left()
+        if full or right_key != last_right:
+            right = self.right()
+        if full or drawer_key != last_drawer:
+            drawer_out = self.drawer()
+        if full or label != last_label:
+            label_out = label
+        return page, left, right, drawer_out, label_out
+
+    def download(self, name: str):
+        """The export buttons: ``(content, filename)`` or None when there is
+        nothing to export yet."""
+        result, _ = self.current_result()
+        stem = self.state.config_path.stem if self.state.config_path else "link"
+        if name == "yaml":
+            return export.overrides_yaml(self.state.config_path, self.state.overrides), f"{stem}.overrides.yaml"
+        if result is None:
+            return None
+        if name == "md":
+            return export.markdown(result), f"{stem}.budget.md"
+        return export.report_json(result), f"{stem}.budget.json"
 
 
 def _crosstalk_text(rep: dict) -> str:
@@ -238,6 +363,7 @@ def create_app(configs_dir: str | Path = "configs", config: str | Path | None = 
                 core.run(kind)
     app = Dash(__name__, title="d2d_link budget", update_title=None, suppress_callback_exceptions=True)
     app.d2d = core
+    atexit.register(core.manager.shutdown)      # the worker processes and the manager go with the server
 
     app.layout = html.Div([
         html.Div([html.Span(["d2d_link", html.Span("budget notebook")], className="brand"),
@@ -250,6 +376,7 @@ def create_app(configs_dir: str | Path = "configs", config: str | Path | None = 
         html.Div([drawer_head(), html.Div(id="drawer-inner", children=core.drawer())],
                  id="drawer-wrap", className="drawer-wrap open" if drawer_open else "drawer-wrap"),
         dcc.Interval(id="tick", interval=1000),
+        dcc.Interval(id="wake", interval=5000),      # pauses the tick while the tab is hidden (see below)
         dcc.Download(id="download"),
     ])
 
@@ -268,39 +395,11 @@ def create_app(configs_dir: str | Path = "configs", config: str | Path | None = 
     def refresh(_tick, _sc, _hl, _fl, _gr, _cx, _r1, _r2, _dis, _lc, _lr, _ac, _cw):
         # a string id that is not in the layout is a client-side error in
         # Dash (the page renders nothing), so the buttons that come and go
-        # with the result use pattern ids
-        trig = ctx.triggered_id
-        st = core.state
-        redraw_drawer = trig != "tick"          # the drawer re-renders only on an edit, a toggle or a new scenario
-        if isinstance(trig, dict):
-            kind = trig["type"]
-            if kind == "scenario" and _clicked(ctx, 1):
-                st.open(Path(trig["path"]))
-                core.shown = None
-                core.run()
-            elif kind in ("headline", "field"):
-                raw = _value_of(ctx, trig)
-                if raw is not None and core.apply_edit(trig["path"], raw) and kind == "headline":
-                    core.run()
-            elif kind == "group" and _clicked(ctx, 4):
-                core.open_groups ^= {trig["key"]}
-            elif kind == "cancel" and _clicked(ctx, 5):
-                core.manager.cancel(trig["id"])
-            elif kind in ("lane-cell", "lane-row") and _clicked(ctx, 9 if kind == "lane-cell" else 10):
-                st.selected_lane = None if st.selected_lane == trig["lane"] else trig["lane"]
-            elif kind == "action" and _clicked(ctx, 11):
-                core.run(trig["name"])
-            elif kind == "compare":
-                value = next((i.get("value") for i in ctx.inputs_list[12] if i["id"] == trig), None)
-                st.compare_path = Path(value) if value else None
-        elif trig in ("btn-rerun", "btn-rerun-drawer"):
-            core.run()
-        elif trig == "btn-discard":
-            st.overrides.clear()
-
-        cfg_label = (str(st.config_path) if st.config_path else "no config") + (
-            f"  · {len(st.overrides)} override(s)" if st.overrides else "")
-        return core.page(), core.left(), core.right(), core.drawer() if redraw_drawer else no_update, cfg_label
+        # with the result use pattern ids. The body lives on App.handle so
+        # the tests drive it without a browser; a tick that changes nothing
+        # returns no_update everywhere (phase 10: the page used to be
+        # rebuilt every second, figures and all).
+        return core.handle(ctx.triggered_id, ctx.inputs_list, force=ctx.triggered_id is None)
 
     @app.callback(Output("drawer-wrap", "className"), Input("btn-drawer-open", "n_clicks"),
                   Input("btn-drawer-close", "n_clicks"), prevent_initial_call=True)
@@ -308,34 +407,37 @@ def create_app(configs_dir: str | Path = "configs", config: str | Path | None = 
         core.drawer_open = ctx.triggered_id == "btn-drawer-open"
         return "drawer-wrap open" if core.drawer_open else "drawer-wrap"
 
-    @app.callback(Output("download", "data"), Input("btn-export-md", "n_clicks"), Input("btn-export-json", "n_clicks"),
-                  Input("btn-export-yaml", "n_clicks"), State("topbar-cfg", "children"), prevent_initial_call=True)
-    def downloads(_m, _j, _y, _label):
-        result, _ = core.current_result()
-        stem = core.state.config_path.stem if core.state.config_path else "link"
-        if ctx.triggered_id == "btn-export-yaml":
-            return dcc.send_string(export.overrides_yaml(core.state.config_path, core.state.overrides), f"{stem}.overrides.yaml")
-        if result is None:
+    @app.callback(Output("download", "data"), Input({"type": "export", "name": ALL}, "n_clicks"),
+                  prevent_initial_call=True)
+    def downloads(_clicks):
+        trig = ctx.triggered_id
+        if not isinstance(trig, dict) or not _clicked(ctx.inputs_list, trig, 0):
+            return no_update                      # the buttons were re-rendered, nobody pressed one
+        out = core.download(trig["name"])
+        if out is None:
             return no_update
-        if ctx.triggered_id == "btn-export-md":
-            return dcc.send_string(export.markdown(result), f"{stem}.budget.md")
-        return dcc.send_string(export.report_json(result), f"{stem}.budget.json")
+        return dcc.send_string(*out)
+
+    # the tick stops while the tab is hidden and resumes within one wake
+    # interval of coming back: a page nobody looks at should not run the server
+    app.clientside_callback("function(n) { return document.hidden === true; }",
+                            Output("tick", "disabled"), Input("wake", "n_intervals"))
 
     return app
 
 
-def _clicked(c, position: int) -> bool:
+def _clicked(inputs_list: list, trig_id, position: int) -> bool:
     """True when the pattern input at ``position`` fired with a real click
     (n_clicks set), not because the component was just (re)created."""
-    for item in c.inputs_list[position]:
-        if item["id"] == c.triggered_id:
+    for item in inputs_list[position]:
+        if item["id"] == trig_id:
             return bool(item.get("value"))
     return False
 
 
-def _value_of(c, trig_id: dict):
+def _value_of(inputs_list: list, trig_id: dict):
     for group in (2, 3):
-        for item in c.inputs_list[group]:
+        for item in inputs_list[group]:
             if item["id"] == trig_id:
                 return item.get("value")
     return None
@@ -371,7 +473,10 @@ def main(argv=None) -> int:
         app.d2d.state.compare_path = args.compare
     print(f"d2d_link GUI on http://{args.host}:{args.port}  (scenarios: {configs_dir}; "
           f"cache: {'off' if args.no_cache else args.cache})")
-    app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
+    try:
+        app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
+    finally:
+        app.d2d.manager.shutdown()
     return 0
 
 

@@ -187,7 +187,10 @@ def values_to_overrides(values: dict[str, object]) -> dict[str, object]:
         if fld["kind"] in ("float", "opt_float"):
             v = float(v) * (scale or 1.0)
         elif fld["kind"] in ("int", "opt_int"):
-            v = int(v)
+            f = float(v)
+            if f != int(f):                      # 4.5 lanes used to become 4 without a word
+                raise ValueError(f"{path} needs a whole number, got {v!r}")
+            v = int(f)
         elif fld["kind"] in ("tuple_float", "tuple_int"):
             if isinstance(v, str):
                 v = [x for x in v.replace(",", " ").split() if x]

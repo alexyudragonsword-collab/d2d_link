@@ -284,3 +284,173 @@ def test_app_sweeps_and_compare(tmp_path):
     left = _text(core.left())
     assert "compare" in left and "standard_32g_x16_repair" in left
     assert any(p.name.startswith("run-") for p in tmp_path.iterdir())
+
+
+# ----------------------------------------------------------------- phase 10
+def _inputs(trig=None, value=1):
+    """A ``ctx.inputs_list`` shaped list (13 Input positions) with ``trig`` set to ``value``."""
+    lst = [[] for _ in range(13)]
+    if isinstance(trig, dict):
+        pos = {"scenario": 1, "headline": 2, "field": 3, "group": 4, "cancel": 5, "lane-cell": 9, "lane-row": 10,
+               "action": 11, "compare": 12}[trig["type"]]
+        lst[pos] = [{"id": trig, "property": "n_clicks", "value": value}]
+    return lst
+
+
+def test_ticks_without_change_render_nothing():
+    """Phase 10: the page was rebuilt every second (figures and all, 70 ms and
+    55 KB per client per tick). A tick that changes none of the render keys
+    returns no_update on every output; an edit or a click renders."""
+    from dash import no_update
+
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0)
+    core = app.d2d
+    first = core.handle(None, _inputs(), force=True)
+    assert all(o is not no_update for o in first)
+    again = core.handle("tick", _inputs())
+    assert all(o is no_update for o in again)
+    trig = {"type": "lane-cell", "lane": 0}
+    page, left, right, drawer, label = core.handle(trig, _inputs(trig))
+    assert core.state.selected_lane == 0 and page is not no_update and right is not no_update
+    assert core.handle("tick", _inputs()) == (no_update,) * 5
+    # a re-created component (n_clicks 0) is not a click
+    core.handle(trig, _inputs(trig, value=0))
+    assert core.state.selected_lane == 0
+    # an edit re-renders the drawer and the label too
+    trig = {"type": "field", "path": "channel.length_mm"}
+    page, left, right, drawer, label = core.handle(trig, _inputs(trig, value=30.0))
+    assert drawer is not no_update and "1 override" in label and core.state.overrides == {"channel.length_mm": 30.0}
+    assert core.handle("btn-discard", _inputs())[4].endswith("standard_32g_x1.yaml") and not core.state.overrides
+
+
+def test_a_failed_run_is_said_on_the_page():
+    """The run of the current config failing used to leave the previous
+    result on screen with the error buried in the Queue card."""
+    from d2d_link.config import ChannelConfig, LinkConfig
+
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0, autorun=False)
+    core = app.d2d
+    core.state.file_cfg = LinkConfig(channel=ChannelConfig(kind="touchstone", file="/nonexistent/line.s4p"))
+    core.run()
+    job = core.current_failure()
+    assert job is not None and job.status == "failed" and job.error
+    result, stale = core.current_result()
+    assert result is None and not stale
+    page = _text(core.page())
+    assert "run failed" in page and job.error.split(":")[0] in page and "Pick a scenario" not in page
+    assert "run failed" in _text(core.right())
+    # a good run afterwards clears it
+    core.state.file_cfg = _small()
+    core.run()
+    assert core.current_failure() is None and "run failed" not in _text(core.page())
+
+
+def test_rejected_edits_say_why():
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0, autorun=False)
+    core = app.d2d
+    assert not core.apply_edit("lanes.count", 4.5) and "whole number" in core.edit_error
+    assert "lanes.count" not in core.state.overrides
+    assert not core.apply_edit("channel.length_mm", "abc") and "Length" in core.edit_error or "length" in core.edit_error.lower()
+    assert not core.apply_edit("lanes.count", -4) and "lanes.count" in core.edit_error
+    assert "rejected" in _text(core.drawer()) and "rejected" in _text(core.right())
+    assert core.apply_edit("channel.length_mm", 30.0) and core.edit_error is None
+    # an invalid value on an already overridden field keeps the earlier override
+    assert not core.apply_edit("channel.length_mm", -1.0) and core.state.overrides["channel.length_mm"] == 30.0
+
+
+def test_scenario_list_matches_the_files_own_run():
+    """A run with overrides carries the scenario's label; the list used to
+    show it as the file's result (and never showed a run whose label had a
+    '+1' suffix). Matching is by config hash now."""
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0)
+    core = app.d2d
+    assert "209.7 mV" in _text(core.left())
+    core.apply_edit("channel.length_mm", 30.0)
+    core.run()
+    r30, _ = core.current_result()
+    assert r30["report"]["link"]["length_mm"] == 30.0
+    left = _text(core.left())
+    assert "209.7 mV" in left and f"{1e3 * r30['lanes'][0]['eye_height_v']:.1f} mV" not in left
+    assert set(core.scenario_hashes()) == {str(p) for p in sorted((REPO / "configs").glob("*.yaml"))}
+
+
+def test_exports_go_through_pattern_ids():
+    app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0)
+    core = app.d2d
+    result, _ = core.current_result()
+    content, name = core.download("md")
+    assert name == "standard_32g_x1.budget.md" and content == export.markdown(result)
+    assert core.download("json")[1].endswith(".budget.json") and core.download("yaml")[1].endswith(".overrides.yaml")
+    assert "export" in _text(core.right()) and "btn-export-md" not in _text(core.right())
+    core.state.file_cfg = _small()                       # no result for this config yet: the page shows the
+    shown, stale = core.current_result()                 # last one dimmed, and that is what an export carries
+    assert shown is result and stale
+    assert core.download("md")[0] == content and core.download("yaml") is not None
+    core.shown = None
+    assert core.download("md") is None
+
+
+def test_disk_cache_is_keyed_by_version(tmp_path):
+    """0.12.0 moved every eye; a cache written by 0.11 would have served the
+    old numbers. The file carries the package version and is ignored when
+    it differs (a pre-key file too)."""
+    import d2d_link
+    from d2d_link.gui.jobs import JobManager as JM
+
+    cfg = _small()
+    j = JM(workers=0, cache_dir=tmp_path).submit("run", cfg)
+    f = next(tmp_path.glob("run-*.json"))
+    data = json.loads(f.read_text())
+    assert data["version"] == d2d_link.__version__ and data["result"]["kind"] == "run"
+    same = JM(workers=0, cache_dir=tmp_path).submit("run", cfg)
+    assert same.started == same.finished and same.result == j.result            # served from disk
+    f.write_text(json.dumps({"version": "0.0.0", "result": dict(data["result"], elapsed_s=-1.0)}))
+    other = JM(workers=0, cache_dir=tmp_path).submit("run", cfg)
+    assert other.result["elapsed_s"] >= 0.0 and other.started != other.finished   # re-run, not the foreign file
+    f.write_text(json.dumps(dict(data["result"], elapsed_s=-1.0)))               # a file from before the key
+    assert JM(workers=0, cache_dir=tmp_path).submit("run", cfg).result["elapsed_s"] >= 0.0
+
+
+def test_process_pool_runs_and_takes_queued_jobs_back():
+    """workers > 0 was never under test: a run through the pool, progress
+    through the manager dict, a queued job cancelled, a running one not."""
+    import time
+
+    cfg = _small()
+    m = JobManager(workers=1)
+    try:
+        a = m.submit("run", cfg, label="a", scope="1 lanes")
+        b = m.submit("sensitivity", cfg, label="b", scope="1 lanes")
+        c = m.submit("rate_sweep", cfg, label="c", scope="1 lanes")
+        assert a.status == "queued" and m.cancellable(c) and m.cancel(c.id) and c.status == "cancelled"
+        deadline = time.time() + 120
+        while a.status not in ("done", "failed") and time.time() < deadline:
+            m.poll()
+            time.sleep(0.2)
+        assert a.status == "done", a.error
+        assert a.result["passes"] in (True, False) and a.elapsed_s is not None
+        while b.status not in ("done", "failed") and time.time() < deadline:
+            jobs = m.poll()
+            if b.status == "running":
+                assert not m.cancellable(b) and not m.cancel(b.id)
+            time.sleep(0.2)
+        assert b.status == "done", b.error
+        assert b.progress is not None and b.progress[0] == b.progress[1] > 1
+        assert [j.id for j in jobs] == [a.id, b.id, c.id]
+    finally:
+        m.shutdown()
+
+
+def test_main_parses_binds_and_shuts_down(monkeypatch, capsys):
+    from dash import Dash
+
+    from d2d_link.gui.app import main
+
+    seen = {}
+    monkeypatch.setattr(Dash, "run", lambda self, **kw: seen.update(kw))
+    rc = main([str(REPO / "configs" / "standard_32g_x1.yaml"), "--no-autorun", "--workers", "0", "--no-cache",
+               "--port", "8123", "--host", "0.0.0.0"])
+    assert rc == 0 and seen["port"] == 8123 and seen["host"] == "0.0.0.0"
+    assert "http://0.0.0.0:8123" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        main(["--also", "bogus"])

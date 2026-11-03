@@ -52,7 +52,7 @@ def _summary(key: str, rows: list[dict]) -> str:
     return ""
 
 
-def drawer(state, open_groups: set[str] | None = None) -> html.Div:
+def drawer(state, open_groups: set[str] | None = None, edit_error: str | None = None) -> html.Div:
     rows = {r["path"]: r for r in state.rows()}
     open_groups = open_groups or set()
     groups = []
@@ -61,7 +61,7 @@ def drawer(state, open_groups: set[str] | None = None) -> html.Div:
         n_over = sum(1 for r in grp_rows if r["source"] == "override")
         head = html.Div([html.Span("▾" if key in open_groups else "▸", className="caret"), html.Span(title),
                          html.Span(_summary(key, grp_rows) + (f" · {n_over} edited" if n_over else ""), className="aside")],
-                        className="grp-head", id={"type": "group", "key": key})
+                        className="grp-head", id={"type": "group", "key": key}, role="button", tabIndex="0")
         body = []
         if key in open_groups:
             for r in grp_rows:
@@ -72,6 +72,7 @@ def drawer(state, open_groups: set[str] | None = None) -> html.Div:
     n = len(state.overrides)
     foot = html.Div([html.Span(f"{n} field(s) differ from the file" if n else "no edits",
                                className="fine"),
+                     html.Span(f"rejected: {edit_error}", className="fine fail") if edit_error else None,
                      html.Button("Discard edits", id="btn-discard", className="btn", disabled=not n),
                      html.Button("Re-run", id="btn-rerun-drawer", className="btn primary")], className="drawer-foot")
     return html.Div([html.Div(groups, className="drawer-body"), foot], className="drawer-inner")

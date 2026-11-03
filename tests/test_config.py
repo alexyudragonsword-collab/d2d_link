@@ -148,3 +148,13 @@ def test_schema_version_in_dump(tmp_path):
     out = tmp_path / "d.yaml"
     dump_config(LinkConfig(), out)
     assert yaml.safe_load(out.read_text())["schema_version"] == 1
+
+
+def test_package_version_matches_pyproject():
+    import re
+    from pathlib import Path
+
+    import d2d_link
+
+    text = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    assert re.search(r'^version = "([^"]+)"', text, re.M).group(1) == d2d_link.__version__

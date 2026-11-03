@@ -5,7 +5,7 @@ summary: "段 8 的浏览器 GUI:报告即界面的设计决定、铁律 1 的�
 tags: [gui, dash, report]
 contains: [decision, lesson]
 created: "2026-10-13"
-updated: "2026-11-02"
+updated: "2026-11-03"
 related: [architecture-invariants.md, engines.md, spec-sources.md]
 authoring_mode: ai_generated
 ---
@@ -43,6 +43,18 @@ authoring_mode: ai_generated
   缓存不跟库版本走 —— 数字会变的版本(性能轮那种)要手动清 `~/.cache/d2d_link/gui`,记在 docs/gui.md。
 - 字符串 id 的 Input 只用于**初始 layout 里就有**的控件(顶栏按钮、tick);栏里渲染出来的全部用模式匹配 id —— 左栏在第一次回调之前是空的,`compare-with` 用字符串 id 时整页空白(G3 第一次截图)。
 
+## 段 10:健壮性(0.12.1)
+
+- 回调主体搬到 `App.handle(trig, inputs_list)`,Dash 回调只剩一行;`App.render_keys()` 给页面 / 右栏 / 抽屉各一把键,tick 只重绘键变了的输出(全不变 → 全 `no_update`,HTTP 204)。
+  运行中任务的秒数只进右栏的键,所以跑任务时每秒只重绘队列卡。`wake` 间隔(5 s)+ 客户端回调把 `document.hidden` 写进 `tick.disabled`。
+- 失败:`JobManager.latest_failed(h)`(最新一个该配置的任务是 failed 才算)→ 页面横幅 + This page 状态;`current_result` 对"不是当前配置的结果"一律标 stale(以前只在有 pending 时标)。
+  `BrokenProcessPool` → `_revive_pool()`,错误文本说明 worker 死了。
+- 缓存文件 `{"version", "result"}`,版本不同或没有版本键就当没有。
+- 编辑:`apply_edit` 把转换与 schema 校验都包进 try,拒绝原因进 `edit_error`;`form.values_to_overrides` 对 int 字段拒绝非整数(以前 `int(4.5)` 静默成 4)。
+- 场景栏:`App.scenario_hashes()`(按 mtime 缓存每个文件的配置哈希)→ `manager.latest_done(h)`。
+- 导出按钮改模式 id `{"type": "export", "name": md|json|yaml}`,回调里用 `_clicked` 过滤重建触发;`atexit` 与 `main` 的 `finally` 调 `shutdown()`。
+- 可访问性:可点 Div 加 `role=button tabIndex=0`,`assets/keys.js` 让 Enter / 空格触发 click;`:focus-visible` 轮廓;`@media (max-width:1100px)` 单栏。
+
 ## 决策记录
 
 - Dash 锁 `>=3,<5`(PyPI 4.4.1):Dash 4 的 Dropdown 换成了 `button.dash-dropdown` 结构,行内控件的 CSS 针对它写;不用 dash-bootstrap / dash-mantine,
@@ -53,6 +65,9 @@ authoring_mode: ai_generated
 - Opus 实跑纠正的三条记录(x5 耦合敏感性无单个翻转、x16 / x5 耗时 29 / 21 s、"x64 五分钟"只在开串扰时成立)已改进 ROADMAP / engines.md。
 
 ## 教训
+
+- 段 10 之前 `current_result` 在"没有 pending 任务"时把上一个结果当成当前配置的结果返回(stale = False):改抽屉字段不跑,页面照常亮着旧数。
+- 进程池的 `future.cancel()` 对已开始的任务永远返回 False,按钮摆在那里就是谎话;只给排队中的任务按钮。
 
 - Dash 回调的 Input 若是字符串 id 且此刻不在 layout 里(随结果出现的按钮),客户端 ReferenceError、整页空白;模式匹配 id 没有这个检查。
 - 每次改 Python 都要重启服务;CSS 不用。截图前看 PNG 大小(十几 KB 就是空白页),或 `--dump-dom` 找关键字。

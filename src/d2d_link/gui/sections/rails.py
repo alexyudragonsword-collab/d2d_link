@@ -12,9 +12,12 @@ from ..figures import bathtub_figure
 from .common import chip
 
 
-def this_page(state, result: dict | None, job) -> html.Div:
+def this_page(state, result: dict | None, job, failed=None, edit_error: str | None = None) -> html.Div:
     rows = []
-    if result:
+    if failed is not None and (result is None or failed.finished and failed.finished > (job.finished if job and job.finished else 0)):
+        rows = [("status", html.Span(f"run failed · {failed.error}", className="fail")),
+                ("overrides vs YAML", str(len(state.overrides)) if state.overrides else "none")]
+    elif result:
         rep = result["report"]
         n_model = sum(1 for k in ("rdc_ohm_m", "r_skin", "loss_tangent", "z0_ohm") if k in rep["channel_model"])
         n_survey = sum(1 for v in rep["targets"].values() if v["source"] == "survey")
@@ -26,6 +29,8 @@ def this_page(state, result: dict | None, job) -> html.Div:
         rows = [("status", job.status), ("overrides vs YAML", str(len(state.overrides)) or "none")]
     else:
         rows = [("status", "not run")]
+    if edit_error:
+        rows.append(("last edit", html.Span(f"rejected · {edit_error}", className="fail")))
     return html.Div([html.H4(["This page", html.Span("results match the file" if not state.overrides else
                                                       f"{len(state.overrides)} override(s)", className="aside")])]
                     + [html.Div([html.Span(k, className="k"), html.Span(v, className="v")], className="kv") for k, v in rows],
@@ -57,7 +62,9 @@ def queue(jobs: list, manager) -> html.Div:
                                html.Div([html.Div(f"{j.label} · {j.kind}" if j.kind != "run" else j.label, className="q-lbl"),
                                          html.Div(sub, className="q-sub")]),
                                html.Button("✕", id={"type": "cancel", "id": j.id}, className="q-cancel",
-                                           title="cancel") if j.status in ("queued", "running") else None],
+                                           title="take this job out of the queue") if manager.cancellable(j) else
+                               (html.Span("", className="q-cancel", title="a running job cannot be interrupted")
+                                if j.status == "running" else None)],
                               className="q-item"))
     if not items:
         items = [html.Div("nothing queued", className="q-sub")]
@@ -70,9 +77,10 @@ def exports(result: dict | None) -> html.Div:
     dis = result is None
     return html.Div([
         html.H4("Export this page"),
-        html.Div([html.Button("Markdown", id="btn-export-md", disabled=dis, className="btn"),
-                  html.Button("JSON", id="btn-export-json", disabled=dis, className="btn"),
-                  html.Button("Overrides YAML", id="btn-export-yaml", className="btn")], className="btn-row"),
+        html.Div([html.Button("Markdown", id={"type": "export", "name": "md"}, n_clicks=0, disabled=dis, className="btn"),
+                  html.Button("JSON", id={"type": "export", "name": "json"}, n_clicks=0, disabled=dis, className="btn"),
+                  html.Button("Overrides YAML", id={"type": "export", "name": "yaml"}, n_clicks=0, className="btn")],
+                 className="btn-row"),
         html.P("The Markdown is the text of tools/budget_report.py; the page adds nothing the report doesn't say.",
                className="fine"),
     ], className="card")
@@ -104,14 +112,15 @@ def unverified(result: dict | None) -> html.Div:
                     className="card")
 
 
-def scenarios(configs_dir: Path, current: Path | None, manager) -> html.Div:
+def scenarios(configs_dir: Path, current: Path | None, manager, hashes: dict | None = None) -> html.Div:
+    """One row per scenario file with the latest result *of that file's
+    config* (matched by config hash, so a run with overrides on top of it
+    is not mistaken for the file's own; ``hashes`` maps path -> hash)."""
     items = []
+    hashes = hashes or {}
     for p in sorted(configs_dir.glob("*.yaml")):
-        job = None
-        for j in reversed(manager.poll()):
-            if j.label == p.stem and j.kind == "run" and j.status == "done":
-                job = j
-                break
+        h = hashes.get(str(p))
+        job = manager.latest_done(h) if h else None
         sub = "not run yet"
         dot = "pending"
         if job and job.result:
@@ -122,7 +131,8 @@ def scenarios(configs_dir: Path, current: Path | None, manager) -> html.Div:
         items.append(html.Div([html.Span("●", className=f"dot {dot}"),
                                html.Div([html.Div(p.stem, className="sc-name"), html.Div(sub, className="sc-sub")])],
                               className="sc-item" + (" on" if current and p.resolve() == current.resolve() else ""),
-                              id={"type": "scenario", "path": str(p)}))
+                              id={"type": "scenario", "path": str(p)}, role="button", tabIndex="0",
+                              title=f"open {p.name}"))
     return html.Div([html.H4(["Scenarios", html.Span("configs/", className="aside")]), *items], className="card")
 
 

@@ -23,7 +23,7 @@ d2d-link-gui configs/standard_32g_x1.yaml --no-cache       # 不写磁盘缓存
 | `--no-autorun` | 打开配置但不自动运行 |
 | `--also a,b` | 启动时就排进队列的任务:`sensitivity`、`rate_sweep`、`sweep:track_bw`、`sweep:local_pll_fn`、`sweep:reach` |
 | `--compare PATH` | 启动时就在 "Compare with" 里选中的场景 |
-| `--cache DIR` / `--no-cache` | 结果缓存目录(默认 `$XDG_CACHE_HOME/d2d_link/gui` 或 `~/.cache/d2d_link/gui`),按配置哈希存 JSON,重启后秒开;缓存不跟库版本走,升级到会动数字的版本后请清掉它 |
+| `--cache DIR` / `--no-cache` | 结果缓存目录(默认 `$XDG_CACHE_HOME/d2d_link/gui` 或 `~/.cache/d2d_link/gui`),按配置哈希存 JSON,重启后秒开;文件带库版本号,别的版本写的(或 0.12.1 之前没有版本号的)会被忽略并重跑 |
 | `--open-drawer` | 启动时打开 All fields 抽屉 |
 
 ## 页面
@@ -48,6 +48,19 @@ d2d-link-gui configs/standard_32g_x1.yaml --no-cache       # 不写磁盘缓存
 | 敏感性(17 次) | ~30 s | 348 s | — |
 | 速率扫描(6 档) | ~10 s | 167 s | 222 s |
 | tracker 带宽扫描(12 点) | 18 s | — | — |
+
+## 健壮性(段 10,0.12.1)
+
+- 浏览器每秒轮询,但服务端只在**渲染键**变了才重绘:配置 / overrides / 选中 lane / 比较场景 / 任务状态进度(页面与左栏)、再加运行中任务的秒数(右栏队列)、
+  抽屉的折叠组。什么都没变的 tick 返回 204,图不换、悬停缩放不丢。标签页切到后台时轮询停(5 s 内恢复)。
+- 当前配置的运行**失败**时页面顶部出红色横幅(错误原文),This page 卡的状态也写 failed;有旧结果时旧结果置灰保留。worker 进程死掉(OOM、被杀)时进程池自动重建,
+  受影响的任务标 failed 并说明,再按 Run 即可。
+- 编辑被拒(非数字、负数、`lanes.count` 4.5 这类非整数)不再静默弹回:抽屉底部与 This page 卡显示"rejected: 字段: 原因",直到下一次成功的编辑。
+- 场景栏按**配置哈希**找该文件自己的运行(以前按 label,带 override 的运行会被当成文件的结果)。
+- Queue 的 ✕ 只在排队中的任务上出现:进程池无法中断已经开始的任务(悬停提示)。
+- 键盘:lane 格、场景行、字段组都能 Tab 到、Enter / 空格激活,焦点有可见轮廊;窄于 1100 px 时三栏变一栏。
+- 测试:`App.handle` 是回调主体,测试直接驱动它(tick 不重绘、点选、编辑、丢弃);失败路径、编辑拒绝、场景匹配、导出、缓存版本、
+  `workers=1` 的进程池(排队 / 取消 / 进度)、`main()` 参数解析都有测试。
 
 ## 不做
 

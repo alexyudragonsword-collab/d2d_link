@@ -4,6 +4,26 @@
 
 ---
 
+## [0.12.1] — 2026-11-03 — 段 10:GUI 健壮性(指纹逐位相同)
+
+### 修复
+- **每秒整页重绘**:回调主体搬到 `App.handle`,`render_keys()` 给页面 / 右栏 / 抽屉各一把渲染键,什么都没变的 tick 全部 `no_update`(HTTP 204);
+  跑任务时每秒只重绘队列卡;标签页隐藏时轮询暂停(`wake` 5 s + 客户端回调)。
+- **失败有反馈**:当前配置的运行失败 → 页面红色横幅(错误原文)+ This page 状态;旧结果只置灰保留。`current_result` 对"不是当前配置的结果"一律标 stale。
+  worker 进程死掉(`BrokenProcessPool`)时进程池重建、任务标 failed 并说明。
+- **磁盘缓存带版本号**:`{"version", "result"}`,别的版本或没有版本键的文件忽略(0.12.0 动了每一只眼,旧缓存会端旧数)。
+- **编辑被拒说原因**:转换与 schema 校验都包进 `apply_edit`,`edit_error` 显示在抽屉底部与 This page 卡;int 字段拒绝非整数(`lanes.count` 4.5 以前静默成 4)。
+- 场景栏按配置哈希找文件自己的运行(以前按 label,带 override 的运行冒充文件的结果);Queue 的 ✕ 只给排队中的任务(进程池无法中断已开始的);
+  导出按钮改模式 id;`atexit` / `main` 的 `finally` 调 `shutdown()`。
+- 可访问性:可点 Div 加 `role=button tabIndex=0`、Enter / 空格激活(`assets/keys.js`)、`:focus-visible` 轮廓;窄于 1100 px 单栏。
+- `d2d_link.__version__` 与 pyproject 对齐(0.12.0 漏了),加测试。
+
+### 测试
+- `tests/test_gui.py` +8:tick 不重绘 / 点选 / 编辑 / 丢弃走 `App.handle`;失败路径;编辑拒绝;场景匹配;导出;缓存版本;`workers=1` 进程池(排队、取消、进度);`main()` 参数。
+  套件 21 项 GUI 测试 19 s。无头 Chromium 实跑:0 条控制台错误,下载、抽屉、点选、键盘 Enter 开场景都通过。
+
+---
+
 ## [0.12.0] — 2026-11-02 — 段 9b:可信度 C(数字会变:走线因果化、脉冲窗、Touchstone 带外、训练窗、报告标签)
 
 ### 修正(会动结论)
