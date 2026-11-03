@@ -429,6 +429,7 @@ def test_process_pool_runs_and_takes_queued_jobs_back():
             time.sleep(0.2)
         assert a.status == "done", a.error
         assert a.result["passes"] in (True, False) and a.elapsed_s is not None
+        jobs = m.poll()                    # b may already be done (CI's runner finished it inside a's loop)
         while b.status not in ("done", "failed") and time.time() < deadline:
             jobs = m.poll()
             if b.status == "running":
