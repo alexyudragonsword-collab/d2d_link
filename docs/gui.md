@@ -40,11 +40,11 @@ d2d-link-gui configs/standard_32g_x1.yaml --no-cache       # 不写磁盘缓存
 - **右栏**:This page(来源计数、overrides 数)、Queue(进度 / 剩余时间 / 取消)、Inspector(选中 lane 的眼对目标、浴盆、事实)、Data rate × package、Export(Markdown 与 CLI 逐字同文、JSON、overrides YAML)、Unverified inputs(survey 条目 + cite)。
 - **All fields 抽屉**:由 `config/form.py::SECTIONS` 生成,折叠组一行摘要,来源标签 yaml / default / model / survey / override;改动只写 overrides,按 Re-run 才跑。
 
-## 耗时(空闲机器,2 个 worker)
+## 耗时(空闲机器,2 个 worker;运行一行是 0.12.2,其余 0.11 量的,0.12 的 512 UI 窗让每次运行多约 20 %)
 
 | 任务 | x1 25 mm | x5 耦合 25 mm | x16 模块 20 mm |
 |---|---|---|---|
-| 运行 | 1.6 s | 21 s | 29 s |
+| 运行 | 1.3 s | 14 s | 19 s |
 | 敏感性(17 次) | ~30 s | 348 s | — |
 | 速率扫描(6 档) | ~10 s | 167 s | 222 s |
 | tracker 带宽扫描(12 点) | 18 s | — | — |

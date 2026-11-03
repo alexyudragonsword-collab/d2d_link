@@ -138,34 +138,96 @@ def _shift_add(p: np.ndarray, s: float) -> np.ndarray:
     return q
 
 
+def _sorted_cursors(cursors: np.ndarray, i_main: int, extra: np.ndarray | None) -> np.ndarray:
+    """The interferers, largest first: the lane's own cursors without the
+    main one and the neighbours' crosstalk cursors on the same footing."""
+    c = np.delete(np.asarray(cursors, dtype=np.float64), i_main)
+    if extra is not None and np.asarray(extra).size:
+        c = np.concatenate([c, np.asarray(extra, dtype=np.float64)])
+    return c[np.argsort(-np.abs(c), kind="stable")]
+
+
+def small_kernel(small: np.ndarray, chunk: int = 16) -> np.ndarray:
+    """The kernel of the sub-bin shifts ``small`` (in order): the product of
+    their 3-tap kernels [f/2, 1-f, f/2].
+
+    The chain of 480 ``np.convolve`` calls a module lane's tail took (6 us of
+    overhead each, half of a module's run time before perf round II) is
+    replaced by two cheaper stages: the cursors are cut into chunks of
+    ``chunk`` and every chunk's kernel is built at once on a 2-D array (one
+    step = three slice products and two sums over all chunks; the last chunk
+    is padded with f = 0, the identity kernel [0, 1, 0], whose zero taps are
+    cut off afterwards), then the chunk kernels are convolved together.
+    The products are the same, in another association, so the result agrees
+    with the plain chain to the last few bits -- the one place this round
+    moved the fingerprint (max 3e-16 relative on the kernel taps)."""
+    small = np.asarray(small, dtype=np.float64)
+    n = small.size
+    if n == 0:
+        return np.ones(1)
+    rows = -(-n // chunk)
+    F = np.zeros((rows, chunk))
+    F.flat[:n] = small
+    half_f, one_f = 0.5 * F, 1.0 - F
+    k = np.ones((rows, 1))
+    for j in range(chunk):
+        a = half_f[:, j][:, None]
+        b = one_f[:, j][:, None]
+        width = k.shape[1]
+        out = np.empty((rows, width + 2))
+        # out[m] = (x[m-2] a + x[m-1] b) + x[m] a, x being zero outside its range
+        out[:, 0] = k[:, 0] * a[:, 0]
+        if width == 1:
+            out[:, 1] = k[:, 0] * b[:, 0]
+            out[:, 2] = k[:, 0] * a[:, 0]
+        else:
+            out[:, 1] = k[:, 0] * b[:, 0] + k[:, 1] * a[:, 0]
+            if width > 2:
+                out[:, 2:width] = (k[:, :-2] * a + k[:, 1:-1] * b) + k[:, 2:] * a
+            out[:, width] = k[:, -2] * a[:, 0] + k[:, -1] * b[:, 0]
+            out[:, width + 1] = k[:, -1] * a[:, 0]
+        k = out
+    pad = rows * chunk - n
+    kern = k[0]
+    for r in range(1, rows):
+        row = k[r, pad: k.shape[1] - pad] if r == rows - 1 and pad else k[r]
+        kern = np.convolve(kern, row)
+    if rows == 1 and pad:
+        kern = kern[pad: kern.size - pad]
+    return kern
+
+
+def _assemble(cursors, i_main: int, bin_v: float, c: np.ndarray, kern: np.ndarray | None) -> IsiModel:
+    """The small cursors' kernel first, then the big cursors' shift-add
+    chain on top of it: the chain is a few slice additions per cursor
+    whatever the array's length, while convolving the finished chain (2400
+    bins) with the kernel (960 taps) cost 2.3 M multiply-adds per model, a
+    third of a module's run before perf round II. Same distribution, the
+    factors multiplied in another order (last bits)."""
+    shifts = np.abs(c) / bin_v
+    p = kern.copy() if kern is not None and kern.size > 1 else np.ones(1)
+    for sk in shifts[shifts >= 1.0]:
+        p = _shift_add(p, sk)
+    half = (p.size - 1) // 2
+    grid = (np.arange(p.size) - half) * bin_v
+    return IsiModel(float(cursors[i_main]), grid, p, float(bin_v), int(c.size), float(math.sqrt(np.sum(c ** 2))))
+
+
+def _small_shifts(c: np.ndarray, bin_v: float) -> np.ndarray:
+    shifts = np.abs(c) / bin_v
+    return shifts[(shifts < 1.0) & (shifts > 0.0)]
+
+
 def isi_model(cursors: np.ndarray, i_main: int, bin_v: float, extra: np.ndarray | None = None) -> IsiModel:
     """``extra`` are further interferers with independent +-1 symbols (the
     neighbour lanes' crosstalk cursors): they join the ISI cursors in the
     distribution on the same footing. Cursors are added largest first so the
-    distribution's support grows as late as possible."""
-    c = np.delete(np.asarray(cursors, dtype=np.float64), i_main)
-    if extra is not None and np.asarray(extra).size:
-        c = np.concatenate([c, np.asarray(extra, dtype=np.float64)])
-    c = c[np.argsort(-np.abs(c), kind="stable")]
-    shifts = np.abs(c) / bin_v
-    big = shifts >= 1.0
-    p = np.ones(1)
-    for sk in shifts[big]:
-        p = _shift_add(p, sk)
-    small = shifts[(~big) & (shifts > 0.0)]
-    if small.size:
-        # a cursor below one bin is the 3-tap kernel [f/2, 1-f, f/2] (the two
-        # half-weight copies share the centre bin, the fractions go one bin
-        # out); the kernels commute, so the whole tail of small cursors is
-        # one kernel, built once from tiny arrays, and one convolution --
-        # 90 of the 130 cursors of a 25 mm line go this way (perf round)
-        kern = np.ones(1)
-        for f in small:
-            kern = np.convolve(kern, np.array([0.5 * f, 1.0 - f, 0.5 * f]))
-        p = np.convolve(p, kern)
-    half = (p.size - 1) // 2
-    grid = (np.arange(p.size) - half) * bin_v
-    return IsiModel(float(cursors[i_main]), grid, p, float(bin_v), int(c.size), float(math.sqrt(np.sum(c ** 2))))
+    distribution's support grows as late as possible; a cursor below one bin
+    is the 3-tap kernel [f/2, 1-f, f/2] and the whole tail of them is one
+    kernel (``small_kernel``) and one convolution."""
+    c = _sorted_cursors(cursors, i_main, extra)
+    small = _small_shifts(c, bin_v)
+    return _assemble(cursors, i_main, bin_v, c, small_kernel(small) if small.size else None)
 
 
 def log10_tail(m: IsiModel, sigma_noise: float, v) -> np.ndarray | float:

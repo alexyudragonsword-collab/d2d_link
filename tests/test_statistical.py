@@ -239,3 +239,30 @@ def test_sampler_jitter_includes_the_pi_step():
     assert r.sigma_sampling_s > r.sigma_jitter_s and "PI step" in r.summary()
     plain = run_statistical(dataclasses.replace(cfg, clocking=ClockingConfig(data_path_rj_s=200e-15)))
     assert plain.sigma_sampling_s == plain.sigma_jitter_s and "PI step" not in plain.summary()
+
+
+def test_small_kernel_is_the_chain_of_three_tap_kernels():
+    """Perf round II: the sub-bin cursors' kernel is built in chunks on a 2-D
+    array and the chunks convolved, instead of one np.convolve per cursor;
+    the same product in another association, within a few ulps of the plain
+    chain for any length, and the chain's exact shape."""
+    from d2d_link.engine.statistical import small_kernel
+
+    rng = np.random.default_rng(7)
+    for n in (0, 1, 2, 15, 16, 17, 33, 480):
+        sm = rng.random(n) * 0.999
+        k = small_kernel(sm)
+        ref = np.ones(1)
+        for f in sm:
+            ref = np.convolve(ref, np.array([0.5 * f, 1.0 - f, 0.5 * f]))
+        assert k.shape == ref.shape == (2 * n + 1,)
+        assert np.allclose(k, ref, rtol=1e-12, atol=1e-300)
+        assert k.sum() == pytest.approx(1.0, abs=1e-12)
+    # the model built kernel-first equals the old chain-first one to the bin
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0), sim=SimConfig(stat_phase_points=16))
+    from d2d_link.channel import link_response
+    r = link_response(cfg)
+    c, i_main = r.cursors(0.0)
+    m = isi_model(c, i_main, cfg.sim.stat_isi_bin_v)
+    assert m.pmf.sum() == pytest.approx(1.0, abs=1e-12) and m.n_cursors == c.size - 1
+    assert float(np.sqrt(np.sum((m.grid_v ** 2) * m.pmf))) == pytest.approx(m.sigma_isi_v, rel=0.02)   # the grid's variance over by < f(1-f) bin^2 per cursor
