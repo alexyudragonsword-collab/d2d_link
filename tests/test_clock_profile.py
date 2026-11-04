@@ -71,12 +71,14 @@ def test_profile_to_nyquist_matches_the_floor_reading():
 
     to16 = {"pll_profile": "data/clock_profiles/bench_markulic16_sspll_40m_10p24g_to16g.yaml",
             "local_pll_profile": "data/clock_profiles/bench_wu19_spll_frac_52m_6p253g_to16g.yaml"}
+    half = {"pll_profile": PROFILE, "local_pll_profile": "data/clock_profiles/bench_wu19_spll_frac_52m_6p253g.yaml"}
     for key, floor_dbc in (("pll_profile", -145.0), ("local_pll_profile", -154.0)):
         p = ClockProfile.load(resolve_data_file(to16[key]))
         top = p.f_hz >= 1e9
         assert p.f_hz[-1] == pytest.approx(16e9) and np.all(np.abs(p.l_dbc_hz[top] - floor_dbc) < 0.05)
     for cfg_name, keys in (("standard_32g_x1", ("pll_profile",)), ("standard_32g_x16_module", ("pll_profile", "local_pll_profile"))):
         cfg = load_config(REPO / "configs" / f"{cfg_name}.yaml")
+        cfg = dataclasses.replace(cfg, clocking=dataclasses.replace(cfg.clocking, **{k: half[k] for k in keys}))
         ref = ForwardedClock(cfg).budget()                       # the f0/2 files, floor reading
         for reading in ("floor", "zero"):
             kw = {k: to16[k] for k in keys}
@@ -86,3 +88,19 @@ def test_profile_to_nyquist_matches_the_floor_reading():
             assert b.total_s == pytest.approx(ref.total_s, rel=1e-4), (cfg_name, reading)
     zero = ForwardedClock(dataclasses.replace(cfg, clocking=dataclasses.replace(cfg.clocking, profile_above="zero"))).budget()
     assert zero.common_leak_s < 0.75 * ref.common_leak_s       # the f0/2 file read with zero drops what the model has
+
+
+def test_bundled_configs_read_profiles_that_reach_the_link_nyquist():
+    """Since 0.13.7 every bundled config names a profile computed to the
+    edge rate's Nyquist (tools/export_profile_to_nyquist.py), so its verdict
+    does not depend on ``clocking.profile_above`` at all."""
+    from conftest import REPO
+    from d2d_link.config import load_config
+
+    for path in sorted((REPO / "configs").glob("*.yaml")):
+        cfg = load_config(path)
+        for name in ("pll_profile", "local_pll_profile"):
+            ref = getattr(cfg.clocking, name)
+            if ref is not None:
+                p = ClockProfile.load(resolve_data_file(ref))
+                assert p.f_hz[-1] >= cfg.f_nyquist * (1 - 1e-9), (path.name, name)

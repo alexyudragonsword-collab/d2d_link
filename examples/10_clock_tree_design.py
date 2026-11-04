@@ -23,7 +23,9 @@ How much floor there is to double depends on two things:
   between 5.12 and 16 GHz; this example shows how much of the verdict the
   reading carries. (0.13.4 asked pll_simulator's model for the missing band:
   it is flat at the VCO floor, so ``floor`` is the model and ``zero`` the
-  format's cut -- docs/clock_profile.md. The zero rows stay as the contrast.)
+  format's cut -- docs/clock_profile.md. Since 0.13.7 the bundled configs
+  read the 16 GHz export, where the two readings coincide; this example
+  keeps the f0/2 file so the zero rows stay as the contrast.)
 
 Four readings, each a dataclass replace of a bundled config. The variant
 profiles are written to a temporary directory and named by
@@ -64,13 +66,19 @@ BUNDLED_FLOOR = -145.0         # the profile's asymptote: l_dbc_hz -> -145.0 at 
 
 
 # ------------------------------------------------------- the floor variants
-src = resolve_data_file(x1.clocking.pll_profile)
+# the format's f0/2 export of the bundled PLL, not the configs' 16 GHz one
+# (0.13.7): only on it do the two readings of the band above 5.12 GHz differ
+F0HALF = "data/clock_profiles/bench_markulic16_sspll_40m_10p24g.yaml"
+LOCAL_F0HALF = "data/clock_profiles/bench_wu19_spll_frac_52m_6p253g.yaml"
+src = resolve_data_file(F0HALF)
 base = yaml.safe_load(src.read_text())
-PROFILES = {fl: pll_floor_variant(x1.clocking.pll_profile, fl, BUNDLED_FLOOR) for fl in FLOORS}
+PROFILES = {fl: pll_floor_variant(F0HALF, fl, BUNDLED_FLOOR) for fl in FLOORS}
 
 
 def clocked(cfg, floor_dbc, reading, tau_ps=None, tree_bw="keep"):
     kw = {"pll_profile": PROFILES[floor_dbc], "profile_above": reading}
+    if cfg.clocking.local_pll_profile is not None:
+        kw["local_pll_profile"] = LOCAL_F0HALF          # the local PLL's f0/2 export too: the readings act on both
     if tau_ps is not None:
         kw["tree_delay_ps"] = float(tau_ps)
     if tree_bw != "keep":

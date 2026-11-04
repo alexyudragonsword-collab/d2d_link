@@ -24,7 +24,7 @@ training centres the eye at its own BER:
                     x1         1e-09     -0.01823     -0.00109    0.7069     203.9
     x5 coupled, lane 0         1e-03     -0.00302     -0.00502    0.6243     197.8   (target-centred 0.6344 UI)
     x5 coupled, lane 1         1e-03     -0.02715     +0.00150    0.6166     194.2   (target-centred 0.6196 UI)
-    x5 coupled, lane 2         1e-03     +0.00138     -0.00907    0.5571     191.2   (target-centred 0.5753 UI)
+    x5 coupled, lane 2         1e-03     +0.00138     -0.00907    0.5572     191.2   (target-centred 0.5753 UI)
     x5 coupled, lane 3         1e-03     -0.00881     -0.00443    0.5918     193.3   (target-centred 0.6006 UI)
     x5 coupled, lane 4         1e-03     -0.02101     -0.00086    0.6719     199.5   (target-centred 0.6736 UI)
   x5 module FAIL target-centred, FAIL trained at 1e-3 (worst lane 2 -> 2); x1's bathtub is nearly symmetric and training costs 0.002 UI, the crosstalk-laden lanes pay up to 0.018 UI (lane 2)

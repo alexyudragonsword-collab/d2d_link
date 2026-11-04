@@ -14,7 +14,7 @@ lanes:
   count: 1
 clocking:
   scheme: forwarded_ddr
-  pll_profile: data/clock_profiles/bench_markulic16_sspll_40m_10p24g.yaml
+  pll_profile: data/clock_profiles/bench_markulic16_sspll_40m_10p24g_to16g.yaml
   correlation: 1.0
   data_path_rj_s: 200.0e-15
   clock_path_rj_s: 200.0e-15

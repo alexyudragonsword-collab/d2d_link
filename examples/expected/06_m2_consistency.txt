@@ -1,13 +1,13 @@
 local PLL, coloured clock noise: noise 0.10 mV, jitter 3844 fs, phase -0.0156 UI
-  statistical 2.530e-05 [~s]   time 3.075e-05 (123 errors in 112 bursts / 4.0e+06, 95% 2.5e-05..3.7e-05) [~s]   ratio 1.22 -> within 0.5-2x
+  statistical 2.527e-05 [~s]   time 3.075e-05 (123 errors in 112 bursts / 4.0e+06, 95% 2.5e-05..3.7e-05) [~s]   ratio 1.22 -> within 0.5-2x
 quantised, delayed tracker: noise 37.26 mV, jitter 2082 fs + PI step 0.03125 UI, phase -0.0156 UI
   statistical 1.000e-05 [~s]   time 9.000e-06 (36 errors in 35 bursts / 4.0e+06, 95% 6.1e-06..1.3e-05) [~s]   ratio 0.90 -> within 0.5-2x
 path wander through the tracker: noise 37.19 mV, jitter 2225 fs, phase -0.0156 UI
-  statistical 1.000e-05 [~s]   time 7.750e-06 (31 errors in 31 bursts / 4.0e+06, 95% 5.0e-06..1.1e-05) [~s]   ratio 0.77 -> within 0.5-2x
+  statistical 1.000e-05 [~s]   time 7.750e-06 (31 errors in 31 bursts / 4.0e+06, 95% 5.0e-06..1.1e-05) [~s]   ratio 0.78 -> within 0.5-2x
 crosstalk, x3 module at -14 dB, middle lane (2 aggressors, 1.9 mV RMS crosstalk): noise 40.0 mV
   statistical 1.356e-05   time 1.300e-05 (26 errors in 26 bursts / 2.0e+06) [~s]   ratio 0.96 -> within 0.5-2x; edge lanes 1.10 / 1.03
 advanced package, CTLE, 0.06 UI DCD: noise 45.73 mV, jitter 1387 fs, phase -0.0156 UI
   statistical 1.000e-05 [~s]   time 7.750e-06 (31 errors in 31 bursts / 4.0e+06, 95% 5.0e-06..1.1e-05) [~s]   ratio 0.78 -> within 0.5-2x
 
-5 points, ratios 0.77..1.22 -- all within 0.5-2x
+5 points, ratios 0.78..1.22 -- all within 0.5-2x
 wrote examples/output/06_m2_consistency.png

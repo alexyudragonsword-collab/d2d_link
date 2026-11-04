@@ -28,7 +28,7 @@ source: "pllsim preset ..., pllsim 0.9.6, commit ..."
 在 100 Hz..`--f-hi`(默认 16 GHz)的对数网格上直接分析模型,按同一格式写出 `<preset>_to16g.yaml`(source 行写明 pllsim 版本、commit 与本工具)。
 随库附两个:`bench_markulic16_sspll_40m_10p24g_to16g.yaml` 与 `bench_wu19_spll_frac_52m_6p253g_to16g.yaml`(pllsim 0.9.6 @ 00e48a2f)。
 读它们时两种口径给出同一预算:x1 泄漏 223.42 fs(f0/2 文件 + floor 223.43)、总 365.52 fs、眼宽 0.7091 UI;x16 模块总 331.54 对 331.56 fs
-(`tests/test_clock_profile.py::test_profile_to_nyquist_matches_the_floor_reading`)。bundled 配置仍指向 f0/2 的文件:换过去数字只差 0.01 fs 量级。
+(`tests/test_clock_profile.py::test_profile_to_nyquist_matches_the_floor_reading`)。0.13.7 起 bundled 配置都指向 `_to16g` 文件(眼宽变 ≤ 8e-6 UI;`tests/test_clock_profile.py` 守着每个 bundled 剖面覆盖到 fs/2),口径不再影响任何结论;f0/2 文件留给测试与示例 10 的读法对照。
 还开着的是底噪本身:−145 dBc/Hz 是 pllsim 预设的 VCO 参数 `pn_floor_dbchz`,不是从 Markulic 2016 原文读的(未核实)。
 另一个口径问题这里不解决:10.24 GHz 载波在 16 GHz 偏移处的连续时间相噪,经时钟边沿采样后如何折叠,由消费端的时钟方案决定;本库把它当作边沿率 fs 上的定时噪声。
 
