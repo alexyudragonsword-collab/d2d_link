@@ -279,5 +279,112 @@ def sensitivity_markdown(sens: dict) -> str:
     return "\n".join(lines)
 
 
+# ------------------------------------------------------------ eye-width attribution
+#
+# Since 0.13.6 every bundled 32 GT/s config fails on eye width. Where does the
+# width go? Each cause is switched off by a replace of the config; the
+# remainder with all of them off is the channel's ISI and the receiver noise.
+# The causes interact (edge crosstalk costs more once jitter has pushed the
+# bathtub's walls in), so the split is the Shapley value: each cause's gain
+# averaged over every order of switching them off, which sums exactly to the
+# gap (0.13.8).
+
+ATTRIBUTION_CAUSES = ("crosstalk", "jitter", "PI step")
+
+
+def attribution_causes(cfg) -> tuple[str, ...]:
+    """The causes this config has: crosstalk (lanes > 1 and any xtalk mode),
+    jitter (always), the PI step (``LinkConfig.pi_step_ui`` > 0)."""
+    out = []
+    if (cfg.channel.xtalk != "none" or cfg.channel.xtalk_next != "none") and cfg.lanes.count > 1:
+        out.append("crosstalk")
+    out.append("jitter")
+    if cfg.pi_step_ui > 0.0:
+        out.append("PI step")
+    return tuple(out)
+
+
+def switched_off(cfg, off):
+    """``cfg`` with the named causes removed: crosstalk -> ``xtalk`` and
+    ``xtalk_next`` none; jitter -> every clock-path term zero (both PLL
+    profiles and white parts, path white and wander, tree jitter, DCD; the
+    tree's delay and the tracker stay, with nothing to track they cost
+    nothing); PI step -> ``clocking.pi_step_ui`` 0 and an ideal deskew."""
+    import dataclasses
+
+    R = dataclasses.replace
+    ch, ck, ln = cfg.channel, cfg.clocking, cfg.lanes
+    if "crosstalk" in off:
+        ch = R(ch, xtalk="none", xtalk_next="none")
+    if "jitter" in off:
+        ck = R(ck, pll_profile=None, pll_rj_s=0.0, local_pll_profile=None, local_pll_rj_s=0.0, data_path_rj_s=0.0,
+               clock_path_rj_s=0.0, tree_rj_s=0.0, data_path_wander_s=0.0, clock_path_wander_s=0.0, dcd_ui=0.0,
+               tx_dcd_ui=0.0)
+    if "PI step" in off:
+        ck = R(ck, pi_step_ui=0.0)
+        ln = R(ln, deskew_with_tracker="ideal")
+    return R(cfg, channel=ch, clocking=ck, lanes=ln)
+
+
+def shapley(items, value) -> dict:
+    """Each item's gain ``value(S | {i}) - value(S)`` averaged over every
+    order of adding the items; the gains sum to ``value(all) - value(none)``."""
+    import itertools
+
+    n = len(items)
+    out = {}
+    for i in items:
+        rest = [j for j in items if j != i]
+        total = 0.0
+        for k in range(n):
+            for S in itertools.combinations(rest, k):
+                w = math.factorial(k) * math.factorial(n - k - 1) / math.factorial(n)
+                total += w * (value(frozenset(S) | {i}) - value(frozenset(S)))
+        out[i] = total
+    return out
+
+
+def attribution(cfg, progress=None) -> dict:
+    """The worst-lane eye width with every subset of the config's causes
+    switched off (2^k runs, k <= 3), and each cause's Shapley share of the
+    gap between the full eye and the ISI-and-noise eye."""
+    import itertools
+
+    from d2d_link.engine import run_link
+
+    items = attribution_causes(cfg)
+    eye, lane, target = {}, {}, None
+    subsets = [frozenset(S) for k in range(len(items) + 1) for S in itertools.combinations(items, k)]
+    for done, S in enumerate(subsets, 1):
+        res = run_link(switched_off(cfg, S))
+        eye[S], lane[S] = res.eye_width_min_ui, res.worst.lane
+        target = res.worst.targets["eye_width_ui"][0]
+        if progress is not None:
+            progress(done, len(subsets))
+    share = shapley(items, lambda S: eye[S])
+    full, ideal = eye[frozenset()], eye[frozenset(items)]
+    return {"causes": list(items), "target_ui": target, "full_ui": full, "ideal_ui": ideal,
+            "worst_lane": lane[frozenset()], "ideal_lane": lane[frozenset(items)],
+            "share_ui": share, "alone_off_ui": {i: eye[frozenset({i})] for i in items},
+            "subsets": [{"off": sorted(S), "eye_width_ui": eye[S], "worst_lane": lane[S]} for S in subsets]}
+
+
+def attribution_markdown(att: dict) -> str:
+    gap = att["ideal_ui"] - att["full_ui"]
+    t = att["target_ui"]
+    lines = ["## Where the eye width goes", "",
+             f"Worst-lane eye width {att['full_ui']:.4f} UI (lane {att['worst_lane']}); with every cause below switched "
+             f"off (ISI and noise only) {att['ideal_ui']:.4f} UI; gap {gap:.4f} UI; target {t:g} UI. Shares are "
+             "Shapley values (averaged over every order of switching the causes off) and sum to the gap.", "",
+             "| cause | share [UI] | of gap | eye with only this off [UI] | passes |", "|---|---:|---:|---:|---|"]
+    for i in att["causes"]:
+        a = att["alone_off_ui"][i]
+        lines.append(f"| {i} | {att['share_ui'][i]:.4f} | {att['share_ui'][i] / gap if gap > 0 else 0.0:.0%} | "
+                     f"{a:.4f} | {'yes' if a >= t else 'no'} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
 __all__ = ["budget_rows", "report", "to_markdown", "build", "sensitivity_knobs", "sensitivity",
+           "attribution", "attribution_causes", "attribution_markdown", "switched_off", "shapley",
            "sensitivity_markdown"]

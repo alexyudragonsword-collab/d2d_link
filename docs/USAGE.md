@@ -14,6 +14,7 @@ python examples/08_crosstalk_physics.py      # 布线、反向 lane 的 NEXT、�
 python examples/09_receiver_front_end.py     # 收端前端带宽、噪声口径、CTLE 代价、训练 BER
 python examples/10_clock_tree_design.py      # 树延时 × 树带宽 × PLL 底噪 × 剖面口径:过的边界,约 5 分钟
 python examples/11_module_jitter_budget.py   # x16 模块能承受的抖动 σ* 与各杠杆,约 3–4 分钟
+python examples/12_eye_width_attribution.py  # 每个配置的眼宽缺口按 串扰 / 抖动 / PI 步长 拆(Shapley),约 3 分钟
 pytest -q
 ```
 
@@ -59,7 +60,7 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 ```bash
 grep "source: survey" src/d2d_link/data/spec/ucie_survey.yaml     # 所有未核实的规范数字
 grep "source: model"  src/d2d_link/data/spec/model_presets.yaml   # 所有模型估计数(走线损耗、叠层、行为级串扰)
-python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity   # 哪些估计 ±20%(dB 值 ±3 dB)会翻转结论
+python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity   # 哪些估计 ±20%(dB 值 ±3 dB)会翻转结论;--attribution 拆眼宽缺口
 ```
 
 走线的 L、C 不是预设:由 `channel.z0_ohm`(预设 50 Ω)与叠层几何的 Hammerstad ε_eff 推出(`LinkConfig.rlgc()`),显式给

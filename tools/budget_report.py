@@ -32,8 +32,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-from d2d_link.report import (build, budget_rows, report, sensitivity, sensitivity_knobs,  # noqa: E402,F401
-                             sensitivity_markdown, to_markdown)
+from d2d_link.report import (attribution, attribution_markdown, build, budget_rows, report,  # noqa: E402,F401
+                             sensitivity, sensitivity_knobs, sensitivity_markdown, to_markdown)
 
 
 def main(argv=None) -> int:
@@ -44,6 +44,8 @@ def main(argv=None) -> int:
     ap.add_argument("--sensitivity", action="store_true",
                     help="also perturb every model / survey number and config jitter (+-20 %%, dB levels +-3 dB) "
                          "and report which flip the verdict")
+    ap.add_argument("--attribution", action="store_true",
+                    help="also split the worst-lane eye-width gap into crosstalk / jitter / PI step (Shapley; 2^k runs)")
     args = ap.parse_args(argv)
     from d2d_link.config import load_config
 
@@ -53,6 +55,9 @@ def main(argv=None) -> int:
     if args.sensitivity:
         rep["sensitivity"] = sensitivity(cfg)
         md += "\n" + sensitivity_markdown(rep["sensitivity"])
+    if args.attribution:
+        rep["attribution"] = attribution(cfg)
+        md += "\n" + attribution_markdown(rep["attribution"])
     if args.out:
         args.out.write_text(md, encoding="utf-8")
         print(f"wrote {args.out}")

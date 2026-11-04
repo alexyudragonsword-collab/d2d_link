@@ -4,6 +4,17 @@
 
 ---
 
+## [0.13.8] — 2026-11-04 — 眼宽归因(不动数字)
+
+### 新增
+- `report.attribution(cfg)` / `attribution_markdown`、`tools/budget_report.py --attribution`:把最差 lane 的眼宽缺口按 串扰 / 抖动 / PI 步长 拆,
+  每项关掉(`report.switched_off`)跑全部 2^k 组合,份额取 Shapley 值(对关掉顺序平均,相加正好是缺口)。示例 12 用它跑全部 bundled 配置与示例 05 的 x64 + FEXT。
+- 结果:抖动是每个配置最大的一份(x1 100 %、x16 模块 73 %、x16 repair / x64 spare 77 %、x5 51 %);串扰 x16 模块 22 %、x5 45 %、x64 + FEXT 31 %;
+  PI 步长(1/16 UI deskew)x16 repair / x64 spare 23 %。单关抖动除 x5 外都过;x64 spare 单关 PI 步长也过(0.765 UI);x5 单关哪项都不过。
+- 测试:Shapley 的交互均分与求和、归因开关与缺口闭合。
+
+---
+
 ## [0.13.7] — 2026-11-04 — bundled 配置读 16 GHz 剖面(数字末位变)
 
 ### 改变
