@@ -140,12 +140,11 @@ def test_data_ships_inside_the_package(tmp_path, monkeypatch):
 
 
 def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
-    """The eye mask the survey quotes carries no rate or package, yet the
-    0.13 verdicts rest on it alone (sensitivity: only the 0.75 UI target
-    flips x1 and the x16 module). The lookup is tiered so the original
-    text's numbers can land per tier: ``<package>.<key>@<rate>`` first, the
-    plain key last. Today every tier resolves to the plain key and the
-    report names it."""
+    """The eye mask the survey quotes carries no rate or package. The lookup
+    is tiered so the original text's numbers can land per tier:
+    ``<package>.<key>@<rate>`` first, the plain key last (0.13.5; on x1 the
+    0.75 UI target alone decides the verdict, sensitivity 0.13.6). Today
+    every tier resolves to the plain key and the report names it."""
     import dataclasses
 
     from d2d_link.config import LinkConfig

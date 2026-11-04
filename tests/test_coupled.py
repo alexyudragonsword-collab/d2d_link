@@ -164,9 +164,10 @@ def test_stripline_has_no_first_order_fext_and_a_slower_line():
 
 
 def test_sensitivity_knobs_cover_the_clock_claims_and_step_db_levels(budget_tool):
-    """Example 11 found the x16 module's verdict set by three config jitters
-    no table sources (data path 200 fs, wander 200 fs, tree 100 fs), and the
-    x1 verdict by the borrowed PLL profile's level: all are knobs now. dB
+    """Example 11 found the x16 module's remaining jitter budget in three
+    config values no table sources (data path 200 fs, wander 200 fs, tree
+    100 fs), and the x1 eye in the borrowed PLL profile's level: all are
+    knobs now (none flips a verdict alone, 0.13.6). dB
     levels move by +-3 dB, not +-20 % (of -30 dB, a factor 2 in amplitude)."""
     from d2d_link.config import load_config
 

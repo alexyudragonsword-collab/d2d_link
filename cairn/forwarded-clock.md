@@ -59,7 +59,7 @@ t_rx[k]   = (h_tree ⊛ t_pll)[k − τ] + n_t[k]                   树:延时 �
   模型积到**边沿率**的 Nyquist fs/2,而共模泄漏 |1 − ρG|² 是高通、恰在被丢的 5–16 GHz 最大:x1(30 ps / 20 GHz 树)泄漏 59 → 223 fs、总抖动 295 → 366 fs。
   **后果:32 GT/s 的判定由时钟树决定**——x1 在 2 mm 也只有 0.745 UI(< 0.75);理想树时 25 mm 0.751 UI 过。前向时钟只在 f < ~1/(6τ) 有利,
   再往上把它跟不上的抖动**加倍**(树 ≈ 1 UI 时 G(fs/2) ≈ −1):`test_tree_delay_leaks_the_common_part_as_a_differentiator`。
-  这条结论依赖借来的 Markulic 剖面 −145 dBc/Hz 底噪(10.24 GHz 载波)在 5–16 GHz 的形状,是模型估计,不是实测。
+  这条结论依赖借来的 Markulic 剖面 −145 dBc/Hz 底噪(10.24 GHz 载波)在 5–16 GHz 的形状,是模型估计,不是实测(更正 0.13.4:形状是平的,未知只剩底噪数值,见下)。
   **0.13.4 核过口径**:pll_simulator 的同一模型算到 16 GHz(`tools/export_profile_to_nyquist.py`)在 1 GHz 以上平在 VCO 底噪 −145.00 dBc/Hz,
   读这个文件时 floor / zero 一样,泄漏 223.42 fs 对 f0/2 文件 + floor 的 223.43 —— floor 是模型,zero 是格式截断。剩下的未知只是底噪的数值
   (pllsim 预设参数 `pn_floor_dbchz`,未对照原文)与边沿采样的折叠(见 `docs/clock_profile.md`)。0.13.7 起 bundled 配置读 `_to16g` 文件,`profile_above` 对它们不起作用。
@@ -71,7 +71,7 @@ t_rx[k]   = (h_tree ⊛ t_pll)[k − τ] + n_t[k]                   树:延时 �
 - **模块抖动预算**(0.13.2,示例 11):统计引擎把残余当一个高斯 σ(加 PI 箱与杂散),所以最差 lane 的眼宽是 σ 的单值函数,读一条曲线即可:
   x16 模块 σ\* = 233.9 fs(0.75 UI;0.13.6 FEXT 形状前 268.7),今天 331.5 fs。单杠杆(闭式):数据路径白抖 200 → 100 fs 到 282.7,跟踪器 10 MHz 296.3,底噪 −155 296.5,
   无漫游 298.0,本地 PLL 0.1 / 10 MHz 327.1 / 334.8(示例 04 的"本地 PLL 带宽"在这条预算里几乎不是杠杆)。组合 24 中 7 过(之前 16)。
-  数据路径 200 fs、漫游 200 fs、树 100 fs 都是配置里的估计值,不在 `--sensitivity` 的旋钮里(ROADMAP P3 #5)。
+  数据路径 200 fs、漫游 200 fs、树 100 fs 都是配置里的估计值,0.13.3 起是 `--sensitivity` 的旋钮,单条或三条一起 −20 % 都不翻判定(第四次体检)。
 - **PI 步长**(段 15):`LinkConfig.pi_step_ui` = `clocking.pi_step_ui`,为 0 且有跟踪器时取 `lanes.deskew_step_ps`(`lanes.deskew_with_tracker: ideal` 复现 0.12 的理想 PI)。
   量化核的两端节点带小数权重,使方差正好是 w²/12(0.12 取整到整数个节点,x5 的 1/64 UI 多 11 % 方差)。
 - **发端 DCD**(段 15,`ForwardedClock.sampling_dcd_ui()`):fs/2 的单音,无本地 PLL 时经 Re E(1 − ρG)(fs/2) 到达采样器(30 ps 树 ≈ 1.7),有本地 PLL 时全额;0.12 当作完全抵消。

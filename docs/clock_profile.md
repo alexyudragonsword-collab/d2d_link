@@ -21,8 +21,8 @@ source: "pllsim preset ..., pllsim 0.9.6, commit ..."
 
 本库读它的地方只有 `clock/profile.py`;`clock/forwarded.py` 把它变成数据路径与前向时钟**共享**的定时抖动(铁律 2),
 同一格式的第二个文件可以作收端本地 PLL(`clocking.local_pll_profile`,锁到前向时钟)。随库附带两个 Halo 从 pll_simulator ex22
-导出的文件:`bench_markulic16_sspll_40m_10p24g.yaml`(Markulic 2016 SSPLL,10.24 GHz,带内 100 Hz..f0/2 约 186 fs、底噪延到 16 GHz 时 226.5 fs,默认发端)
-与 `bench_wu19_spll_frac_52m_6p253g.yaml`(Wu 2019 分数 SPLL,6.25 GHz,约 88 fs、底噪延到 16 GHz 时 119.9 fs,示例 04 的本地 PLL)。
+导出的文件:`bench_markulic16_sspll_40m_10p24g.yaml`(Markulic 2016 SSPLL,10.24 GHz,带内 100 Hz..f0/2 约 186 fs、底噪延到 16 GHz 时 226.5 fs;0.13.7 前的默认发端)
+与 `bench_wu19_spll_frac_52m_6p253g.yaml`(Wu 2019 分数 SPLL,6.25 GHz,约 88 fs、底噪延到 16 GHz 时 119.9 fs;0.13.7 前示例 04 的本地 PLL)。0.13.7 起 bundled 配置与示例 04 用下面的 `_to16g` 版本,f0/2 版本留给测试与示例 10。
 
 **算到链路 Nyquist 的剖面**(0.13.4):pll_simulator 的导出器按格式只写 100 Hz..f0/2,也拒绝外推。`tools/export_profile_to_nyquist.py --pllsim <checkout> <preset>`
 在 100 Hz..`--f-hi`(默认 16 GHz)的对数网格上直接分析模型,按同一格式写出 `<preset>_to16g.yaml`(source 行写明 pllsim 版本、commit 与本工具)。
