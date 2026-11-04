@@ -111,3 +111,37 @@ def test_accept_gate_reads_history_releases_and_spec_numbers_as_no_quote(drift, 
     assert drift.blocking_quotes(exp, new, tmp_path) == []                          # ... unless marked as the past
     spans, versions = drift.history_spans("0.11 UI 与 0.5 与 0.12.3 的 1.5 mV", 13)
     assert versions == {"0.11 UI 与 0.5 与 0.12.3 的 1.5 mV".index("0.12.3")} and len(spans) == 1
+
+
+def test_gate_checks_current_decimals_and_spec_valued_results(drift, tmp_path):
+    """Fourth health check: 0.693 in "眼宽 0.693 对 0.75 UI" was read as a
+    release number and never checked, and a reach of 25 mm was exempt
+    because 25 is a spec-table value. Both are quotes of today's output."""
+    exp, new = tmp_path / "expected", tmp_path / "new"
+    exp.mkdir()
+    new.mkdir()
+    (tmp_path / "pyproject.toml").write_text('version = "0.13.9"\n', encoding="utf-8")
+    doc = tmp_path / "README.md"
+    (exp / "05_module_xtalk_repair.txt").write_text("worst lane 4: eye 226.3 mV / 0.693 UI\n", encoding="utf-8")
+    (new / "05_module_xtalk_repair.txt").write_text("worst lane 4: eye 226.3 mV / 0.701 UI\n", encoding="utf-8")
+    doc.write_text("| `05_module_xtalk_repair.py` | module | 最差 lane 逻辑 4 眼宽 0.693 对 0.75 UI;到 0.11 为止 |\n", encoding="utf-8")
+    assert [h[2] for h in drift.blocking_quotes(exp, new, tmp_path)] == ["0.693"]
+    (exp / "05_module_xtalk_repair.txt").unlink()
+    (new / "05_module_xtalk_repair.txt").unlink()
+    (exp / "02_reach_sweep.txt").write_text("reach 25 mm (eye width 0.751 UI); survey reach 25 mm\n", encoding="utf-8")
+    (new / "02_reach_sweep.txt").write_text("reach 20 mm (eye width 0.752 UI); survey reach 25 mm\n", encoding="utf-8")
+    doc.write_text("| `02_reach_sweep.py` | reach | reach 25 mm,对综述 25 mm 1.00× |\n", encoding="utf-8")
+    hits = drift.blocking_quotes(exp, new, tmp_path)
+    assert [h[2] for h in hits] == ["25"] and hits[0][0] == "README.md"     # the first 25 only: the second quotes the table
+
+
+def test_changes_pair_table_rows_by_row_not_by_position(drift):
+    """A row inserted at the top of a table used to shift every pairing under
+    it; rows now pair by their text skeleton and shared numbers, and a row's
+    label numbers that the new block still prints are not "moved"."""
+    old = "floor  reading  eye\n-145   floor    0.693\n-150   floor    0.708\n"
+    new = "floor  reading  eye\n-140   floor    0.650\n-145   floor    0.693\n-150   floor    0.709\n"
+    ch = drift.changes("10_clock_tree_design", old, new)
+    moved = {o: n for c in ch for o, n in c.pairs}
+    assert moved == {"0.708": "0.709"}                 # -145 / 0.693 kept their row; -150's eye moved
+    assert drift._pair_rows(["a 1 b 2 c 5"], ["a 3 b 2 c 6", "a 1 b 2 c 9"]) == [1]      # most numbers in place wins

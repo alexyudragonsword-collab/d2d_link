@@ -150,6 +150,7 @@ class Change:
 def changes(example: str, old: str, new: str) -> list[Change]:
     """Line-level diff of two normalised outputs, numbers paired where they can be."""
     a, b = old.splitlines(), new.splitlines()
+    everywhere = set(NUM.findall(new))
     out = []
     for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
         if tag == "equal":
@@ -159,17 +160,67 @@ def changes(example: str, old: str, new: str) -> list[Change]:
             out.extend(Change(example, None, ln) for ln in b[j1:j2])
             continue
         news = b[j1:j2] if tag == "replace" else []
+        partner = _pair_rows(a[i1:i2], news)
         for k, line in enumerate(a[i1:i2]):
-            nl = news[k] if k < len(news) else None
+            nl = news[partner[k]] if partner[k] is not None else None
             ot = NUM.findall(line)
             nt = NUM.findall(nl) if nl is not None else []
-            if nl is not None and len(ot) == len(nt):
-                # same numbers in the same order, whatever the words around
-                # them did (a relabelled line moved none of its numbers)
-                pairs = [(o, n) for o, n in zip(ot, nt) if o != n]
-            else:
-                pairs = [(o, None) for o in ot]
-            out.append(Change(example, line, nl, pairs))
+            out.append(Change(example, line, nl, _pair_numbers(ot, nt, everywhere)))
+    return out
+
+
+def _pair_numbers(ot: list[str], nt: list[str], everywhere: set) -> list:
+    """(old, new) for the numbers of one paired line: the two token lists are
+    aligned (difflib), equal runs did not move, a replaced run of the same
+    length pairs in place; anything else is (old, None) -- unless the new
+    output still prints that number somewhere (a row label, a setting), which
+    is no evidence it moved. Lists of equal length pair in place (a line
+    whose words changed moved none of its numbers by position)."""
+    if len(ot) == len(nt):
+        return [(o, n) for o, n in zip(ot, nt) if o != n]
+    pairs = []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, ot, nt, autojunk=False).get_opcodes():
+        if tag == "equal":
+            continue
+        if tag == "replace" and i2 - i1 == j2 - j1:
+            pairs.extend((o, n) for o, n in zip(ot[i1:i2], nt[j1:j2]) if o != n)
+        else:
+            pairs.extend((o, None) for o in ot[i1:i2] if o not in everywhere)
+    return pairs
+
+
+def _skeleton(line: str) -> str:
+    return " ".join(re.sub(r"[*†]", "", NUM.sub("#", line)).split())
+
+
+def _pair_rows(olds: list[str], news: list[str]) -> list:
+    """For each old line of a replaced block, the index of its new line: the
+    unused new line most like it -- same text skeleton (numbers and table
+    markers masked) first, then the most numbers shared in place, then the
+    nearest position. A table row keeps its label numbers ("-145 floor 30"),
+    so rows pair by row, not by position. Lines with no partner of the same
+    skeleton fall back to the most similar line by token alignment when that
+    shares at least half of its numbers, else None. Before 0.13.9 every
+    block paired by position: a row added or reordered in an example-10 /
+    -11 table misaligned every row under it (86 flags in 0.13.6, none real)."""
+    used, out = set(), []
+    for k, line in enumerate(olds):
+        ot, sk = NUM.findall(line), _skeleton(line)
+        best, score = None, None
+        for j, nl in enumerate(news):
+            if j in used:
+                continue
+            nt = NUM.findall(nl)
+            same = _skeleton(nl) == sk and len(nt) == len(ot)
+            shared = difflib.SequenceMatcher(None, ot, nt, autojunk=False).ratio() if (ot or nt) else 1.0
+            if not same and shared < 0.5:
+                continue
+            s = (same, shared, -abs(j - k))
+            if score is None or s > score:
+                best, score = j, s
+        if best is not None:
+            used.add(best)
+        out.append(best)
     return out
 
 
@@ -180,6 +231,7 @@ class DocNumber:
     tok: str
     block: frozenset   # examples cited in the same block (or the example's own file)
     section: frozenset  # ... in the same section
+    target_ctx: bool = False   # a target word around it ("目标", "对", "≥", "vs", "target"): may quote the spec table
 
 
 def _cited(text: str) -> set[str]:
@@ -218,11 +270,16 @@ def _prose_lines(source: str) -> list[str]:
 # ("0.75 UI", the eye-width target). Phase 15's accept flagged 104 such lines
 # for 8 real ones (ROADMAP P3 #5).
 
-_VERSION = re.compile(r"(?<![\w.])0\.(\d+)(?:\.\d+)?(?![\w.])")
+_V3 = re.compile(r"(?<![\w.])0\.(\d+)\.\d+(?![\w.])")          # 0.13.6: always a release (never a NUM token)
+_V2 = re.compile(r"(?<![\w.])0\.(\d{2})(?![\w.])")               # 0.12: a release only in a release context
+_RELEASE_CTX = re.compile(r"\s*(?:起|之后|以后|开始|onwards|前|之前|以前|及以前|为止|时|的|:|：|\)|）)")
 _UNIT_AFTER = re.compile(r"\s*(?:[A-Za-zµ×%°]|/\s*\d)")
 _SINCE_AFTER = re.compile(r"\s*(?:起|之后|以后|开始|onwards)")
 _BEFORE_AFTER = re.compile(r"\s*(?:前|之前|以前|及以前|为止|时|:|：)")
 _SEGMENT_END = re.compile(r"[;；。|)）]")
+_TARGET_CTX = re.compile(r"目标|眼罩|综述|对|target|vs|≥|>=|survey|spec", re.I)
+_PAST_BEFORE = re.compile(r"(?:前|此前|以前|原来|旧值|was)\s*[:：]?\s*$")
+_TARGET_AFTER = re.compile(r"\s*[A-Za-zµ/%]*\s*(?:target|目标)", re.I)       # "0.75 UI target"
 
 
 def current_minor(repo: Path = REPO) -> int:
@@ -238,16 +295,24 @@ def history_spans(plain: str, minor: int) -> tuple[list[tuple[int, int]], set[in
     "起" / "之后": since-then statements still describe today), or any release
     marked as the past ("0.13.3 前", "0.12 时", "0.11:"), to the next
     ";" "。" "|" or closing bracket; the version starts are the offsets of the
-    release numbers themselves (a 0.x number followed by no unit)."""
+    release numbers themselves.
+
+    A three-part 0.x.y is always a release. A two-part 0.xy is one only when
+    xy lies in 10..minor + 1 and a release word follows it ("到 0.11 为止",
+    "0.12 的", "0.13 起", "0.11:"): until 0.13.9 any 0.xyz without a Latin
+    letter after it counted, which exempted 0.693 in "眼宽 0.693 对 0.75 UI"
+    and 68 other current numbers (fourth health check)."""
     spans, starts = [], set()
-    for m in _VERSION.finditer(plain):
+    found = [(m, True) for m in _V3.finditer(plain)] + [(m, False) for m in _V2.finditer(plain)]
+    for m, three in sorted(found, key=lambda t: t[0].start()):
         tail = plain[m.end():]
         if _UNIT_AFTER.match(tail):
             continue                                  # "0.11 UI", "0.12 mV": a value, not a release
-        if "." not in m.group(0)[2:] and int(m.group(1)) < 10:
-            continue                                  # "0.5" is a number; releases here are 0.10 and later or three-part
+        v = int(m.group(1))
+        if not three and not (10 <= v <= minor + 1 and _RELEASE_CTX.match(tail)):
+            continue
         starts.add(m.start())
-        if (int(m.group(1)) < minor and not _SINCE_AFTER.match(tail)) or _BEFORE_AFTER.match(tail):
+        if (v < minor and not _SINCE_AFTER.match(tail)) or _BEFORE_AFTER.match(tail):
             end = _SEGMENT_END.search(plain, m.end())
             spans.append((m.end(), end.start() if end else len(plain)))
     return spans, starts
@@ -281,8 +346,12 @@ def doc_numbers(path: Path, rel: str) -> list[DocNumber]:
         for m in NUM.finditer(plain):
             if m.start() in versions or any(a <= m.start() < b for a, b in spans):
                 continue
+            if _PAST_BEFORE.search(plain[max(0, m.start() - 6):m.start()]):
+                continue                              # "(之前 268.7)": history without a release tag
             if float(m.group(0)) != 0.0:
-                out.append(DocNumber(rel, i + 1, m.group(0), bl, se))
+                ctx = bool(_TARGET_CTX.search(plain[max(0, m.start() - 16):m.start()])
+                           or _TARGET_AFTER.match(plain[m.end():]))
+                out.append(DocNumber(rel, i + 1, m.group(0), bl, se, ctx))
     return out
 
 
@@ -353,8 +422,8 @@ def stale(change: Change, index: DocIndex) -> list[tuple[DocNumber, str, str | N
         ov = float(o)
         nv = float(n) if n is not None else None
         for d in index.near(ov):
-            if float(d.tok) in targets:
-                continue                              # a spec number ("0.75 UI") that an output passes by
+            if float(d.tok) in targets and d.target_ctx:
+                continue                              # a spec number quoted as such ("对 0.75 UI"); "reach 25 mm" is checked
             if rounds_to(d.tok, ov) and not (nv is not None and rounds_to(d.tok, nv)):
                 where = _scope(d, ex)
                 if where is not None:
