@@ -18,13 +18,14 @@ coupled traces, Hammerstad's microstrip effective permittivity):
   mismatch is taken as ``(1 - eps_eff / eps_r)`` with the microstrip
   ``eps_eff`` -- a stripline (homogeneous) couples no FEXT at this order;
 * the coupled voltage grows with the coupled length over the rise time:
-  ``X/H = j 2 pi f * tau``, ``tau = kappa (1 - eps_eff/eps_r) length / (2 v)``,
-  evaluated at the Nyquist frequency and capped at -3 dB (the behavioural
-  shape saturates there anyway).
+  ``X/H = j 2 pi f * tau``, ``tau = kappa (1 - eps_eff/eps_r) length / (2 v)``
+  to first order; the two-mode result it approximates is ``j sin(2 pi f tau)``,
+  evaluated at the Nyquist frequency (never above 0 dB).
 
 The second neighbour sits at twice the pitch. Both levels go through the
-same ``k (jf/fn) / (1 + jf/fn)`` shape as the ``fext`` mode, so switching a
-config from ``fext`` to ``coupled`` changes the level, not the model.
+same ``j sin(2 pi f tau)`` shape as the ``fext`` mode (``channel.model.
+xtalk_response``, 0.13.6), so switching a config from ``fext`` to
+``coupled`` changes the level, not the model.
 """
 
 from __future__ import annotations
@@ -58,7 +59,7 @@ def fext_ratio_at(cfg: LinkConfig, spacing_um: float) -> float:
     v = C0 / math.sqrt(eps_eff)
     kappa = coupling_fraction(spacing_um, st["dielectric_height_um"])
     tau = kappa * mismatch * (cfg.coupled_length_mm() * 1e-3) / (2.0 * v)
-    return min(2.0 * math.pi * cfg.f_nyquist * tau, 1.0 / math.sqrt(2.0))
+    return math.sin(min(2.0 * math.pi * cfg.f_nyquist * tau, 0.5 * math.pi))
 
 
 def fext_db(cfg: LinkConfig) -> tuple[float, float]:

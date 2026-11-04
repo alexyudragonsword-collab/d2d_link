@@ -3,15 +3,18 @@
 Example 10 found that on the x16 module the clock tree's length does nothing.
 The receiver's local PLL (1 MHz natural frequency) re-times the forwarded
 clock, so the Tx PLL's floor above it is not tracked whatever the tree. Even a
--155 dBc/Hz floor leaves the worst lane at 0.733 UI. This example asks the
+-155 dBc/Hz floor leaves the worst lane at 0.714 UI. This example asks the
 module's own question: how much residual jitter can it afford, and which
 design levers buy the difference?
 
 1. **The affordable sigma.** Everything else held (crosstalk, skew residual,
    the 1/64 UI PI step, noise), the worst lane's eye width falls with the
-   Gaussian RMS of the sampling residual alone. The curve is read by varying
-   one white term (the data path's ``data_path_rj_s``), and sigma* is where
-   it crosses the 0.75 UI target.
+   Gaussian RMS of the sampling residual alone. The curve is read by scaling
+   every jitter source together (the config's white and wander terms by g,
+   both PLL profiles by 20 log10 g dB), and sigma* is where it crosses the
+   0.75 UI target. (Until 0.13.5 only the data path's white term moved; with
+   the 0.13.6 far-end shape the module's eye no longer reaches the target
+   even with that term at zero.)
 2. **Levers one at a time**, in closed form (``ForwardedClock.budget``):
    - the Tx PLL floor (variants as in example 10);
    - the per-lane tracker's bandwidth;
@@ -74,44 +77,57 @@ print(f"bundled residual {1e15 * b0.total_s:.1f} fs = "
 print(f"worst lane {base.worst.lane}: {base.eye_width_min_ui:.4f} UI against {ew_target:g} UI -> link {'PASS' if base.passes else 'FAIL'}\n")
 
 # ------------------------------------------------- 1. the affordable sigma
-print("1. worst-lane eye width against the residual's Gaussian RMS (varying the data path's white jitter only)")
-print(f"{'data_path_rj [fs]':>18s} {'sigma [fs]':>11s} {'eye width min [UI]':>19s} {'worst lane':>11s}")
+JITTERS = ("data_path_rj_s", "clock_path_rj_s", "tree_rj_s", "data_path_wander_s", "clock_path_wander_s")
+
+
+def scaled(g: float):
+    """Every jitter source of the module scaled by ``g``: the config's white
+    and wander terms by g, both PLL profiles by 20 log10 g dB."""
+    kw = {k: g * getattr(ck0, k) for k in JITTERS}
+    db = 20.0 * np.log10(max(g, 1e-6))
+    return clocked(pll_shift_db=ck0.pll_shift_db + db, local_pll_shift_db=ck0.local_pll_shift_db + db, **kw)
+
+
+print("1. worst-lane eye width against the residual's Gaussian RMS (every jitter source scaled by g)")
+print(f"{'g':>6s} {'sigma [fs]':>11s} {'eye width min [UI]':>19s} {'worst lane':>11s}")
 curve = []                                                  # (sigma fs, eye width UI)
-by_rj = {}
-for rj in (0.0, 100.0, 150.0, 200.0, 250.0):
-    c = clocked(data_path_rj_s=rj * 1e-15)
-    r = base if rj * 1e-15 == ck0.data_path_rj_s else run_link(c)
+by_g = {}
+for g in (0.25, 0.5, 0.75, 1.0, 1.25):
+    c = scaled(g)
+    r = base if g == 1.0 else run_link(c)
     curve.append((sigma_fs(c), r.eye_width_min_ui))
-    by_rj[rj] = r.eye_width_min_ui
-    print(f"{rj:18g} {curve[-1][0]:11.1f} {r.eye_width_min_ui:19.4f} {r.worst.lane:11d}")
-curve.sort()
-sig, ew = np.array(curve).T
-# sigma*: regula falsi on the data path's term between the bracketing points
-lo, hi = 0.0, 100.0
-w_lo, w_hi = by_rj[lo], by_rj[hi]
-if w_lo < ew_target:
-    raise SystemExit("even a noiseless data path does not open the module to the target")
-for _ in range(6):
+    by_g[g] = r.eye_width_min_ui
+    print(f"{g:6g} {curve[-1][0]:11.1f} {r.eye_width_min_ui:19.4f} {r.worst.lane:11d}")
+# sigma*: regula falsi on g between the bracketing grid points
+gs = sorted(by_g)
+if by_g[gs[0]] < ew_target:
+    raise SystemExit(f"even a quarter of every jitter source leaves the module below {ew_target:g} UI")
+i = next((k for k in range(len(gs)) if by_g[gs[k]] < ew_target), None)
+if i is None:
+    raise SystemExit("the module passes with every jitter source scaled up: nothing to find")
+lo, hi = gs[i - 1], gs[i]
+w_lo, w_hi = by_g[lo], by_g[hi]
+for _ in range(8):
     m = lo + (w_lo - ew_target) * (hi - lo) / (w_lo - w_hi)
-    wm = run_link(clocked(data_path_rj_s=m * 1e-15)).eye_width_min_ui
+    wm = run_link(scaled(m)).eye_width_min_ui
     if abs(wm - ew_target) < 2e-4:
         break
     if wm >= ew_target:
         lo, w_lo = m, wm
     else:
         hi, w_hi = m, wm
-sigma_star = sigma_fs(clocked(data_path_rj_s=m * 1e-15))
+sigma_star = sigma_fs(scaled(m))
 curve.append((sigma_star, wm))
 curve.sort()
 sig, ew = np.array(curve).T
-print(f"  sigma* = {sigma_star:.1f} fs (eye {wm:.4f} UI at data_path_rj {m:.1f} fs): the module affords {sigma_star:.0f} fs "
-      f"against {1e15 * b0.total_s:.1f} fs today -- {np.sqrt((1e15 * b0.total_s) ** 2 - sigma_star ** 2):.0f} fs "
+print(f"  sigma* = {sigma_star:.1f} fs (eye {wm:.4f} UI at g = {m:.3f}): the module affords {sigma_star:.0f} fs "
+      f"against {1e15 * b0.total_s:.1f} fs today -- {np.sqrt(max((1e15 * b0.total_s) ** 2 - sigma_star ** 2, 0.0)):.0f} fs "
       f"(in power) has to go\n")
 
 
 def predicted(s: float) -> float:
     """The worst lane's eye at residual sigma ``s`` read off the curve (nan
-    below the curve's lowest point: a noiseless data path is its end)."""
+    below the curve's lowest point, g = 0.25)."""
     return float(np.interp(s, sig, ew)) if s >= sig[0] else float("nan")
 
 
@@ -188,14 +204,15 @@ if confirm:
     inside = [(s, w) for s, w in confirm if not np.isnan(predicted(s))]
     err = max(abs(predicted(s) - w) for s, w in inside)
     print(f"  largest prediction error on the curve's range {err:.4f} UI ({len(inside)} points): the statistical engine takes the "
-          "residual as one Gaussian sigma, so the curve is exact whichever term the sigma comes from")
+          "residual as one Gaussian sigma, so whichever term the sigma comes from the curve holds; what is left is its "
+          "linear interpolation")
     print("  (a point below the curve's lowest sigma is only bounded from below by it)\n")
 
 # ------------------------------------------------------------------ figure
 plt = plt_or_none()
 if plt is not None:
     fig, (a, b) = plt.subplots(1, 2, figsize=(11, 4.2), gridspec_kw={"width_ratios": [1, 1.2]})
-    a.plot(sig, ew, "o-", color="C0", label="data path's white jitter varied")
+    a.plot(sig, ew, "o-", color="C0", label="every jitter source scaled by g")
     if confirm:
         cs, cw = np.array(confirm).T
         a.plot(cs, cw, "s", color="C3", label="combinations (section 4)")

@@ -89,7 +89,7 @@ def test_isi_grid_converges_with_hundreds_of_crosstalk_cursors():
     assert fine.extras["n_cursors"] > 300 and fine.extras["isi_bins"] > coarse.extras["isi_bins"]
     assert abs(fine.eye_width_ui - coarse.eye_width_ui) < 0.002
     assert abs(fine.eye_height_v - coarse.eye_height_v) < 1e-3
-    assert fine.eye_width_ui == pytest.approx(0.590, abs=0.01)      # 0.632 on 0.12 (constant tan d, PLL floor zeroed); 0.699 with the non-causal line (0.11); 0.685 before the geometry-derived L / C (0.5.0); 0.671 with 12 cursors enumerated
+    assert fine.eye_width_ui == pytest.approx(0.575, abs=0.01)      # 0.590 with the sqrt2 u/(1+u) FEXT shape (0.13.5); 0.632 on 0.12 (constant tan d, PLL floor zeroed); 0.699 with the non-causal line (0.11); 0.685 before the geometry-derived L / C (0.5.0); 0.671 with 12 cursors enumerated
 
 
 def test_tails_live_in_the_log_domain():

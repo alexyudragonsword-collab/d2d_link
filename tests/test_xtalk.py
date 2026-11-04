@@ -84,8 +84,10 @@ def test_engines_agree_with_strong_crosstalk():
                      lanes=LaneConfig(count=3, skew_ps=(0.0, 3.0, -2.0)),
                      clocking=ClockingConfig(pll_profile=PROFILE, data_path_rj_s=200e-15, clock_path_rj_s=200e-15),
                      rx=RxConfig(noise_rms_v=0.045),
-                     sim=SimConfig(n_symbols=300_000, engine="both", stat_phase_points=32))
+                     sim=SimConfig(n_symbols=400_000, engine="both", stat_phase_points=32))
     res = run_link(cfg)
+    # 300 k symbols gave 39 / 93 / 37 errors once the far-end shape became the
+    # aggressor's derivative (0.13.6: it bites on the edges, not at the centre)
     assert all(t.n_errors >= 40 for t in res.time)
     for ratio in res.consistency_ratios():
         assert 0.5 < ratio < 2.0, res.consistency_ratios()
@@ -157,3 +159,24 @@ def test_engines_agree_with_strong_near_end_crosstalk():
     assert t.n_errors >= 40 and t.extras["n_aggressors"] == 1
     (ratio,) = res.consistency_ratios()
     assert 0.5 < ratio < 2.0, ratio
+
+
+def test_far_end_shape_is_the_two_mode_result():
+    """Relative to the mean-delay through path a weakly coupled pair's far
+    end is j sin(2 pi f tau): the aggressor's derivative (the coupled-line
+    first order) while 2 pi f tau << 1, the configured level at Nyquist,
+    never above 1. The sqrt2 u/(1+u) shape of 0.13.5 and before was 3 dB
+    above that below Nyquist and flat above it (third health check)."""
+    import math
+
+    from d2d_link.channel.model import xtalk_response
+
+    cfg = LinkConfig(channel=dataclasses.replace(X, xtalk_adjacent_db=-20.0), lanes=LaneConfig(count=3))
+    fn = cfg.f_nyquist
+    f = np.array([0.0, 0.01 * fn, fn, 4 * fn])
+    x = xtalk_response(cfg, f, 1)
+    assert x[0] == 0.0 and abs(x[2]) == pytest.approx(0.1, rel=1e-12)
+    tau = math.asin(0.1) / (2 * math.pi * fn)
+    assert x[1] == pytest.approx(1j * 2 * math.pi * f[1] * tau, rel=1e-3)          # the derivative
+    assert abs(x[3]) == pytest.approx(math.sin(4 * math.asin(0.1)), rel=1e-12)     # rises past Nyquist, no saturation at k
+    assert abs(xtalk_response(cfg, f, 2)[2]) == pytest.approx(10 ** (-32 / 20), rel=1e-12)   # second neighbour -12 dB

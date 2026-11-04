@@ -37,16 +37,16 @@ Tx PLL profile bench_markulic16_sspll_40m_10p24g.yaml: floor -145 dBc/Hz above ~
 
 4. x16 module (20 mm, crosstalk fext, local PLL 1 MHz): worst lane against the floor
  floor  reading tree [ps]  leak [fs]  eye width min [UI]  eye height min [mV]  link
-  -145    floor        30      176.4               0.712                205.3  FAIL
-  -145     zero        30      120.4               0.733                206.2  FAIL
-  -150    floor        30      120.0               0.728                206.0  FAIL
-  -150     zero        30       95.7               0.739                206.4  FAIL
-  -155    floor        30       95.5               0.733                206.2  FAIL
-  -155     zero        30       86.3               0.741                206.5  FAIL
-  -145    floor         0      176.4               0.712                205.3  FAIL
+  -145    floor        30      176.4               0.693                226.3  FAIL
+  -145     zero        30      120.4               0.714                227.0  FAIL
+  -150    floor        30      120.0               0.708                226.8  FAIL
+  -150     zero        30       95.7               0.719                227.2  FAIL
+  -155    floor        30       95.5               0.714                227.0  FAIL
+  -155     zero        30       86.3               0.721                227.2  FAIL
+  -145    floor         0      176.4               0.693                226.3  FAIL
   budget at -145 dBc/Hz (floor reading): total 331.6 fs = Tx leak 176.4 + local PLL 87.6 + data path 200.0 + data wander 120.3 + clock path 2.1 + clock wander 81.4 + tree 100.0 + spurs 1.8 fs (in power)
   budget at -155 dBc/Hz (floor reading): total 296.5 fs = Tx leak 95.5 + local PLL 87.6 + data path 200.0 + data wander 120.3 + clock path 2.1 + clock wander 81.4 + tree 100.0 + spurs 1.8 fs (in power)
   a 30 ps shorter tree moves the module's eye by +0.0000 UI: on the module, the local PLL's bandwidth sets how much of the Tx floor is tracked (example 04),
-  and the floor alone does not pass it: the best point here reads 0.741 UI; the rest of its budget (wander, the local PLL's own noise, crosstalk, the PI step) is what stays
+  and the floor alone does not pass it: the best point here reads 0.721 UI; the rest of its budget (wander, the local PLL's own noise, crosstalk, the PI step) is what stays
 
 wrote examples/output/10_clock_tree_design.png

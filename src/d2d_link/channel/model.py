@@ -209,7 +209,7 @@ def extend_band_like(X: np.ndarray, f: np.ndarray, f_edge: float, H: np.ndarray)
     """A coupling term past the file's band: the through path ``H`` (already
     extended) sets the decay, X(f) = X(f_edge) H(f) / H(f_edge) beyond
     ``f_edge``. A coupled line's far-end term is the through path times a
-    coupling shape that saturates near the band edge, so its own log|X|
+    coupling shape that turns over at high frequency, so its own log|X|
     slope there says nothing about what follows, while the attenuation it
     shares with the through path does. On the 25 mm line written as a 3-lane
     file cut at 50 GHz the middle lane's eye read 3.5 mV / 0.010 UI off the
@@ -292,17 +292,25 @@ def ctle_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
 
 def xtalk_response(cfg: LinkConfig, f: np.ndarray, neighbour: int) -> np.ndarray:
     """Far-end crosstalk from a lane ``neighbour`` places away, relative to the
-    through response: coupled lines couple the *derivative* of the aggressor
-    at low frequency and saturate near the band edge, so X/H = k (jf/fn) /
-    (1 + jf/fn) with k set by the configured level at the Nyquist frequency
-    fn. Zero when crosstalk is off or the neighbour is further than two lanes."""
+    through response. A weakly coupled pair carries an even and an odd mode
+    whose delays differ by 2 tau; relative to the mean-delay through path the
+    victim's far end sees ``X/H = j sin(2 pi f tau)`` -- the derivative of
+    the aggressor (j 2 pi f tau, the coupled-line estimate of
+    ``channel.coupled``) while 2 pi f tau << 1, never above 1. tau is set so
+    that ``|X/H|`` at the Nyquist frequency is the configured (``fext``) or
+    estimated (``coupled``) level.
+
+    Until 0.13.5 the shape was ``k sqrt(2) u / (1 + u)``, u = jf/f_N: the same
+    level at f_N, but 3 dB above the derivative below it and flat above it
+    (third health check: the x5 middle lane read 60 mV apart between the two).
+    Zero when crosstalk is off or the neighbour is further than two lanes."""
     f = np.asarray(f, dtype=np.float64)
     if cfg.channel.xtalk in ("none", "touchstone") or neighbour not in (1, 2):
         return np.zeros_like(f, dtype=complex)
     adj, sec = cfg.xtalk_db()          # configured level, or the coupled-line estimate
-    level = 10.0 ** ((adj if neighbour == 1 else sec) / 20.0)
-    u = 1j * f / cfg.f_nyquist
-    return level * math.sqrt(2.0) * u / (1.0 + u)
+    level = min(10.0 ** ((adj if neighbour == 1 else sec) / 20.0), 1.0)
+    tau = math.asin(level) / (2.0 * math.pi * cfg.f_nyquist)
+    return 1j * np.sin(2.0 * math.pi * f * tau)
 
 
 def next_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:

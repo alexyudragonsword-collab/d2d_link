@@ -2,6 +2,7 @@
 
 import dataclasses
 import importlib.util
+import math
 import json
 
 import numpy as np
@@ -41,7 +42,7 @@ def test_coupling_falls_with_spacing_and_grows_with_length():
     short = fext_db(LinkConfig(channel=dataclasses.replace(COUPLED, length_mm=5.0)))[0]
     assert short < adj                                                  # a shorter coupled run: less FEXT
     r25, r5 = fext_ratio_at(cfg, 115.0), fext_ratio_at(dataclasses.replace(cfg, channel=dataclasses.replace(COUPLED, length_mm=5.0)), 115.0)
-    assert r25 == pytest.approx(5.0 * r5, rel=1e-9)                     # linear in length below the cap
+    assert math.asin(r25) == pytest.approx(5.0 * math.asin(r5), rel=1e-9)   # j sin(2 pi f tau): tau linear in length
 
 
 def test_coupled_length_is_explicit_with_a_touchstone_channel():
@@ -54,7 +55,7 @@ def test_coupled_length_is_explicit_with_a_touchstone_channel():
     cfg = LinkConfig(channel=COUPLED)
     assert cfg.coupled_length_mm() == 25.0
     half = LinkConfig(channel=dataclasses.replace(COUPLED, coupled_length_mm=12.5))
-    assert fext_ratio_at(half, 115.0) == pytest.approx(0.5 * fext_ratio_at(cfg, 115.0), rel=1e-9)
+    assert math.asin(fext_ratio_at(half, 115.0)) == pytest.approx(0.5 * math.asin(fext_ratio_at(cfg, 115.0)), rel=1e-9)
     d = describe(half)
     assert d["coupled_length_mm"] == 12.5 and d["stackup_source"] == "model" and d["eps_eff"] == pytest.approx(cfg.rlgc()["eps_eff"])
     assert describe(LinkConfig(channel=dataclasses.replace(COUPLED, eps_r=3.0)))["stackup_source"] == "config"
@@ -68,7 +69,7 @@ def test_homogeneous_dielectric_couples_no_fext():
 
 def test_cap_and_explicit_stackup():
     cfg = LinkConfig(channel=dataclasses.replace(COUPLED, length_mm=500.0, dielectric_height_um=200.0))
-    assert fext_ratio_at(cfg, 115.0) == pytest.approx(1.0 / np.sqrt(2.0))
+    assert fext_ratio_at(cfg, 115.0) == pytest.approx(1.0)        # sin(2 pi f_N tau) saturates at 0 dB (0.13.6; -3 dB cap before)
     st = LinkConfig(channel=dataclasses.replace(COUPLED, eps_r=4.0)).stackup()
     assert st["eps_r"] == 4.0 and st["trace_width_um"] == PACKAGE_STACKUP["standard"]["trace_width_um"]
     with pytest.raises(ValueError):

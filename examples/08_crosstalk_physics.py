@@ -9,7 +9,7 @@ dataclass replace, never a loose number:
    dielectric gives and a stripline's homogeneous one does not: the same
    geometry routed as a stripline has no first-order FEXT, and its line is
    slower (eps_eff = eps_r). The module's verdict flips with the routing --
-   which is the point: the -18.6 dB that fails the 32 GT/s standard package
+   which is the point: the -18.7 dB that fails the 32 GT/s standard package
    is a microstrip model estimate.
 2. **Direction.** Lanes at the module's edge sit next to the return module's
    lanes, which transmit the other way: their near-end crosstalk arrives at
@@ -90,7 +90,8 @@ if skrf is not None:
     f = ChannelModel.grid(module)[1:]
     thru = ChannelModel.from_config(module).H[1:]    # the analytic 25 mm line itself, as the file's through terms
     level = 10 ** (-20.0 / 20.0)                     # the synthetic file's coupling: -20 dB at Nyquist, FEXT shape
-    kx = level * np.sqrt(2.0) * (1j * f / module.f_nyquist) / (1 + 1j * f / module.f_nyquist)
+    tau = np.arcsin(level) / (2 * np.pi * module.f_nyquist)
+    kx = 1j * np.sin(2 * np.pi * f * tau)            # the two-mode far-end shape (channel.model.xtalk_response, 0.13.6)
     n = 3
     s = np.zeros((f.size, 2 * n, 2 * n), dtype=complex)
     for i in range(n):
