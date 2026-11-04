@@ -113,7 +113,7 @@ grep "source: survey" src/d2d_link/data/spec/ucie_survey.yaml
 | `src/d2d_link/spec/`、`src/d2d_link/data/` | 规范数字表的读取;规范表、模型预设与随库的时钟剖面(package data,配置里仍写 `data/...`) |
 | `src/d2d_link/vendor/` | Halo_Serdes 的 S 参数读法 / RLGC / 响应转换,pll_simulator 的相噪合成与积分;完整 SHA 钉住,`tools/vendor_check.py` 守 |
 | `src/d2d_link/report.py`、`src/d2d_link/gui/` | 时序预算报表(dict / Markdown / 敏感性);浏览器 GUI(Dash,零仿真逻辑) |
-| `tools/` | `fingerprint.py`、`example_drift.py`、`run_examples.py`、`vendor_check.py`、`budget_report.py`(报表的 CLI) |
+| `tools/` | `fingerprint.py`、`example_drift.py`、`run_examples.py`、`vendor_check.py`、`budget_report.py`(报表的 CLI)、`export_profile_to_nyquist.py`(pll_simulator 剖面算到 16 GHz) |
 | `cairn/` | 项目知识:铁律论证、前向时钟、双引擎、串扰、收端、规范来源、坑;`LOG.md` 每轮数字与被推翻的判断 |
 
 ## 不做

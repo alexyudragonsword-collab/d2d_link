@@ -16,11 +16,21 @@ source: "pllsim preset ..., pllsim 0.9.6, commit ..."
 1. **L(f) 是单边带**:S_φ = 2·10^(L/10)。丢掉这个 2 就是所有抖动数上的 √2。
 2. **秒数按文件的 f0 算**,不从数据率推。10.24 GHz 的 PLL 经倍频做 16 GHz DDR 前向时钟,秒数不变。`clocking.pll_f0_hz` 只改比例。
 3. **最后一个频点以上**:默认按最后的电平平延到 fs/2(`clocking.profile_above: floor`,0.13.0);`zero` 是 Halo 的约定(f0/2 以上 S_φ = 0)。网格以下按首值保持(Halo 同)。
+   0.13.4 用 pll_simulator 的同一模型算到 16 GHz 核过:两个随库 PLL 在 1 GHz 以上都平在 VCO 底噪(Markulic −145.00、Wu −154.00 dBc/Hz,其余各项 < −175),
+   所以 `floor` 就是模型,`zero` 只是文件格式在 f0/2 的截断。
 
 本库读它的地方只有 `clock/profile.py`;`clock/forwarded.py` 把它变成数据路径与前向时钟**共享**的定时抖动(铁律 2),
 同一格式的第二个文件可以作收端本地 PLL(`clocking.local_pll_profile`,锁到前向时钟)。随库附带两个 Halo 从 pll_simulator ex22
 导出的文件:`bench_markulic16_sspll_40m_10p24g.yaml`(Markulic 2016 SSPLL,10.24 GHz,带内 100 Hz..f0/2 约 186 fs、底噪延到 16 GHz 时 226.5 fs,默认发端)
 与 `bench_wu19_spll_frac_52m_6p253g.yaml`(Wu 2019 分数 SPLL,6.25 GHz,约 88 fs、底噪延到 16 GHz 时 119.9 fs,示例 04 的本地 PLL)。
+
+**算到链路 Nyquist 的剖面**(0.13.4):pll_simulator 的导出器按格式只写 100 Hz..f0/2,也拒绝外推。`tools/export_profile_to_nyquist.py --pllsim <checkout> <preset>`
+在 100 Hz..`--f-hi`(默认 16 GHz)的对数网格上直接分析模型,按同一格式写出 `<preset>_to16g.yaml`(source 行写明 pllsim 版本、commit 与本工具)。
+随库附两个:`bench_markulic16_sspll_40m_10p24g_to16g.yaml` 与 `bench_wu19_spll_frac_52m_6p253g_to16g.yaml`(pllsim 0.9.6 @ 00e48a2f)。
+读它们时两种口径给出同一预算:x1 泄漏 223.42 fs(f0/2 文件 + floor 223.43)、总 365.52 fs、眼宽 0.7091 UI;x16 模块总 331.54 对 331.56 fs
+(`tests/test_clock_profile.py::test_profile_to_nyquist_matches_the_floor_reading`)。bundled 配置仍指向 f0/2 的文件:换过去数字只差 0.01 fs 量级。
+还开着的是底噪本身:−145 dBc/Hz 是 pllsim 预设的 VCO 参数 `pn_floor_dbchz`,不是从 Markulic 2016 原文读的(未核实)。
+另一个口径问题这里不解决:10.24 GHz 载波在 16 GHz 偏移处的连续时间相噪,经时钟边沿采样后如何折叠,由消费端的时钟方案决定;本库把它当作边沿率 fs 上的定时噪声。
 
 vendored 的 `synth_from_psd` / `integrate_pn` 来自 pll_simulator@00e48a2f(`src/d2d_link/vendor/pllsim/`),
 `tools/vendor_check.py` 守着与上游逐字节一致。

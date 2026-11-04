@@ -20,8 +20,10 @@ How much floor there is to double depends on two things:
   ``floor`` holds the last level flat out to fs/2 (the default since 0.13.0;
   the profile ends at f0/2 = 5.12 GHz, the sampler sees to 16 GHz).
   ``zero`` drops it there (0.12 and earlier). The profile file says nothing
-  between 5.12 and 16 GHz, so the reading is a modelling choice; this example
-  shows how much of the verdict it carries.
+  between 5.12 and 16 GHz; this example shows how much of the verdict the
+  reading carries. (0.13.4 asked pll_simulator's model for the missing band:
+  it is flat at the VCO floor, so ``floor`` is the model and ``zero`` the
+  format's cut -- docs/clock_profile.md. The zero rows stay as the contrast.)
 
 Four readings, each a dataclass replace of a bundled config. The variant
 profiles are written to a temporary directory and named by

@@ -4,6 +4,19 @@
 
 ---
 
+## [0.13.4] — 2026-11-04 — PLL 剖面算到 16 GHz(不动数字)
+
+### 新增
+- `tools/export_profile_to_nyquist.py`:用 pll_simulator 的线性模型在 100 Hz..16 GHz(链路 Nyquist)上直接分析预设,按剖面格式写出(上游导出器按格式止于 f0/2、拒绝外推)。
+- 随库 `bench_markulic16_sspll_40m_10p24g_to16g.yaml`、`bench_wu19_spll_frac_52m_6p253g_to16g.yaml`(pllsim 0.9.6 @ 00e48a2f)。
+
+### 发现
+- 两个模型在 1 GHz 以上都平在 VCO 底噪(−145.00 / −154.00 dBc/Hz,其余各项 < −175):`profile_above: floor` 就是模型。读 16 GHz 文件时两种口径一样,
+  x1 泄漏 223.42 fs(f0/2 文件 + floor 223.43)、总 365.52 fs、眼宽 0.7091 UI;x16 模块总 331.54 对 331.56 fs。新测试守这条等价。
+- bundled 配置仍用 f0/2 文件(换过去只差 0.01 fs 量级);ROADMAP P1 #3 的口径问题关闭,剩下底噪数值未核实(pllsim 预设参数 `pn_floor_dbchz`)。
+
+---
+
 ## [0.13.3] — 2026-11-04 — 敏感性与第三次体检余项(bundled 指纹不变;示例 08 的 NEXT 数字变)
 
 ### 修正

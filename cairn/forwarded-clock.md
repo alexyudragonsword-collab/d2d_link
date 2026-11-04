@@ -60,6 +60,9 @@ t_rx[k]   = (h_tree ⊛ t_pll)[k − τ] + n_t[k]                   树:延时 �
   **后果:32 GT/s 的判定由时钟树决定**——x1 在 2 mm 也只有 0.745 UI(< 0.75);理想树时 25 mm 0.751 UI 过。前向时钟只在 f < ~1/(6τ) 有利,
   再往上把它跟不上的抖动**加倍**(树 ≈ 1 UI 时 G(fs/2) ≈ −1):`test_tree_delay_leaks_the_common_part_as_a_differentiator`。
   这条结论依赖借来的 Markulic 剖面 −145 dBc/Hz 底噪(10.24 GHz 载波)在 5–16 GHz 的形状,是模型估计,不是实测。
+  **0.13.4 核过口径**:pll_simulator 的同一模型算到 16 GHz(`tools/export_profile_to_nyquist.py`)在 1 GHz 以上平在 VCO 底噪 −145.00 dBc/Hz,
+  读这个文件时 floor / zero 一样,泄漏 223.42 fs 对 f0/2 文件 + floor 的 223.43 —— floor 是模型,zero 是格式截断。剩下的未知只是底噪的数值
+  (pllsim 预设参数 `pn_floor_dbchz`,未对照原文)与边沿采样的折叠(见 `docs/clock_profile.md`)。
 - **设计边界**(0.13.1,示例 10;底噪变体 = 去掉 −145 白底、换上新白底,带内不动):x1 20 GHz 树、floor 口径下过的最长树:−145 → 2.7 ps,
   −150 → 11.9 ps,−155 → ≥ 40 ps;zero 口径三档都 ≥ 40 ps。floor 口径的泄漏是 zero 的 3.1–4.8 倍。树带宽是第二根杠杆:一阶树的相位滞后像
   1/(2πf_t) 的延时,但它在 f_t 以上不再跟踪,底噪只过一次而不是加倍 —— −150 时 10 GHz 树 ≥ 40 ps、平坦树只到 5.0 ps。
