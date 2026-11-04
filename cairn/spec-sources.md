@@ -19,6 +19,10 @@ authoring_mode: ai_generated
   每条 note 都写了"未核实"。最不可靠的三条:收端眼高 40 mV、眼宽 0.75 UI(眼罩表的速率档与封装归属不明)、1e-15 的 retry 口径。
 - 升级流程:用户把原文贴进 `cairn/Reference/`(只追加)→ 对应条目改 `source: spec`、加 `quote` 与 `section` → `tests/test_spec_sources.py`
   自动要求 quote 非空 → LOG 记一条。
+- **分档(0.13.5)**:目标按 `<package>.<key>@<rate>` → `<key>@<rate>` → `<package>.<key>` → `<key>` 查表(`spec.survey_tiered`)。
+  原文的眼罩若按速率档 / 封装给数,就加对应的分档条目(如 `standard.rx_eye_width_ui@32`,`source: spec`),只接管那一档;
+  没写到的档继续落到综述的通用值。报表的 Targets 表多一列 table key,GUI 的未核实输入卡按这个 key 取出处。
+  今天没有分档条目:综述的眼罩不带速率与封装,不为凑表复制同一个未核实的数(铁律 5)。
 
 ## 规范数字进入模型的地方(里程碑 3)
 
@@ -28,7 +32,7 @@ authoring_mode: ai_generated
 
 ## 决策记录
 
-- 规范数字不进代码:`TargetConfig` 字段默认 None,运行时按 package 解析成 `(value, source)`,结果行打印 `source: xxx`。
+- 规范数字不进代码:`TargetConfig` 字段默认 None,运行时按 package 与速率分档解析成 `(value, source)`(0.13.5 起 `target_keys` 给出答话的表 key),结果行打印 `source: xxx`。
   配置里显式写的值标 `source: config`,是配置自己的主张。
 - `PACKAGE_RLGC` 是模型参数,不是规范数字,不进这张表;reach / pitch / 模块宽度进表。
 - 段 2 起模型参数有自己的表 `src/d2d_link/data/spec/model_presets.yaml`(20 条,全部 `source: model`,带 cite 与 note):R_dc、R_skin、tanδ、G、Z0、

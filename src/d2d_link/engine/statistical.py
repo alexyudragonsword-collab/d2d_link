@@ -53,7 +53,7 @@ from scipy.special import erfc, log_ndtr
 from ..channel.model import LinkResponse, link_response, noise_shaping_gain
 from ..clock.forwarded import ForwardedClock, JitterBudget
 from ..config.schema import LinkConfig
-from ..spec import survey
+from ..spec import survey_tiered
 
 SQRT2 = math.sqrt(2.0)
 LN10 = math.log(10.0)
@@ -79,18 +79,33 @@ def _logsumexp(a: np.ndarray, axis: int | None = None) -> np.ndarray | float:
     return out.reshape(-1)
 
 
+TARGET_KEYS = (("ber", "raw_ber_target"), ("eye_height_mv", "rx_eye_height_mv"), ("eye_width_ui", "rx_eye_width_ui"))
+
+
+def target_keys(cfg: LinkConfig) -> dict:
+    """Where each target came from: ``"config"`` or the spec-table key that
+    answered the tiered lookup for this package and data rate
+    (``spec.survey_tiered``: ``standard.rx_eye_width_ui@32`` before
+    ``rx_eye_width_ui``). Since 0.13.5; the survey's eye mask is untiered."""
+    out = {}
+    for name, key in TARGET_KEYS:
+        out[name] = ("config" if getattr(cfg.target, name) is not None
+                     else survey_tiered(key, cfg.package.kind, cfg.data_rate_gtps).key)
+    return out
+
+
 def resolved_targets(cfg: LinkConfig) -> dict:
     """The BER / eye targets: the config's own values where set, else the
-    survey table's for this package, each with its source."""
+    spec table's most specific entry for this package and data rate, each
+    with its source (``target_keys`` names the entry)."""
     t = cfg.target
     out = {}
-    for name, key in (("ber", "raw_ber_target"), ("eye_height_mv", "rx_eye_height_mv"),
-                      ("eye_width_ui", "rx_eye_width_ui")):
+    for name, key in TARGET_KEYS:
         v = getattr(t, name)
         if v is not None:
             out[name] = (float(v), "config")
         else:
-            s = survey(key, cfg.package.kind)
+            s = survey_tiered(key, cfg.package.kind, cfg.data_rate_gtps)
             out[name] = (float(s.value), s.source)
     return out
 
@@ -817,4 +832,4 @@ def run_statistical(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int
 
 
 __all__ = ["run_statistical", "StatisticalEngine", "StatResult", "IsiModel", "isi_model",
-           "tail_probability", "log10_tail", "qfunc", "resolved_targets", "jitter_quadrature"]
+           "tail_probability", "log10_tail", "qfunc", "resolved_targets", "target_keys", "jitter_quadrature"]

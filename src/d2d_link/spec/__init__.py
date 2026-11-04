@@ -131,6 +131,37 @@ def survey(key: str, package: str | None = None) -> SpecNumber:
     return table[key]
 
 
+def tier_keys(key: str, package: str | None = None, rate_gtps: float | None = None) -> list[str]:
+    """The table keys a tiered lookup tries, most specific first:
+    ``<package>.<key>@<rate>``, ``<key>@<rate>``, ``<package>.<key>``, ``<key>``
+    (``@32`` for 32 GT/s). The survey has only the plain keys today -- the
+    eye mask its sources quote carries no rate or package -- so every tier
+    resolves to them; an entry added with the original text's tier (e.g.
+    ``standard.rx_eye_width_ui@32``, ``source: spec``) takes over for that
+    tier alone and the report names the key it came from."""
+    rate = None if rate_gtps is None else f"@{float(rate_gtps):g}"
+    out = []
+    if package is not None and rate is not None:
+        out.append(f"{package}.{key}{rate}")
+    if rate is not None:
+        out.append(f"{key}{rate}")
+    if package is not None:
+        out.append(f"{package}.{key}")
+    out.append(key)
+    return out
+
+
+def survey_tiered(key: str, package: str | None = None, rate_gtps: float | None = None,
+                  table: dict[str, SpecNumber] | None = None) -> SpecNumber:
+    """The most specific entry for ``key`` at this package and data rate
+    (``tier_keys``); its ``.key`` says which tier answered."""
+    table = _table() if table is None else table
+    for k in tier_keys(key, package, rate_gtps):
+        if k in table:
+            return table[k]
+    raise KeyError(f"no spec entry for {key!r} at {package} / {rate_gtps} GT/s (tried {tier_keys(key, package, rate_gtps)})")
+
+
 def all_entries() -> dict[str, SpecNumber]:
     return dict(_table())
 
@@ -139,5 +170,5 @@ def unverified() -> list[SpecNumber]:
     return [e for e in _table().values() if not e.verified]
 
 
-__all__ = ["SpecNumber", "survey", "all_entries", "unverified", "load_survey", "SURVEY_FILE", "SOURCES",
+__all__ = ["SpecNumber", "survey", "survey_tiered", "tier_keys", "all_entries", "unverified", "load_survey", "SURVEY_FILE", "SOURCES",
            "preset", "all_presets", "preset_values", "PRESETS_FILE"]

@@ -97,6 +97,7 @@ Crosstalk、Receiver、Sweeps(tracker 带宽 / 本地 PLL / reach);右栏队列(
 
 本库拿不到 UCIe 规范原文。速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 15 条,全部在 `src/d2d_link/data/spec/ucie_survey.yaml`,
 每条 `source: survey` 并注明综述出处与"未核实";引擎只按 key 取,结果行打印 `source: xxx`。
+0.13 的判定只由眼宽目标 0.75 UI 决定(敏感性,0.13.3)。目标按 封装 × 速率档 分档查表(0.13.5):原文的分档数字一来,加 `standard.rx_eye_width_ui@32` 这样的条目即可,报表写明用的是哪一档。
 
 ```bash
 grep "source: survey" src/d2d_link/data/spec/ucie_survey.yaml

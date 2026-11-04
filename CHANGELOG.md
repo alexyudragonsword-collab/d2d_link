@@ -4,6 +4,16 @@
 
 ---
 
+## [0.13.5] — 2026-11-04 — 眼罩目标分档查表(不动数字)
+
+### 新增
+- `spec.survey_tiered` / `spec.tier_keys`:目标按 `<package>.<key>@<rate>` → `<key>@<rate>` → `<package>.<key>` → `<key>` 查表;
+  `engine.statistical.target_keys(cfg)` 给出每个目标由哪个表 key 答话(或 `config`)。
+- 报表 Targets 表多一列 table key;GUI 的未核实输入卡按这个 key 取出处(以前按子串猜)。
+- 没有新增条目:综述的眼罩不带速率与封装,不复制同一个未核实的数凑表;原文到了按档加条目即可。新测试守查表顺序。
+
+---
+
 ## [0.13.4] — 2026-11-04 — PLL 剖面算到 16 GHz(不动数字)
 
 ### 新增

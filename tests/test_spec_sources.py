@@ -137,3 +137,35 @@ def test_data_ships_inside_the_package(tmp_path, monkeypatch):
     # tomllib is 3.11+; the declaration is one line of text
     pyproject = (PACKAGE_DIR.parents[1] / "pyproject.toml").read_text(encoding="utf-8")
     assert re.search(r'^d2d_link = \[.*"data/clock_profiles/\*\.yaml".*\]', pyproject, re.M), "package-data declaration"
+
+
+def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
+    """The eye mask the survey quotes carries no rate or package, yet the
+    0.13 verdicts rest on it alone (sensitivity: only the 0.75 UI target
+    flips x1 and the x16 module). The lookup is tiered so the original
+    text's numbers can land per tier: ``<package>.<key>@<rate>`` first, the
+    plain key last. Today every tier resolves to the plain key and the
+    report names it."""
+    import dataclasses
+
+    from d2d_link.config import LinkConfig
+    from d2d_link.engine.statistical import resolved_targets, target_keys
+
+    assert spec.tier_keys("rx_eye_width_ui", "standard", 32.0) == [
+        "standard.rx_eye_width_ui@32", "rx_eye_width_ui@32", "standard.rx_eye_width_ui", "rx_eye_width_ui"]
+    cfg = LinkConfig()
+    assert target_keys(cfg) == {"ber": "raw_ber_target", "eye_height_mv": "rx_eye_height_mv",
+                                "eye_width_ui": "rx_eye_width_ui"}
+    table = dict(spec.all_entries())
+    base = table["rx_eye_width_ui"]
+    table["rx_eye_width_ui@32"] = dataclasses.replace(base, key="rx_eye_width_ui@32", value=0.70)
+    table["standard.rx_eye_width_ui@32"] = dataclasses.replace(base, key="standard.rx_eye_width_ui@32", value=0.65)
+    monkeypatch.setattr(spec, "_table", lambda: table)
+    import d2d_link.engine.statistical as st
+    monkeypatch.setattr(st, "survey_tiered", lambda *a, **k: spec.survey_tiered(*a, **k, table=table))
+    assert resolved_targets(cfg)["eye_width_ui"] == (0.65, "survey")
+    assert target_keys(cfg)["eye_width_ui"] == "standard.rx_eye_width_ui@32"
+    adv = dataclasses.replace(cfg, package=dataclasses.replace(cfg.package, kind="advanced"))
+    assert resolved_targets(adv)["eye_width_ui"][0] == 0.70                      # rate tier, no package tier
+    slow = dataclasses.replace(cfg, data_rate_gtps=16.0)
+    assert resolved_targets(slow)["eye_width_ui"][0] == 0.75 and target_keys(slow)["eye_width_ui"] == "rx_eye_width_ui"

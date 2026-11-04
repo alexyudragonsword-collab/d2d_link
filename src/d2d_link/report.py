@@ -48,8 +48,11 @@ def report(cfg, res, clock) -> dict:
     ui = cfg.ui
     rows = budget_rows(cfg, clock)
     total = math.sqrt(sum(v ** 2 for _, v in rows))
+    from d2d_link.engine.statistical import target_keys
+
     lm = res.lanes
     t = res.targets
+    keys = target_keys(cfg)
     out = {
         "link": {"data_rate_gtps": cfg.data_rate_gtps, "package": cfg.package.kind,
                  "length_mm": cfg.channel.length_mm, "ui_ps": ui * 1e12,
@@ -66,7 +69,7 @@ def report(cfg, res, clock) -> dict:
                  "verdict": "PASS" if res.passes else "FAIL"},
         "jitter_budget": [{"term": name, "fs": 1e15 * v, "ui": v / ui} for name, v in rows]
                          + [{"term": "total (power sum)", "fs": 1e15 * total, "ui": total / ui}],
-        "targets": {k: {"value": v, "source": src} for k, (v, src) in t.items()},
+        "targets": {k: {"value": v, "source": src, "key": keys[k]} for k, (v, src) in t.items()},
         "crosstalk": ({"mode": cfg.channel.xtalk, **describe(cfg)} if cfg.channel.xtalk == "coupled"
                       else {"mode": cfg.channel.xtalk, **_xtalk_level(cfg, res)}),
         "channel_model": ({"rlgc_source": "model", **{k: v for k, v in cfg.rlgc().items()}}
@@ -101,9 +104,9 @@ def to_markdown(rep: dict) -> str:
              "| term | fs | UI |", "|---|---:|---:|"]
     for row in rep["jitter_budget"]:
         lines.append(f"| {row['term']} | {row['fs']:.1f} | {row['ui']:.4f} |")
-    lines += ["", "## Targets", "", "| quantity | value | source |", "|---|---:|---|"]
+    lines += ["", "## Targets", "", "| quantity | value | source | table key |", "|---|---:|---|---|"]
     for k, v in rep["targets"].items():
-        lines.append(f"| {k} | {v['value']:g} | {v['source']} |")
+        lines.append(f"| {k} | {v['value']:g} | {v['source']} | {v.get('key', '')} |")
     x = rep["crosstalk"]
     lines += ["", "## Crosstalk", ""]
     if x["mode"] == "coupled":

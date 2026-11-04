@@ -96,11 +96,8 @@ def unverified(result: dict | None) -> html.Div:
         t = result["report"]["targets"][k]
         if t["source"] != "survey":
             continue
-        cite = ""
-        for e in entries.values():
-            if e.key.endswith(k) or k in e.key:
-                cite = e.cite
-                break
+        e = entries.get(t.get("key", ""))          # the tier that answered (spec.survey_tiered)
+        cite = f"{t['key']}: {e.cite}" if e is not None else ""
         rows.append(html.Div([html.Span(f"{label} {t['value']:g}", className="k"),
                               html.Span(cite if len(cite) <= 90 else cite[:88] + "…", className="v")], className="uv-item"))
     x = result["report"]["crosstalk"]
