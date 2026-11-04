@@ -30,6 +30,8 @@
    复现:`clocking.profile_above: zero` 回到 0.12 的口径;`clocking.tree_delay_ps: 0` 看理想树。
    设计边界(示例 10,0.13.1):x1 20 GHz 树、floor 口径下 −145 / −150 / −155 dBc/Hz 过的最长树 2.7 / 11.9 / ≥ 40 ps;zero 口径都 ≥ 40 ps。
    x16 模块(1 MHz 本地 PLL)与树延时无关,−155 也只 0.733 UI —— 模块要过还差漫游 / 路径噪声这一侧,本条拿到 PLL 数据也不够。
+   模块的预算(示例 11,0.13.2):σ* = 268.7 fs 对今天 331.6 fs;没有单个杠杆够,最大的是数据路径白抖 200 → 100 fs(282.7 fs)。
+   **决定模块判定的是三个无出处的配置值**:`data_path_rj_s` 200 fs、`*_path_wander_s` 200 fs、`tree_rj_s` 100 fs —— 要么给出处,要么标 `source: model` 进敏感性。
 4. **第三次体检(2026-11-03)挂出、段 15 尚未处理的**:行为级 FEXT 形状 √2·u/(1+u) 与耦合线一阶 j2πfτ 不符(x5 中间 lane 眼高差 60 mV、x16 最差 lane 换人);
    已在段 15 处理的(PLL 带外口径、有跟踪器时的 deskew 步长、介质色散、Tx DCD、PI 量化箱)见 CHANGELOG 0.13.0。复现:scratchpad `audit3_code/p04_fext_shape.py`。
 

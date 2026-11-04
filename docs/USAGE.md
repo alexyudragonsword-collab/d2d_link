@@ -13,6 +13,7 @@ python examples/07_rate_sweep.py             # 规范表全部速率档 × 两�
 python examples/08_crosstalk_physics.py      # 布线、反向 lane 的 NEXT、单端 Touchstone 读法
 python examples/09_receiver_front_end.py     # 收端前端带宽、噪声口径、CTLE 代价、训练 BER
 python examples/10_clock_tree_design.py      # 树延时 × 树带宽 × PLL 底噪 × 剖面口径:过的边界,约 5 分钟
+python examples/11_module_jitter_budget.py   # x16 模块能承受的抖动 σ* 与各杠杆,约 3–4 分钟
 pytest -q
 ```
 

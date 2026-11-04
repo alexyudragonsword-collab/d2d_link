@@ -43,13 +43,11 @@ is not changed.
 
 import dataclasses
 import math
-import tempfile
-from pathlib import Path
 
 import numpy as np
 import yaml
 
-from _common import CONFIGS, OUT, plt_or_none
+from _common import CONFIGS, OUT, pll_floor_variant, plt_or_none
 from d2d_link.clock.forwarded import ForwardedClock, resolve_data_file
 from d2d_link.config import load_config
 from d2d_link.engine import run_link, run_statistical
@@ -66,24 +64,7 @@ BUNDLED_FLOOR = -145.0         # the profile's asymptote: l_dbc_hz -> -145.0 at 
 # ------------------------------------------------------- the floor variants
 src = resolve_data_file(x1.clocking.pll_profile)
 base = yaml.safe_load(src.read_text())
-l_base = np.asarray(base["l_dbc_hz"], dtype=float)
-tmp = Path(tempfile.mkdtemp(prefix="d2d_floor_"))
-
-
-def floor_profile(floor_dbc: float) -> str:
-    """The bundled profile with its -145 dBc/Hz white floor swapped for
-    ``floor_dbc``: the in-band shape (what lies above the floor) is kept."""
-    if floor_dbc == BUNDLED_FLOOR:
-        return x1.clocking.pll_profile
-    s = np.maximum(10.0 ** (l_base / 10.0) - 10.0 ** (BUNDLED_FLOOR / 10.0), 0.0) + 10.0 ** (floor_dbc / 10.0)
-    var = dict(base, l_dbc_hz=[float(v) for v in 10.0 * np.log10(s)],
-               source=f"{base['source']}; white floor {BUNDLED_FLOOR:g} -> {floor_dbc:g} dBc/Hz (example 10, a design target)")
-    p = tmp / f"{src.stem}_floor{-floor_dbc:g}.yaml"
-    p.write_text(yaml.safe_dump(var, sort_keys=False))
-    return str(p)
-
-
-PROFILES = {fl: floor_profile(fl) for fl in FLOORS}
+PROFILES = {fl: pll_floor_variant(x1.clocking.pll_profile, fl, BUNDLED_FLOOR) for fl in FLOORS}
 
 
 def clocked(cfg, floor_dbc, reading, tau_ps=None, tree_bw="keep"):
