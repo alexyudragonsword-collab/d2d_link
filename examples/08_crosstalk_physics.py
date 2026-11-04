@@ -14,7 +14,8 @@ dataclass replace, never a loose number:
 2. **Direction.** Lanes at the module's edge sit next to the return module's
    lanes, which transmit the other way: their near-end crosstalk arrives at
    this receiver's die without crossing the lossy line, as a pulse pair
-   2 tau_c apart with the backward coefficient K_b = kappa / 4.
+   2 tau_c apart with the backward coefficient K_b = kappa (1 + eps_eff/eps_r) / 4
+   (both couplings add at the near end; until 0.13.2 it was kappa / 4).
 3. **A file.** A single-ended 2N-port Touchstone extraction carries its own
    coupling terms. Lacking a real one (ROADMAP P1 #2), a synthetic 3-lane
    file is written here from the analytic line's own transfer and the
@@ -69,7 +70,7 @@ xn = describe(nx)
 res_n = run_link(nx)
 res_0 = routing["microstrip"][1]
 pn = link_response(nx).xtalk_pulses["next"].y
-print(f"\nnear-end crosstalk from the return module on edge lanes {list(edges)}: K_b = kappa/4 = {xn['next_db']:.1f} dB, "
+print(f"\nnear-end crosstalk from the return module on edge lanes {list(edges)}: K_b = (kappa_L + kappa_C)/4 = {xn['next_db']:.1f} dB, "
       f"two lobes {2 * xn['coupled_delay_ps']:.0f} ps = {2e-12 * xn['coupled_delay_ps'] / nx.ui:.1f} UI apart, "
       f"peak {1e3 * np.max(np.abs(pn)):.1f} mV of {1e3 * link_response(nx).main_amplitude:.1f} mV main")
 print(f"{'lane':>5s} {'aggressors':>10s} {'xtalk [mV]':>10s} {'eye [mV] off/on':>16s} {'eye [UI] off/on':>16s}")

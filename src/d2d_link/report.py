@@ -148,8 +148,13 @@ def build(cfg):
 
 def sensitivity_knobs(cfg) -> list[dict]:
     """The estimated and unverified numbers this config's verdict rests on:
-    ``(label, config path, nominal, source, step)`` for each. A parameter the
-    config sets explicitly is its own claim (source config) and still listed."""
+    ``label, path, nominal, source`` and either ``rel`` (moved by +-rel of the
+    nominal) or ``step`` (moved by +-step: dB levels and profile shifts, where
+    +-20 % of -30 dB would be +-6 dB, a factor 2 in amplitude). A parameter
+    the config sets explicitly is its own claim (source config) and still
+    listed: since 0.13.3 that includes the clock path's white and wander
+    jitter, which decide the x16 module (example 11), and the PLL profiles'
+    level (``pll_shift_db``, +-3 dB: a borrowed bench profile, source model)."""
     from d2d_link.channel.coupled import trace_pitch_um
     from d2d_link.config.schema import RLGC_PRESET_KEYS, STACKUP_KEYS
 
@@ -169,9 +174,25 @@ def sensitivity_knobs(cfg) -> list[dict]:
         pitch, src = trace_pitch_um(cfg)
         knobs.append(dict(label="trace_pitch_um", path="channel.trace_pitch_um", nominal=pitch, source=src, rel=0.2))
     elif ch.xtalk == "fext" and cfg.lanes.count > 1:
-        adj = cfg.xtalk_db()[0]
+        adj, sec = cfg.xtalk_db()
         knobs.append(dict(label="xtalk_adjacent_db", path="channel.xtalk_adjacent_db", nominal=adj,
-                          source="config" if ch.xtalk_adjacent_db is not None else "model", rel=0.2))
+                          source="config" if ch.xtalk_adjacent_db is not None else "model", step=3.0))
+        knobs.append(dict(label="xtalk_second_db", path="channel.xtalk_second_db", nominal=sec,
+                          source="config" if ch.xtalk_second_db is not None else "model", step=3.0))
+    if ch.xtalk_next == "fixed":
+        knobs.append(dict(label="next_db", path="channel.next_db", nominal=ch.next_db, source="config", step=3.0))
+    ck = cfg.clocking
+    for name in ("data_path_rj_s", "clock_path_rj_s", "tree_rj_s", "data_path_wander_s", "clock_path_wander_s", "pll_rj_s",
+                 "local_pll_rj_s"):
+        v = getattr(ck, name, 0.0)
+        if v:
+            knobs.append(dict(label=name, path=f"clocking.{name}", nominal=v, source="config", rel=0.2))
+    if ck.pll_profile is not None:
+        knobs.append(dict(label="pll_shift_db", path="clocking.pll_shift_db", nominal=ck.pll_shift_db,
+                          source="model", step=3.0))
+    if ck.local_pll_profile is not None:
+        knobs.append(dict(label="local_pll_shift_db", path="clocking.local_pll_shift_db", nominal=ck.local_pll_shift_db,
+                          source="model", step=3.0))
     if cfg.rx.bw_hz is not None:
         # the receiver's bandwidth is the design's claim, and with the noise
         # at the input it moves both the pulse and the noise
@@ -210,7 +231,7 @@ def sensitivity(cfg, eye_height_mv: float = 10.0, eye_width_ui: float = 0.05, pr
     for k in knobs:
         sides = {}
         for sign, name in ((-1.0, "low"), (1.0, "high")):
-            value = k["nominal"] * (1.0 + sign * k["rel"])
+            value = k["nominal"] + sign * k["step"] if "step" in k else k["nominal"] * (1.0 + sign * k["rel"])
             res = run_link(apply_overrides(cfg, {k["path"]: value}))
             tick()
             sides[name] = {"value": value, **verdict(res)}
@@ -240,7 +261,8 @@ def sensitivity_markdown(sens: dict) -> str:
     lines = ["## Sensitivity", "",
              f"Nominal: {'PASS' if n['passes'] else 'FAIL'}, worst lane {n['worst_lane']} margin {n['margin']:+.3f} "
              f"(min eye {n['eye_height_mv']:.1f} mV / {n['eye_width_ui']:.3f} UI). Each estimate (source: model) and "
-             "unverified number (source: survey) moved -20 % / +20 % (targets -/+ 10 mV, 0.05 UI); "
+             "unverified number (source: survey), and each jitter the config claims, moved -20 % / +20 % (dB levels and "
+             "profile shifts -/+ 3 dB; targets -/+ 10 mV, 0.05 UI); "
              "margin = min(eye height, eye width) relative to its target, worst lane.", "",
              "| parameter | source | nominal | low -> verdict (margin) | high -> verdict (margin) | flips |",
              "|---|---|---:|---|---|---|"]

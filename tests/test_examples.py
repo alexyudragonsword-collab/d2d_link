@@ -23,3 +23,18 @@ def test_example_imports_resolve(path):
             mod = importlib.import_module(node.module)
             for alias in node.names:
                 assert hasattr(mod, alias.name), f"{path.name}: {node.module}.{alias.name}"
+
+
+def test_only_a_missing_optional_package_is_a_skip():
+    """run_examples reports an example as skipped only when the optional
+    package itself is absent; an ImportError raised inside an installed one
+    is a failure (third health check)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("run_examples", REPO / "tools" / "run_examples.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod._missing_optional("ModuleNotFoundError: No module named 'matplotlib'") == "matplotlib"
+    assert mod._missing_optional("ModuleNotFoundError: No module named 'skrf.io'") == "skrf"
+    assert mod._missing_optional("ImportError: cannot import name 'x' from 'matplotlib' (/x)") is None
+    assert mod._missing_optional("ModuleNotFoundError: No module named 'scipy'") is None

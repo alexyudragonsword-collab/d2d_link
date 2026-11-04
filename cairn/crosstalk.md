@@ -5,7 +5,7 @@ summary: "lane 间串扰怎么建:FEXT 的行为级 / 耦合线估计、带状�
 tags: [crosstalk, fext, next, stripline, touchstone]
 contains: [decision, lesson]
 created: "2026-10-13"
-updated: "2026-11-03"
+updated: "2026-11-04"
 related: [architecture-invariants.md, engines.md, spec-sources.md]
 authoring_mode: ai_generated
 ---
@@ -26,11 +26,14 @@ authoring_mode: ai_generated
   给文件自己的 Nyquist 耦合、`adjacent_source: file`(之前打的是预设 −30 dB 的 "model" 标签)—— 数字来自 lane 的 `extras["xtalk_adjacent_db"]`。
 
 **带状线**(`channel.routing: stripline`):均匀介质,ε_eff = ε_r,奇偶模同速,一阶 FEXT 为 0(估计给 −300 dB 下限);同几何的线更慢
-(L、C 由 ε_r 推出)。NEXT 系数 κ/4 与布线方式无关。**到 0.11 为止,「32 GT/s 标准封装不过」是微带假设的产物**:同几何布成带状线就过(0.761 UI)。段 9b 走线因果化后带状线也差 0.002 UI 不过(0.748 UI,示例 08),微带 0.633 UI;0.13.0(PLL 底噪、色散介质)带状线 0.717、微带 0.590 UI。结论改为:标准封装 25 mm 在 32 GT/s 的 0.75 UI 眼宽目标下,本库的每个模型变体都不过,串扰只决定差多少。
+(L、C 由 ε_r 推出)。NEXT 系数在带状线是 κ/2、微带 κ(1 + ε_eff/ε_r)/4(0.13.3 起;之前 κ/4,与布线无关)。**到 0.11 为止,「32 GT/s 标准封装不过」是微带假设的产物**:同几何布成带状线就过(0.761 UI)。段 9b 走线因果化后带状线也差 0.002 UI 不过(0.748 UI,示例 08),微带 0.633 UI;0.13.0(PLL 底噪、色散介质)带状线 0.717、微带 0.590 UI。结论改为:标准封装 25 mm 在 32 GT/s 的 0.75 UI 眼宽目标下,本库的每个模型变体都不过,串扰只决定差多少。
 
 **近端串扰**(`channel.xtalk_next`,段 6):模块边缘的 lane 旁边是回程模块的 lane,方向相反,它的发端在本 lane 的收端 die 上。
-弱耦合对的后向波是 K_b × [p(t) − p(t − 2τ_c)],K_b = κ/4(Johnson & Graham),τ_c 是耦合长度的单程延时;不经有损线,只经攻击方的
-驱动极点与本方的 CTLE。标准封装 25 mm:K_b = −36.0 dB,两瓣相距 2τ_c = 266 ps = 8.5 UI,峰值 3.3 mV 对 165 mV 主光标。
+弱耦合对的后向波是 K_b × [p(t) − p(t − 2τ_c)],K_b = (L_m/L + C_m/C)/4,τ_c 是耦合长度的单程延时;不经有损线,只经攻击方的
+驱动极点与本方的 CTLE。远端估计已隐含 L_m/L = κ、C_m/C = κ ε_eff/ε_r(两者之差就是 FEXT 的失配 κ(1 − ε_eff/ε_r)),同一对耦合在近端相加:
+**K_b = κ(1 + ε_eff/ε_r)/4**(带状线 κ/2)。标准封装 25 mm:K_b = −31.2 dB,两瓣相距 2τ_c = 266 ps = 8.5 UI,峰值 5.6 mV 对 165 mV 主光标。
+- **更正(0.13.3,第三次体检 B 项)**:0.8.0–0.13.2 用 K_b = κ/4,只算了一种耦合,微带少 4.8 dB(−36.0 dB、峰值 3.3 mV);示例 08 边缘 lane 眼宽 0.661 → 0.645 UI。
+  bundled 配置都不开 NEXT,指纹不变。教科书式未对照 Johnson & Graham 原文(未核实),改动依据是与本库远端估计自洽。
 `lanes.reverse_adjacent` 指名受害 lane,`lanes.reverse_phase_ui` 是反向 lane 符号相对本模块采样点的相位(配置选择,默认 0)。
 x3 边缘 lane 加 NEXT 后眼宽下降,中间 lane 不变;−14 dB 的固定 NEXT 上两引擎 1e-4 处 2× 内。
 

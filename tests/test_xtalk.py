@@ -104,7 +104,7 @@ def test_time_engine_takes_aggressors_directly():
 
 def test_near_end_crosstalk_from_a_reverse_lane():
     """A reverse-direction neighbour launches at this receiver's die: the
-    backward-coupled wave is K_b (kappa / 4) times the aggressor's pulse minus
+    backward-coupled wave is K_b (kappa (1 + eps_eff/eps_r) / 4) times the aggressor's pulse minus
     the same pulse a round trip of the coupled length later -- two lobes
     2 tau_c apart, no channel loss on either. Only the lanes named in
     lanes.reverse_adjacent take it."""
@@ -118,8 +118,9 @@ def test_near_end_crosstalk_from_a_reverse_lane():
                               lanes=dataclasses.replace(base.lanes, count=3, reverse_adjacent=(0, 2)),
                               sim=dataclasses.replace(base.sim, stat_phase_points=16))
     pitch, _ = trace_pitch_um(cfg)
-    kb = 0.25 * coupling_fraction(pitch, cfg.stackup()["dielectric_height_um"])
-    assert cfg.next_ratio() == pytest.approx(kb) and 20 * np.log10(kb) == pytest.approx(-36.0, abs=0.1)
+    st = cfg.stackup()
+    kb = 0.25 * coupling_fraction(pitch, st["dielectric_height_um"]) * (1.0 + st["eps_eff"] / st["eps_r"])
+    assert cfg.next_ratio() == pytest.approx(kb) and 20 * np.log10(kb) == pytest.approx(-31.2, abs=0.1)
     assert base.next_ratio() == 0.0 and describe(cfg)["next_db"] == pytest.approx(20 * np.log10(kb))
     f = np.array([0.0, 1.0 / (4.0 * cfg.coupled_delay_s())])          # DC: cancels; quarter period of the round trip: 2 K_b
     assert next_response(cfg, f)[0] == 0.0 and abs(next_response(cfg, f)[1]) == pytest.approx(2 * kb)

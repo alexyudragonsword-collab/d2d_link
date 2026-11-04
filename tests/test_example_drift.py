@@ -84,3 +84,30 @@ def test_accept_refuses_while_a_citing_table_quotes_a_moved_number(drift, tmp_pa
     assert [(h[0], h[2]) for h in hits] == [("README.md", "194.7")]
     doc.write_text("| `07_rate_sweep.py` | rate sweep | first failing rate 24 GT/s, eye 194.6 mV |\n", encoding="utf-8")
     assert drift.blocking_quotes(exp, new, tmp_path) == []
+
+
+def test_accept_gate_reads_history_releases_and_spec_numbers_as_no_quote(drift, tmp_path):
+    """Phase 15's accept flagged 104 doc numbers for 8 real stale quotes: a
+    number labelled with an older release ("0.12 的 194.7"), a release number
+    itself ("到 0.11 为止"), and a spec-table number an output passes by
+    ("0.75 UI", the eye-width target) are not quotes of today's output. A
+    since-then statement ("0.12 起 194.7") still is."""
+    exp = tmp_path / "expected"
+    new = tmp_path / "new"
+    exp.mkdir()
+    new.mkdir()
+    (tmp_path / "pyproject.toml").write_text('version = "0.13.2"\n', encoding="utf-8")
+    doc = tmp_path / "README.md"
+    (exp / "07_rate_sweep.txt").write_text("first failing rate 24 GT/s: eye 194.7 mV / 0.747 UI\n", encoding="utf-8")
+    (new / "07_rate_sweep.txt").write_text("first failing rate 24 GT/s: eye 194.6 mV / 0.691 UI\n", encoding="utf-8")
+    doc.write_text("| `07_rate_sweep.py` | rate sweep | eye 194.6 mV against the 0.75 UI target"
+                   "(0.12 的口径下 194.7 mV;到 0.11 为止 0.11 的数) |\n", encoding="utf-8")
+    assert drift.blocking_quotes(exp, new, tmp_path) == []
+    doc.write_text("| `07_rate_sweep.py` | rate sweep | 0.12 起 eye 194.7 mV |\n", encoding="utf-8")
+    assert [h[2] for h in drift.blocking_quotes(exp, new, tmp_path)] == ["194.7"]
+    doc.write_text("| `07_rate_sweep.py` | rate sweep | 0.13.0 的 eye 194.7 mV |\n", encoding="utf-8")
+    assert [h[2] for h in drift.blocking_quotes(exp, new, tmp_path)] == ["194.7"]   # today's release is not history
+    doc.write_text("| `07_rate_sweep.py` | rate sweep | eye 194.6 mV(0.13.2 前 194.7 mV) |\n", encoding="utf-8")
+    assert drift.blocking_quotes(exp, new, tmp_path) == []                          # ... unless marked as the past
+    spans, versions = drift.history_spans("0.11 UI 与 0.5 与 0.12.3 的 1.5 mV", 13)
+    assert versions == {"0.11 UI 与 0.5 与 0.12.3 的 1.5 mV".index("0.12.3")} and len(spans) == 1

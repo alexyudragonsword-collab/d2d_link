@@ -28,7 +28,7 @@ def test_model_presets_are_tagged_and_grep_able():
     import subprocess
 
     presets = spec.all_presets()
-    assert len(presets) == 18 and all(e.estimated and e.cite and e.note for e in presets.values())
+    assert len(presets) == 20 and all(e.estimated and e.cite and e.note for e in presets.values())
     out = subprocess.run(["grep", "-c", "source: model"], input=spec.PRESETS_FILE.read_text(encoding="utf-8"),
                          capture_output=True, text=True)
     assert int(out.stdout.strip()) == len(presets)
@@ -45,6 +45,11 @@ def test_model_presets_are_tagged_and_grep_able():
     assert PACKAGE_RLGC["standard"]["r_skin"] == spec.preset("r_skin", "standard").value
     assert PACKAGE_STACKUP["advanced"]["eps_r"] == spec.preset("eps_r", "advanced").value
     assert PACKAGE_XTALK_DB["standard"] == spec.preset("xtalk_adjacent_db", "standard").value
+    from d2d_link.config import LinkConfig
+    from d2d_link.config.schema import PACKAGE_XTALK_SECOND_OFFSET_DB
+    assert PACKAGE_XTALK_SECOND_OFFSET_DB["advanced"] == spec.preset("xtalk_second_offset_db", "advanced").value == -12.0
+    adj, sec = LinkConfig().xtalk_db()
+    assert sec == adj + PACKAGE_XTALK_SECOND_OFFSET_DB["standard"]     # the third health check's B9: no bare -12 left
     assert "l_h_m" not in PACKAGE_RLGC["standard"] and "c_f_m" not in PACKAGE_RLGC["standard"]
 
 

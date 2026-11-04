@@ -9,7 +9,7 @@
 preset the config leans on (source: model -- trace resistance, loss tangent,
 Z0, stack-up geometry, behavioural crosstalk level) and every survey number
 it leans on (bump pitch for the coupled estimate; the eye-mask targets) is
-moved by +-20 % (targets by +-10 mV / +-0.05 UI) and the link rerun; the
+moved by +-20 % (dB levels and profile shifts by +-3 dB, targets by +-10 mV / +-0.05 UI) and the link rerun; the
 table lists the worst lane's margin on each side and marks the parameters
 whose perturbation flips PASS/FAIL.
 
@@ -42,7 +42,8 @@ def main(argv=None) -> int:
     ap.add_argument("-o", "--out", type=Path, help="Markdown file (default: stdout)")
     ap.add_argument("--json", type=Path, help="also write the report as JSON")
     ap.add_argument("--sensitivity", action="store_true",
-                    help="also perturb every model / survey number by +-20 %% and report which flip the verdict")
+                    help="also perturb every model / survey number and config jitter (+-20 %%, dB levels +-3 dB) "
+                         "and report which flip the verdict")
     args = ap.parse_args(argv)
     from d2d_link.config import load_config
 

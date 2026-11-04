@@ -5,7 +5,7 @@
 #
 # 规范数字(速率、BER、bump 间距、reach、模块宽度、眼罩)在 ucie_survey.yaml;这里只放"没有规范、
 # 只能估"的几何与材料参数。L、C 不在表里:它们由 z0_ohm 与叠层几何推出(config/schema.py::LinkConfig.rlgc),
-# 让信道延时与串扰估计用同一个介电常数。tools/budget_report.py --sensitivity 把每条 ±20% 看结论翻不翻。
+# 让信道延时与串扰估计用同一个介电常数。tools/budget_report.py --sensitivity 把每条 ±20%(dB 值 ±3 dB)看结论翻不翻。
 
 entries:
 
@@ -64,6 +64,13 @@ entries:
     source: model
     cite: "ABF-class build-up film relative permittivity 3.2–3.6 at 10 GHz"
     note: "估计:ε_eff(Hammerstad, w=20, h=30) = 2.54;信道速度与 FEXT 速度失配都用它。"
+
+  standard.xtalk_second_offset_db:
+    value: -12.0
+    unit: dB
+    source: model
+    cite: "second neighbour at twice the pitch: the coupled-line kappa = 1/(1 + (s/h)^2) falls ~4x (-12 dB) when s doubles at s >> h"
+    note: "估计:xtalk: fext 时第二邻 = 最近邻 + 本条(未设 channel.xtalk_second_db 时);coupled 模式按两倍间距直接算,不用本条。"
 
   standard.xtalk_adjacent_db:
     value: -30.0
@@ -127,6 +134,13 @@ entries:
     source: model
     cite: "polyimide RDL dielectric ~3.3; silicon oxide ~3.9"
     note: "估计:ε_eff(Hammerstad, w=2, h=4) = 2.38。"
+
+  advanced.xtalk_second_offset_db:
+    value: -12.0
+    unit: dB
+    source: model
+    cite: "second neighbour at twice the pitch: the coupled-line kappa = 1/(1 + (s/h)^2) falls ~4x (-12 dB) when s doubles at s >> h"
+    note: "估计:xtalk: fext 时第二邻 = 最近邻 + 本条(未设 channel.xtalk_second_db 时);coupled 模式按两倍间距直接算,不用本条。"
 
   advanced.xtalk_adjacent_db:
     value: -24.0

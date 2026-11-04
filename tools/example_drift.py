@@ -58,6 +58,7 @@ import argparse
 import ast
 import bisect
 import difflib
+import functools
 import io
 import re
 import sys
@@ -208,6 +209,50 @@ def _prose_lines(source: str) -> list[str]:
     return keep
 
 
+# --- history and spec numbers: not quotes of an output ----------------------
+#
+# A doc line that labels a number with an older release ("0.12 的 ... 209.7 /
+# 0.761", "0.11:0.774 -> 0.913 UI") records what that release printed; the next
+# numbers-move does not make it stale. Neither is a release number itself
+# ("到 0.11 为止") nor a spec-table number that happens to equal an output
+# ("0.75 UI", the eye-width target). Phase 15's accept flagged 104 such lines
+# for 8 real ones (ROADMAP P3 #5).
+
+_VERSION = re.compile(r"(?<![\w.])0\.(\d+)(?:\.\d+)?(?![\w.])")
+_UNIT_AFTER = re.compile(r"\s*(?:[A-Za-zµ×%°]|/\s*\d)")
+_SINCE_AFTER = re.compile(r"\s*(?:起|之后|以后|开始|onwards)")
+_BEFORE_AFTER = re.compile(r"\s*(?:前|之前|以前|及以前|为止|时|:|：)")
+_SEGMENT_END = re.compile(r"[;；。|)）]")
+
+
+def current_minor(repo: Path = REPO) -> int:
+    """The package's minor version (0.<minor>.x) from pyproject.toml."""
+    m = re.search(r'^version = "0\.(\d+)', (repo / "pyproject.toml").read_text(encoding="utf-8"), re.M) \
+        if (repo / "pyproject.toml").exists() else None
+    return int(m.group(1)) if m else 10 ** 6
+
+
+def history_spans(plain: str, minor: int) -> tuple[list[tuple[int, int]], set[int]]:
+    """``(spans, version starts)`` of a plain doc line: each span runs from a
+    tag naming an older release (0.<m> with m < ``minor``, not followed by
+    "起" / "之后": since-then statements still describe today), or any release
+    marked as the past ("0.13.3 前", "0.12 时", "0.11:"), to the next
+    ";" "。" "|" or closing bracket; the version starts are the offsets of the
+    release numbers themselves (a 0.x number followed by no unit)."""
+    spans, starts = [], set()
+    for m in _VERSION.finditer(plain):
+        tail = plain[m.end():]
+        if _UNIT_AFTER.match(tail):
+            continue                                  # "0.11 UI", "0.12 mV": a value, not a release
+        if "." not in m.group(0)[2:] and int(m.group(1)) < 10:
+            continue                                  # "0.5" is a number; releases here are 0.10 and later or three-part
+        starts.add(m.start())
+        if (int(m.group(1)) < minor and not _SINCE_AFTER.match(tail)) or _BEFORE_AFTER.match(tail):
+            end = _SEGMENT_END.search(plain, m.end())
+            spans.append((m.end(), end.start() if end else len(plain)))
+    return spans, starts
+
+
 def doc_numbers(path: Path, rel: str) -> list[DocNumber]:
     text = path.read_text(encoding="utf-8")
     lines = _prose_lines(text) if path.suffix == ".py" else text.splitlines()
@@ -227,12 +272,17 @@ def doc_numbers(path: Path, rel: str) -> list[DocNumber]:
         bcite.setdefault(blocks[i], set()).update(c)
         scite.setdefault(sections[i], set()).update(c)
     out = []
+    minor = current_minor(path.parents[len(Path(rel).parts) - 1])
     for i, ln in enumerate(lines):
         bl = frozenset(bcite[blocks[i]] | own)
         se = frozenset(scite[sections[i]] | own)
-        for tok in NUM.findall(_plain(ln)):
-            if float(tok) != 0.0:
-                out.append(DocNumber(rel, i + 1, tok, bl, se))
+        plain = _plain(ln)
+        spans, versions = history_spans(plain, minor)
+        for m in NUM.finditer(plain):
+            if m.start() in versions or any(a <= m.start() < b for a, b in spans):
+                continue
+            if float(m.group(0)) != 0.0:
+                out.append(DocNumber(rel, i + 1, m.group(0), bl, se))
     return out
 
 
@@ -275,15 +325,36 @@ class DocIndex:
         return self.docs[bisect.bisect_left(self.mag, v / 1.5):bisect.bisect_right(self.mag, 2 * v)]
 
 
+@functools.lru_cache(maxsize=None)
+def spec_values(repo: Path = REPO) -> frozenset:
+    """Every number in the spec table (``ucie_survey.yaml``): targets, reach,
+    module widths, pitches, rates. A doc quoting one quotes the table."""
+    import yaml
+
+    f = repo / "src" / "d2d_link" / "data" / "spec" / "ucie_survey.yaml"
+    if not f.exists():
+        return frozenset()
+    out = set()
+    for e in (yaml.safe_load(f.read_text(encoding="utf-8")).get("entries") or {}).values():
+        v = e.get("value") if isinstance(e, dict) else None
+        for x in (v if isinstance(v, list) else [v]):
+            if isinstance(x, (int, float)) and not isinstance(x, bool):
+                out.add(float(x))
+    return frozenset(out)
+
+
 def stale(change: Change, index: DocIndex) -> list[tuple[DocNumber, str, str | None, str]]:
     """The doc numbers that quote a value this change moved:
     (doc number, old, new, scope)."""
     ex = change.example[:2]
     hits = []
+    targets = spec_values()
     for o, n in change.pairs:
         ov = float(o)
         nv = float(n) if n is not None else None
         for d in index.near(ov):
+            if float(d.tok) in targets:
+                continue                              # a spec number ("0.75 UI") that an output passes by
             if rounds_to(d.tok, ov) and not (nv is not None and rounds_to(d.tok, nv)):
                 where = _scope(d, ex)
                 if where is not None:

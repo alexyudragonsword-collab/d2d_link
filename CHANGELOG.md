@@ -4,6 +4,22 @@
 
 ---
 
+## [0.13.3] — 2026-11-04 — 敏感性与第三次体检余项(bundled 指纹不变;示例 08 的 NEXT 数字变)
+
+### 修正
+- **NEXT 系数**:K_b = κ(1 + ε_eff/ε_r)/4(带状线 κ/2),与远端估计同一对耦合 L_m/L = κ、C_m/C = κ ε_eff/ε_r;0.8.0 起的 κ/4 只算了一种,微带少 4.8 dB。
+  标准封装 25 mm −36.0 → −31.2 dB,峰值 3.3 → 5.6 mV;示例 08 边缘 lane 眼宽 0.661 → 0.645 UI。bundled 配置不开 NEXT,指纹 3194 项逐位不变。
+- **第二邻串扰偏移 −12 dB** 进 `model_presets.yaml`(`xtalk_second_offset_db`,source: model),`grep -c "source: model"` 18 → 20。
+- **敏感性旋钮**:dB 值与 PLL 剖面平移按 ±3 dB(不再 ±20 %,−30 dB 的 ±20 % 是幅度 2×);新增 `xtalk_second_db`、固定 NEXT、配置里的抖动(数据 / 时钟路径白抖与漫游、
+  树、PLL 白抖)与 `pll_shift_db` / `local_pll_shift_db`。
+- `example_drift accept`:标了旧版本("0.12 的 …"、"0.13.2 前 …")的数、版本号本身、等于规范表数(0.75 UI)的数不再算过期引用;段 15 的转换 106 → 28 条。
+- `run_examples`:只有 `No module named 'matplotlib' / 'skrf'` 算 skip,已装包内部的 ImportError 算失败。
+
+### 发现
+- 敏感性重跑:x1 与 x16 模块**只有眼宽目标 0.75 UI 翻转**(0.70 UI 过);±20 % 的每条估计和抖动、±3 dB 的剖面都不翻。x5 耦合什么都不翻。
+
+---
+
 ## [0.13.2] — 2026-11-04 — x16 模块的抖动预算(不动数字)
 
 ### 新增

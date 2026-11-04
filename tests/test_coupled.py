@@ -154,6 +154,25 @@ def test_stripline_has_no_first_order_fext_and_a_slower_line():
     assert fext_db(strip) == (-300.0, -300.0) and fext_db(micro)[0] > -30.0
     assert strip.rlgc()["l_h_m"] > micro.rlgc()["l_h_m"] and strip.coupled_delay_s() > micro.coupled_delay_s()
     assert describe(strip)["mismatch"] == 0.0
-    # the near-end coefficient does not care: kappa / 4 either way
+    # the near-end coefficient adds the two couplings the far end subtracts:
+    # kappa (1 + eps_eff/eps_r) / 4 -- kappa / 2 in the stripline, where they are equal
     nx = dataclasses.replace(COUPLED, xtalk_next="coupled")
-    assert LinkConfig(channel=nx).next_ratio() == LinkConfig(channel=dataclasses.replace(nx, routing="stripline")).next_ratio() > 0.0
+    m_kb, s_kb = LinkConfig(channel=nx).next_ratio(), LinkConfig(channel=dataclasses.replace(nx, routing="stripline")).next_ratio()
+    k = coupling_fraction(trace_pitch_um(LinkConfig(channel=nx))[0], micro.stackup()["dielectric_height_um"])
+    assert s_kb == pytest.approx(k / 2) and m_kb == pytest.approx(k * (1 + micro.stackup()["eps_eff"] / 3.5) / 4) and m_kb < s_kb
+
+
+def test_sensitivity_knobs_cover_the_clock_claims_and_step_db_levels(budget_tool):
+    """Example 11 found the x16 module's verdict set by three config jitters
+    no table sources (data path 200 fs, wander 200 fs, tree 100 fs), and the
+    x1 verdict by the borrowed PLL profile's level: all are knobs now. dB
+    levels move by +-3 dB, not +-20 % (of -30 dB, a factor 2 in amplitude)."""
+    from d2d_link.config import load_config
+
+    x1 = {k["label"]: k for k in budget_tool.sensitivity_knobs(load_config(REPO / "configs" / "standard_32g_x1.yaml"))}
+    assert {"data_path_rj_s", "clock_path_rj_s", "tree_rj_s", "pll_shift_db"} <= set(x1)
+    assert x1["pll_shift_db"]["step"] == 3.0 and x1["pll_shift_db"]["source"] == "model" and x1["tree_rj_s"]["rel"] == 0.2
+    m = {k["label"]: k for k in budget_tool.sensitivity_knobs(load_config(REPO / "configs" / "standard_32g_x16_module.yaml"))}
+    assert {"data_path_wander_s", "clock_path_wander_s", "local_pll_shift_db", "xtalk_second_db"} <= set(m)
+    assert m["xtalk_adjacent_db"]["step"] == 3.0 and "rel" not in m["xtalk_adjacent_db"]
+    assert m["xtalk_second_db"]["nominal"] == m["xtalk_adjacent_db"]["nominal"] - 12.0 and m["xtalk_second_db"]["source"] == "model"

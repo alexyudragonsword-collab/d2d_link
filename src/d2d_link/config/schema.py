@@ -64,13 +64,15 @@ def _load_presets():
     rlgc = {pkg: {k: float(v[k]) for k in RLGC_PRESET_KEYS} for pkg, v in values.items()}
     stack = {pkg: {k: float(v[k]) for k in STACKUP_KEYS} for pkg, v in values.items()}
     xt = {pkg: float(v["xtalk_adjacent_db"]) for pkg, v in values.items()}
-    return rlgc, stack, xt
+    xt2 = {pkg: float(v["xtalk_second_offset_db"]) for pkg, v in values.items()}
+    return rlgc, stack, xt, xt2
 
 
 PACKAGE_RLGC: dict[str, dict[str, float]]
 PACKAGE_STACKUP: dict[str, dict[str, float]]
 PACKAGE_XTALK_DB: dict[str, float]
-PACKAGE_RLGC, PACKAGE_STACKUP, PACKAGE_XTALK_DB = _load_presets()
+PACKAGE_XTALK_SECOND_OFFSET_DB: dict[str, float]     # second neighbour relative to the nearest (xtalk: fext)
+PACKAGE_RLGC, PACKAGE_STACKUP, PACKAGE_XTALK_DB, PACKAGE_XTALK_SECOND_OFFSET_DB = _load_presets()
 
 
 def eps_eff_microstrip(eps_r: float, w_um: float, h_um: float) -> float:
@@ -129,9 +131,9 @@ class ChannelConfig:
     #   touchstone : the file's own coupling terms (single-ended multi-port file, see touchstone_mode)
     xtalk: Literal["none", "fext", "coupled", "touchstone"] = "none"
     xtalk_adjacent_db: Optional[float] = None   # |X/H| at Nyquist, nearest neighbour; None -> package preset
-    xtalk_second_db: Optional[float] = None     # second neighbour; None -> adjacent - 12 dB
+    xtalk_second_db: Optional[float] = None     # second neighbour; None -> adjacent + preset offset (-12 dB, source: model)
     # near-end crosstalk from a reverse-direction neighbour (lanes.reverse_adjacent names the victims):
-    #   coupled : backward coupling K_b = kappa / 4 from the stack-up geometry
+    #   coupled : backward coupling K_b = kappa (1 + eps_eff/eps_r) / 4 from the stack-up geometry
     #   fixed   : next_db as K_b in dB
     xtalk_next: Literal["none", "coupled", "fixed"] = "none"
     next_db: Optional[float] = None
@@ -576,7 +578,7 @@ class LinkConfig:
         adj = self.channel.xtalk_adjacent_db
         adj = PACKAGE_XTALK_DB[self.package.kind] if adj is None else adj
         sec = self.channel.xtalk_second_db
-        return adj, (adj - 12.0 if sec is None else sec)
+        return adj, (adj + PACKAGE_XTALK_SECOND_OFFSET_DB[self.package.kind] if sec is None else sec)
 
     @property
     def pi_step_ui(self) -> float:
@@ -612,9 +614,16 @@ class LinkConfig:
 
     def next_ratio(self) -> float:
         """Backward (near-end) coupling coefficient K_b of a reverse-direction
-        neighbour: kappa / 4 from the stack-up for ``xtalk_next: coupled``
-        (Johnson & Graham's weak-coupling backward coefficient), the configured
-        level for ``fixed``, 0 when off."""
+        neighbour: for ``xtalk_next: coupled`` the weak-coupling backward
+        coefficient ``K_b = (L_m/L + C_m/C) / 4`` with the same coupling the
+        far-end estimate uses (``channel.coupled``): ``L_m/L = kappa`` and
+        ``C_m/C = kappa eps_eff/eps_r`` -- their difference is the FEXT
+        mismatch ``kappa (1 - eps_eff/eps_r)``, their sum gives
+        ``K_b = kappa (1 + eps_eff/eps_r) / 4`` (kappa / 2 in a stripline).
+        Until 0.13.2 it was kappa / 4, which counts only one of the two
+        couplings: 4.8 dB low on the standard microstrip (third health
+        check; the textbook form is unverified against Johnson & Graham's
+        text). The configured level for ``fixed``, 0 when off."""
         ch = self.channel
         if ch.xtalk_next == "none":
             return 0.0
@@ -623,7 +632,8 @@ class LinkConfig:
         from ..channel.coupled import coupling_fraction, trace_pitch_um
 
         pitch, _ = trace_pitch_um(self)
-        return 0.25 * coupling_fraction(pitch, self.stackup()["dielectric_height_um"])
+        st = self.stackup()
+        return 0.25 * coupling_fraction(pitch, st["dielectric_height_um"]) * (1.0 + st["eps_eff"] / st["eps_r"])
 
     def coupled_delay_s(self) -> float:
         """One-way propagation delay of the coupled length at the stack-up's speed."""

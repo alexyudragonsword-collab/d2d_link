@@ -4,13 +4,13 @@ microstrip     2.54          -18.6       132.8         137.8         0.590      
  stripline     3.50 none (1st order)       156.0         200.3         0.717          0     FAIL
   both routings fail at 32 GT/s: the stripline's zero first-order FEXT buys +0.127 UI on the middle lane, not enough against the 0.75 UI target
 
-near-end crosstalk from the return module on edge lanes [0, 4]: K_b = kappa/4 = -36.0 dB, two lobes 266 ps = 8.5 UI apart, peak 3.3 mV of 164.6 mV main
+near-end crosstalk from the return module on edge lanes [0, 4]: K_b = (kappa_L + kappa_C)/4 = -31.2 dB, two lobes 266 ps = 8.5 UI apart, peak 5.6 mV of 164.6 mV main
  lane aggressors xtalk [mV]  eye [mV] off/on  eye [UI] off/on
-    0    2 -> 3   11.6 -> 12.3   164.9 / 154.2    0.679 / 0.661
+    0    2 -> 3   11.6 -> 13.8   164.9 / 145.8    0.679 / 0.645
     1    3 -> 3   10.2 -> 10.2   158.7 / 158.7    0.592 / 0.592
     2    4 -> 4   14.3 -> 14.3   137.8 / 137.8    0.590 / 0.590
     3    3 -> 3   13.0 -> 13.0   148.4 / 148.4    0.601 / 0.601
-    4    2 -> 3    7.6 -> 8.8    178.8 / 167.7    0.652 / 0.639
+    4    2 -> 3    7.6 -> 10.8   178.8 / 159.0    0.652 / 0.626
   module FAIL with NEXT (worst lane 2); the reverse lane's symbols sit 0 UI off this module's sampling instant (a config choice)
 
 synthetic single-ended 6-port file 08_synthetic_3lane.s6p (the analytic 25 mm line as 3 lanes, FEXT -20 dB / -32 dB at Nyquist):

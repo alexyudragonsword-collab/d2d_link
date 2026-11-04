@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import time
@@ -69,12 +70,18 @@ runpy.run_path(sys.argv[0], run_name="__main__")
 """
 
 
+_NO_MODULE = re.compile(r"ModuleNotFoundError: No module named '([\w.]+)'")
+
+
 def _missing_optional(stderr: str) -> str | None:
+    """The optional package whose absence ended the run, else None. Only a
+    ``No module named`` for the package itself (or one of its submodules)
+    counts: an ImportError from inside an installed matplotlib is a failure,
+    not a skip (third health check)."""
     for line in stderr.splitlines()[::-1]:
-        if "ModuleNotFoundError" in line or "ImportError" in line:
-            for mod in OPTIONAL:
-                if f"'{mod}'" in line or f"{mod} " in line:
-                    return mod
+        m = _NO_MODULE.search(line)
+        if m and m.group(1).split(".")[0] in OPTIONAL:
+            return m.group(1).split(".")[0]
     return None
 
 
