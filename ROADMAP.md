@@ -28,6 +28,8 @@
    把共模泄漏从 59 推到 223 fs,2 mm 也只有 0.745 UI;理想树时 25 mm 0.751 UI 过。这依赖借来的 Markulic 剖面(10.24 GHz 载波、−145 dBc/Hz 底噪)
    在 5–16 GHz 的形状 —— 需要真实发端 PLL 在 fs/2 以内的相噪,或用户给出 fs/2 处的底噪假设;也说明树延时是设计上第一位的参数(≪ 1 UI)。
    复现:`clocking.profile_above: zero` 回到 0.12 的口径;`clocking.tree_delay_ps: 0` 看理想树。
+   设计边界(示例 10,0.13.1):x1 20 GHz 树、floor 口径下 −145 / −150 / −155 dBc/Hz 过的最长树 2.7 / 11.9 / ≥ 40 ps;zero 口径都 ≥ 40 ps。
+   x16 模块(1 MHz 本地 PLL)与树延时无关,−155 也只 0.733 UI —— 模块要过还差漫游 / 路径噪声这一侧,本条拿到 PLL 数据也不够。
 4. **第三次体检(2026-11-03)挂出、段 15 尚未处理的**:行为级 FEXT 形状 √2·u/(1+u) 与耦合线一阶 j2πfτ 不符(x5 中间 lane 眼高差 60 mV、x16 最差 lane 换人);
    已在段 15 处理的(PLL 带外口径、有跟踪器时的 deskew 步长、介质色散、Tx DCD、PI 量化箱)见 CHANGELOG 0.13.0。复现:scratchpad `audit3_code/p04_fext_shape.py`。
 

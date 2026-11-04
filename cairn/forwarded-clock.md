@@ -5,7 +5,7 @@ summary: "前向时钟模型的方程、带宽/相关度/树延时三个极限�
 tags: [forwarded-clock, jitter, core-mechanism]
 contains: [decision, lesson]
 created: "2026-10-12"
-updated: "2026-11-03"
+updated: "2026-11-04"
 related: [architecture-invariants.md, engines.md]
 authoring_mode: ai_generated
 ---
@@ -60,6 +60,11 @@ t_rx[k]   = (h_tree ⊛ t_pll)[k − τ] + n_t[k]                   树:延时 �
   **后果:32 GT/s 的判定由时钟树决定**——x1 在 2 mm 也只有 0.745 UI(< 0.75);理想树时 25 mm 0.751 UI 过。前向时钟只在 f < ~1/(6τ) 有利,
   再往上把它跟不上的抖动**加倍**(树 ≈ 1 UI 时 G(fs/2) ≈ −1):`test_tree_delay_leaks_the_common_part_as_a_differentiator`。
   这条结论依赖借来的 Markulic 剖面 −145 dBc/Hz 底噪(10.24 GHz 载波)在 5–16 GHz 的形状,是模型估计,不是实测。
+- **设计边界**(0.13.1,示例 10;底噪变体 = 去掉 −145 白底、换上新白底,带内不动):x1 20 GHz 树、floor 口径下过的最长树:−145 → 2.7 ps,
+  −150 → 11.9 ps,−155 → ≥ 40 ps;zero 口径三档都 ≥ 40 ps。floor 口径的泄漏是 zero 的 3.1–4.8 倍。树带宽是第二根杠杆:一阶树的相位滞后像
+  1/(2πf_t) 的延时,但它在 f_t 以上不再跟踪,底噪只过一次而不是加倍 —— −150 时 10 GHz 树 ≥ 40 ps、平坦树只到 5.0 ps。
+  **有本地 PLL 的模块(x16,1 MHz)树延时不起作用**:本地 PLL 以上发端底噪本来就没被跟踪,泄漏 176.4 fs 与树 0 / 30 ps 无关;−155 也只到 0.733 UI,
+  剩下的是漫游(数据 120 + 时钟 81 fs)、数据路径 200 fs、树 100 fs —— 模块的杠杆是本地 PLL 带宽(示例 04)和路径噪声,不是树长。
 - **PI 步长**(段 15):`LinkConfig.pi_step_ui` = `clocking.pi_step_ui`,为 0 且有跟踪器时取 `lanes.deskew_step_ps`(`lanes.deskew_with_tracker: ideal` 复现 0.12 的理想 PI)。
   量化核的两端节点带小数权重,使方差正好是 w²/12(0.12 取整到整数个节点,x5 的 1/64 UI 多 11 % 方差)。
 - **发端 DCD**(段 15,`ForwardedClock.sampling_dcd_ui()`):fs/2 的单音,无本地 PLL 时经 Re E(1 − ρG)(fs/2) 到达采样器(30 ps 树 ≈ 1.7),有本地 PLL 时全额;0.12 当作完全抵消。

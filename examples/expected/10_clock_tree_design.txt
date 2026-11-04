@@ -1,0 +1,52 @@
+x1 standard package, 25 mm, 32 GT/s; bundled tree 30 ps / 20 GHz; targets 0.75 UI / 40 mV at BER 1e-27
+Tx PLL profile bench_markulic16_sspll_40m_10p24g.yaml: floor -145 dBc/Hz above ~300 MHz, last point 5.12 GHz; the sampler sees to fs/2 = 16 GHz
+
+1. common-mode leak [fs] (Tx PLL noise through 1 - G) against tree delay, closed form
+ link  floor  reading      0     10     20     30     40   tree delay [ps]
+   x1   -145    floor   61.9  135.3  191.4  223.4  231.3
+   x1   -145     zero   12.8   28.8   44.5   59.4   73.4
+   x1   -150    floor   34.8   76.1  107.7  125.7  130.1
+   x1   -150     zero    7.2   16.2   25.0   33.4   41.3
+   x1   -155    floor   19.6   42.8   60.6   70.7   73.2
+   x1   -155     zero    4.1    9.2   14.1   18.8   23.3
+  x16   -145    floor  176.4  176.4  176.4  176.4  176.5
+  x16   -145     zero  120.4  120.4  120.4  120.4  120.5
+  x16   -150    floor  120.0  120.0  120.0  120.0  120.0
+  x16   -150     zero   95.6   95.6   95.6   95.7   95.7
+  x16   -155    floor   95.5   95.5   95.5   95.5   95.5
+  x16   -155     zero   86.3   86.3   86.3   86.3   86.4
+  x1: the leak grows with the tree; the floor reading carries 3.1-4.8x the zero reading's (the 5.12-16 GHz band only the floor reading fills is most of it)
+  x16: flat in tree delay -- its local PLL (1 MHz) re-times the clock, so the Tx floor above it is not tracked whatever the tree
+
+2. x1 eye width [UI] against tree delay (tree 20 GHz); eye height stays within 204.0..205.2 mV
+ floor  reading      0      5     10     15     20     25     30     35     40   longest passing tree
+  -145    floor  0.753  0.747  0.738  0.729  0.721  0.714  0.709  0.706  0.706   2.7 ps
+  -145     zero  0.757  0.757  0.756  0.756  0.755  0.754  0.754  0.753  0.752   >= 40 ps (all)
+  -150    floor  0.756  0.754  0.751  0.748  0.745  0.743  0.741  0.740  0.740   11.9 ps
+  -150     zero  0.757  0.757  0.757  0.757  0.757  0.756  0.756  0.756  0.755   >= 40 ps (all)
+  -155    floor  0.757  0.756  0.755  0.754  0.753  0.753  0.752  0.752  0.752   >= 40 ps (all)
+  -155     zero  0.757  0.757  0.757  0.757  0.757  0.757  0.757  0.757  0.757   >= 40 ps (all)
+  the bundled 30 ps tree passes with -145 / zero, -150 / zero, -155 / floor, -155 / zero and fails with -145 / floor, -150 / floor (floor dBc/Hz / reading)
+
+3. longest passing x1 tree [ps] against the tree's bandwidth (floor reading)
+ floor      flat    40 GHz    20 GHz    10 GHz
+  -145       2.8       1.9       2.7       5.0
+  -150       5.0       6.6      11.9     >= 40
+  -155       9.0      16.1     >= 40     >= 40
+  a first-order tree at f_t lags its phase like a delay of 1/(2 pi f_t) at low frequency (40 GHz 4.0 ps, 20 GHz 8.0 ps, 10 GHz 15.9 ps), and it filters the clock path's own jitter: the two pull against each other
+
+4. x16 module (20 mm, crosstalk fext, local PLL 1 MHz): worst lane against the floor
+ floor  reading tree [ps]  leak [fs]  eye width min [UI]  eye height min [mV]  link
+  -145    floor        30      176.4               0.712                205.3  FAIL
+  -145     zero        30      120.4               0.733                206.2  FAIL
+  -150    floor        30      120.0               0.728                206.0  FAIL
+  -150     zero        30       95.7               0.739                206.4  FAIL
+  -155    floor        30       95.5               0.733                206.2  FAIL
+  -155     zero        30       86.3               0.741                206.5  FAIL
+  -145    floor         0      176.4               0.712                205.3  FAIL
+  budget at -145 dBc/Hz (floor reading): total 331.6 fs = Tx leak 176.4 + local PLL 87.6 + data path 200.0 + data wander 120.3 + clock path 2.1 + clock wander 81.4 + tree 100.0 + spurs 1.8 fs (in power)
+  budget at -155 dBc/Hz (floor reading): total 296.5 fs = Tx leak 95.5 + local PLL 87.6 + data path 200.0 + data wander 120.3 + clock path 2.1 + clock wander 81.4 + tree 100.0 + spurs 1.8 fs (in power)
+  a 30 ps shorter tree moves the module's eye by +0.0000 UI: on the module, the local PLL's bandwidth sets how much of the Tx floor is tracked (example 04),
+  and the floor alone does not pass it: the best point here reads 0.741 UI; the rest of its budget (wander, the local PLL's own noise, crosstalk, the PI step) is what stays
+
+wrote examples/output/10_clock_tree_design.png

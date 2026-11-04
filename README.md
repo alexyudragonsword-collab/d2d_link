@@ -83,6 +83,15 @@ Markulic 2016 SSPLL 剖面(带内 186 fs),数据 / 时钟路径各 200 fs 白抖
 Crosstalk、Receiver、Sweeps(tracker 带宽 / 本地 PLL / reach);右栏队列(进程池,进度与剩余时间)、Data rate × package、导出(Markdown 与 CLI 同文)、
 未核实输入;Compare with 并排两场景;结果按配置哈希缓存到磁盘。GUI 不含仿真逻辑(铁律 1,`tests/test_gui.py` 用 AST 守);见 `docs/gui.md`、`cairn/gui.md`。
 
+## 时钟树设计扫描(0.13.1)
+
+0.13.0 起 bundled 配置全部不过,原因是时钟树把 PLL 的高频底噪加倍送到采样器。示例 10 不改模型,只问:树要多短、PLL 底噪要多低才过。
+底噪变体把剖面的 −145 dBc/Hz 白底换掉、带内形状不动,是设计目标而不是实测 PLL。
+
+| 示例 | 问题 | 答案(2026-11-04,0.13.1) |
+|---|---|---|
+| `10_clock_tree_design.py` | 树要多短、底噪要多低 | **x1(20 GHz 树、底噪平延口径)**:−145 dBc/Hz 时树 ≤ 2.7 ps 才过,−150 时 ≤ 11.9 ps,−155 时 40 ps 内都过(30 ps 0.752 UI)。置零口径下三档底噪 40 ps 内都过 —— 判定的一半在剖面 5.12–16 GHz 的读法上。树带宽:10 GHz 树在 −150 时 40 ps 内都过,平坦树在 −155 时也只到 9.0 ps(慢树不再跟高频,底噪只过一次而不是加倍)。**x16 模块**:1 MHz 本地 PLL 重定时,泄漏与树延时无关(0 / 30 ps 都是 176.4 fs);底噪 −155 也只到 0.733 UI(置零口径 0.741),剩下的是漫游、本地 PLL 与数据路径,不是树 |
+
 ## 规范数字
 
 本库拿不到 UCIe 规范原文。速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 15 条,全部在 `src/d2d_link/data/spec/ucie_survey.yaml`,
