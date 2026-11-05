@@ -227,9 +227,11 @@ class LaneConfig:
     # physical lanes whose outer neighbour is a lane of the *other* direction
     # (a module's edge lanes next to the return module): they take near-end
     # crosstalk from it when channel.xtalk_next is on; the reverse lane's
-    # symbols sit reverse_phase_ui off this module's sampling instant
+    # symbols sit reverse_phase_ui off this module's sampling instant. None
+    # (the default since 0.14.9): the return module's clock has no fixed
+    # phase to this one, so the lane takes the worst of REVERSE_PHASES
     reverse_adjacent: tuple[int, ...] = ()
-    reverse_phase_ui: float = 0.0
+    reverse_phase_ui: Optional[float] = None
 
     def __post_init__(self):
         _require(self.count >= 1, f"lanes.count must be >= 1, got {self.count}")
@@ -237,7 +239,8 @@ class LaneConfig:
         n_phys = self.count + self.spare_count
         for i in self.reverse_adjacent:
             _require(0 <= i < n_phys, f"lanes.reverse_adjacent names lane {i}, module has {n_phys} physical lanes")
-        _require(math.isfinite(self.reverse_phase_ui), "lanes.reverse_phase_ui must be finite")
+        _require(self.reverse_phase_ui is None or math.isfinite(self.reverse_phase_ui),
+                 "lanes.reverse_phase_ui must be finite or null")
         _require(len(self.skew_ps) <= n_phys,
                  f"lanes.skew_ps has {len(self.skew_ps)} entries for {n_phys} physical lanes")
         _finite_nonneg(self.skew_sigma_ps, "lanes.skew_sigma_ps")

@@ -4,6 +4,15 @@
 
 ---
 
+## [0.14.9] — 2026-11-05 — NEXT 反向 lane 相位取最差(bundled 数字不变)
+
+- `lanes.reverse_phase_ui` 默认 None:回程模块的时钟与本模块没有固定相位,每个边缘 lane 在 `REVERSE_PHASES`(8 个,1/8 UI 一步)上各跑一次、按余量取最差,
+  选中的相位记在 `extras["reverse_phase_ui"]`,时域引擎用同一个;给定数值仍是固定相位(此前默认 0.0)。GUI 表单的这一格可留空。
+- 示例 08:边缘 lane 眼宽随相位 0.6132..0.6140 / 0.6465..0.6476 UI —— 相位几乎不起作用;lane 4 0.647 → 0.646(最差在 0.5 UI)。指纹逐位相同(bundled 配置没有反向 lane)。
+- ROADMAP P3 #1 改写:剩回程时钟漂移未建模。
+
+---
+
 ## [0.14.8] — 2026-11-05 — CI 冒烟提速(不动数字)
 
 - `tools/run_examples.py --smoke` 给子进程设 `D2D_LINK_SMOKE=1`(`examples/_common.py::SMOKE`):示例 13 只跑 x1 与 x16 repair 的敏感性、示例 14 只跑前三个杠杆

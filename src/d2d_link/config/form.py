@@ -76,7 +76,7 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
         _f("lanes.failed", "Failed physical lanes", "tuple_int"),
         _f("lanes.repair", "Repair", "enum", options=["none", "spare", "width_degrade"]),
         _f("lanes.reverse_adjacent", "Lanes next to a reverse-direction lane", "tuple_int"),
-        _f("lanes.reverse_phase_ui", "Reverse lane symbol phase [UI]", "float"),
+        _f("lanes.reverse_phase_ui", "Reverse lane symbol phase [UI] (empty = worst of 8)", "opt_float"),
     ]),
     ("clocking", "Forwarded clock", [
         _f("clocking.scheme", "Scheme", "enum", options=["forwarded_ddr"]),

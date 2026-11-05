@@ -190,9 +190,22 @@ def aggressors_of(cfg: LinkConfig, lm: LaneMap, phys: int, skews_ps: np.ndarray)
     if cfg.channel.xtalk_next != "none" and phys in cfg.lanes.reverse_adjacent:
         # the reverse-direction neighbour: its own symbols (seeded apart from
         # every forward lane), launched at this receiver's die, at the
-        # configured phase against this module's sampling instant
-        out.append(("next", float(cfg.lanes.reverse_phase_ui), 10_000 + phys))
+        # configured phase against this module's sampling instant -- or None:
+        # run_link takes the worst of REVERSE_PHASES
+        ph = cfg.lanes.reverse_phase_ui
+        out.append(("next", None if ph is None else float(ph), 10_000 + phys))
     return tuple(out)
+
+
+#: the reverse lane's symbol phases a lane is run at when ``lanes.reverse_phase_ui``
+#: is None (the return module's clock has no fixed phase to this one): the
+#: worst by margin is kept. On example 08's x5 edge lanes the eye width moves
+#: <= 0.0008 UI over these (the near-end pulse is ~8.5 UI long and smooth)
+REVERSE_PHASES = tuple(i / 8 for i in range(8))
+
+
+def _with_next_phase(aggr: tuple, phase: float) -> tuple:
+    return tuple(("next", phase, a[2]) if a[0] == "next" and a[1] is None else a for a in aggr)
 
 
 def coupled_lines(cfg: LinkConfig, phys: int) -> tuple[int, int]:
@@ -254,9 +267,23 @@ def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
             # residual: the statistical result is the same lane for lane
             # (the engine is deterministic), so it is reused, not recomputed
             stat.append(dataclasses.replace(seen[key], lane=lane))
+            if "reverse_phase_ui" in seen[key].extras:
+                aggr[phys] = _with_next_phase(aggr[phys], seen[key].extras["reverse_phase_ui"])
             continue
-        engine = StatisticalEngine(cfg, lane_resp[phys], clock, key_aggr)
-        seen[key] = engine.run(lane, resid)
+        if any(a[0] == "next" and a[1] is None for a in aggr[phys]):
+            # the return module's phase is free: run each candidate, keep the worst
+            best = None
+            for ph in REVERSE_PHASES:
+                cand = StatisticalEngine(cfg, lane_resp[phys], clock,
+                                         tuple((d, sk) for d, sk, _ in _with_next_phase(aggr[phys], ph))).run(lane, resid)
+                if best is None or cand.margin < best[1].margin:
+                    best = (ph, cand)
+            ph, r = best
+            r.extras["reverse_phase_ui"] = ph
+            aggr[phys] = _with_next_phase(aggr[phys], ph)
+            seen[key] = r
+        else:
+            seen[key] = StatisticalEngine(cfg, lane_resp[phys], clock, key_aggr).run(lane, resid)
         stat.append(seen[key])
     time: list[TimeResult] = []
     if cfg.sim.engine in ("time", "both"):
@@ -269,5 +296,5 @@ def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     return LinkResult(cfg, lm, stat, time, skews, resolved_targets(cfg), rows)
 
 
-__all__ = ["LaneMap", "lane_map", "physical_skews_ps", "residual_skew_ui", "aggressors_of", "coupled_lines", "file_per_lane", "LinkResult",
+__all__ = ["LaneMap", "lane_map", "physical_skews_ps", "residual_skew_ui", "aggressors_of", "coupled_lines", "file_per_lane", "REVERSE_PHASES", "LinkResult",
            "run_link"]

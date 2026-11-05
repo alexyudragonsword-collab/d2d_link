@@ -48,7 +48,7 @@ authoring_mode: ai_generated
 **K_b = κ(1 + ε_eff/ε_r)/4**(带状线 κ/2)。标准封装 25 mm:K_b = −31.2 dB,两瓣相距 2τ_c = 266 ps = 8.5 UI,峰值 5.6 mV 对 165 mV 主光标。
 - **更正(0.13.3,第三次体检 B 项)**:0.8.0–0.13.2 用 K_b = κ/4,只算了一种耦合,微带少 4.7 dB(−36.0 dB、峰值 3.3 mV);示例 08 边缘 lane 眼宽 0.661 → 0.645 UI(0.13.6 的 FEXT 形状下 0.634 → 0.616)。
   bundled 配置都不开 NEXT,指纹不变。教科书式未对照 Johnson & Graham 原文(未核实),改动依据是与本库远端估计自洽。
-`lanes.reverse_adjacent` 指名受害 lane,`lanes.reverse_phase_ui` 是反向 lane 符号相对本模块采样点的相位(配置选择,默认 0)。
+`lanes.reverse_adjacent` 指名受害 lane,`lanes.reverse_phase_ui` 是反向 lane 符号相对本模块采样点的相位:0.14.9 起默认 None —— 回程模块的时钟与本模块没有固定相位,每个边缘 lane 在 `engine/lanes.py::REVERSE_PHASES`(0, 1/8, …, 7/8 UI)上各跑一次、按余量取最差;给定数值仍是固定相位(此前默认 0)。示例 08:边缘 lane 眼宽随相位只在 0.6132..0.6140 / 0.6465..0.6476 UI 之间(近端脉冲约 8.5 UI 长、平滑),最差在 0 与 0.5 UI。
 x3 边缘 lane 加 NEXT 后眼宽下降,中间 lane 不变;−14 dB 的固定 NEXT 上两引擎 1e-4 处 2× 内。
 
 ## 决策记录

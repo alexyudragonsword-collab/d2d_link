@@ -29,13 +29,13 @@ import dataclasses
 
 import numpy as np
 
-from _common import CONFIGS, OUT, plt_or_none
+from _common import CONFIGS, OUT, SMOKE, plt_or_none
 from d2d_link.channel import ChannelModel, link_response
 from d2d_link.channel.coupled import describe
 from d2d_link.channel.model import through_factor, xtalk_response
 from d2d_link.config import load_config
 from d2d_link.engine import run_link
-from d2d_link.engine.lanes import coupled_lines
+from d2d_link.engine.lanes import REVERSE_PHASES, coupled_lines
 
 module = load_config(CONFIGS / "standard_32g_x5_coupled.yaml")
 mid = module.lanes.count // 2
@@ -80,8 +80,17 @@ for a, b in zip(res_0.stat, res_n.stat):
     print(f"{a.lane:5d} {a.extras['n_aggressors']:>4d} -> {b.extras['n_aggressors']:<3d} "
           f"{1e3 * a.extras['xtalk_rms_v']:4.1f} -> {1e3 * b.extras['xtalk_rms_v']:<4.1f} "
           f"{1e3 * a.eye_height_v:7.1f} / {1e3 * b.eye_height_v:<6.1f} {a.eye_width_ui:7.3f} / {b.eye_width_ui:<6.3f}")
-print(f"  module {'PASS' if res_n.passes else 'FAIL'} with NEXT (worst lane {res_n.worst.lane}); "
-      f"the reverse lane's symbols sit {nx.lanes.reverse_phase_ui:g} UI off this module's sampling instant (a config choice)")
+phases = {r.lane: r.extras["reverse_phase_ui"] for r in res_n.stat if "reverse_phase_ui" in r.extras}
+spread = []
+for ph in REVERSE_PHASES[:2] if SMOKE else REVERSE_PHASES:      # each fixed phase: how much the free phase can matter
+    rf = run_link(dataclasses.replace(nx, lanes=dataclasses.replace(nx.lanes, reverse_phase_ui=ph)))
+    spread.append([rf.stat[i].eye_width_ui for i in edges])
+lo, hi = np.min(spread, axis=0), np.max(spread, axis=0)
+print(f"  module {'PASS' if res_n.passes else 'FAIL'} with NEXT (worst lane {res_n.worst.lane}). The return module's clock has no "
+      f"fixed phase to this one, so each edge lane takes the worst of {len(REVERSE_PHASES)} reverse-lane phases (0.14.9): "
+      + ", ".join(f"lane {k} at {v:g} UI" for k, v in phases.items())
+      + "; over the phases the edge lanes' eye width spans "
+      + ", ".join(f"{a:.4f}..{b:.4f}" for a, b in zip(lo, hi)) + " UI")
 
 # ----------------------------------------------------------------- 3. a file
 try:

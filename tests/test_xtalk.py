@@ -256,3 +256,22 @@ def test_line_count_and_bookkeeping_follow_the_physical_lines():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         run_statistical(LinkConfig(sim=SimConfig(engine="statistical", stat_phase_points=8)))   # single lane: quiet
+
+
+def test_free_reverse_phase_takes_the_worst_of_the_candidates():
+    """The return module's clock has no fixed phase to this one: with
+    ``lanes.reverse_phase_ui`` None (the default since 0.14.9) an edge lane
+    is run at each of REVERSE_PHASES and keeps the worst by margin; a given
+    phase still fixes it."""
+    from d2d_link.engine.lanes import REVERSE_PHASES
+
+    base = LinkConfig(channel=dataclasses.replace(X, xtalk="none", xtalk_next="fixed", next_db=-14.0),
+                      lanes=LaneConfig(count=2, reverse_adjacent=(0,)), sim=SimConfig(engine="statistical", stat_phase_points=8))
+    assert base.lanes.reverse_phase_ui is None
+    free = run_link(base)
+    fixed = [run_link(dataclasses.replace(base, lanes=dataclasses.replace(base.lanes, reverse_phase_ui=ph))).stat[0]
+             for ph in REVERSE_PHASES]
+    worst = min(fixed, key=lambda r: r.margin)
+    assert free.stat[0].margin == worst.margin and free.stat[0].extras["reverse_phase_ui"] in REVERSE_PHASES
+    assert "reverse_phase_ui" not in free.stat[1].extras                    # lane 1 has no reverse neighbour
+    assert "reverse_phase_ui" not in fixed[0].extras
