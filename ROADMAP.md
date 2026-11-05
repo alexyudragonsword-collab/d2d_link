@@ -9,8 +9,8 @@
 
 ## P1 — 结论的可信度
 
-1. **32 GT/s 的判定悬在一个二手转述的眼罩数上**(铁律 5)。17 条 `source: survey`(`grep -c "source: survey" src/d2d_link/data/spec/ucie_survey.yaml`),
-   没有一条读过规范原文。0.14.0 起眼宽目标分档:4–16 GT/s 0.75 UI,**24 / 32 GT/s 0.65 UI**(`rx_eye_width_ui@24` / `@32`,出自一篇 2025 年 UCIe 48/64 GT/s
+1. **32 GT/s 的判定悬在一个二手转述的眼罩数上**(铁律 5)。16 条 `source: survey`(`grep -c "source: survey" src/d2d_link/data/spec/ucie_survey.yaml`),
+   没有一条读过规范原文。0.14.0 起眼宽目标分档:4–16 GT/s 0.75 UI,**24–32 GT/s 0.65 UI**(`rx_eye_width_ui@24-32`,0.14.5 起是区间;出自一篇 2025 年 UCIe 48/64 GT/s
    分析论文对规范的转述,只读到检索摘要;用户 2026-11-05 决定采用)。按它:x1 0.709 UI、x16 模块 0.693、x16 repair 0.668、x64 spare 0.710 **过**(眼宽裕度
    +0.059 / +0.043 / +0.018 / +0.060 UI),x5 耦合 0.572 **不过**(−0.078;0.14.1 受害方直通 cos 项前 0.575)。若原文仍是 0.75 UI,回到 0.13 的结论:五个配置全不过。
    这些「过」还假定接收前端无限快:前端一阶极点低于 26 GHz(x16 模块)/ 40.75 GHz(x16 repair)就翻回不过(见 P2 #2)。
@@ -52,11 +52,9 @@
    延拓是外推(直通按最后十倍频的斜率,耦合沿直通的衰减):合成文件上剩 0.005 UI 的直通延拓误差;真实文件的带外行为未知,文件带宽低于 4 × Nyquist 时把这一项列进该链路的不确定度。
 
 4. **第五次体检(2026-11-05,0.14.0–0.14.3)的余项**(报告:scratchpad `health_check_2026-11-05.md`;没有判定或文档数字错,文档里的过期数已改):
-   - **分档只认表里的速率**(中):`spec.tier_keys` 按 `@{rate:g}` 精确匹配,24 与 32 GT/s 之间(28、30)落回 0.75 UI,目标随速率不单调。
-     配置测试只许表里的速率,但 GUI 的速率编辑与 schema 收任何数。复现:`with_data_rate(x1, 28)` → `resolved_targets` 0.75。要么加区间档、要么非表速率告警。
    - **示例 11 第 4 节对照表空了**(中):`picks` 要两侧各有组合,0.65 UI 下 24 组合全过 → 不再验证曲线预测(0.13 时误差 0.0006 UI)。应改成取 σ* 两侧的点。
    - 测试薄处:`test_lanes.py` 的去重测试看不到缓存键里的 `lines`(同攻击方、不同线数的 lane 只在有失效 / 闲置邻线时出现,例:4 lane width_degrade 失效 0);
-     `@24` 档从未在套件里解析;新 cos 测试没断言 `touchstone` 下 `coupled_lines` 为 (0, 0)。
+     新 cos 测试没断言 `touchstone` 下 `coupled_lines` 为 (0, 0)。
    - `LinkResponse.with_through` 留着基础响应的 `grid_top_response`(偏大,告警只会多报)与 `channel`(插损列不含 cos,x5 中间 lane 少算 0.13 dB)。
    - `coupled_lines` 不算 `lanes.reverse_adjacent` 的反向线(算上时示例 08 边缘 lane 0.615 → 0.613 UI,判定不变);`count = 1` 带 spare 时串扰生效但敏感性 / 归因看不到(按 `count > 1` 判断)。
    - 单 lane API(`run_statistical`、`run_time`)默认不加直通 cos 也不加攻击方;bundled 调用方都没碰到。

@@ -13,11 +13,12 @@ authoring_mode: ai_generated
 
 ## 当前结论
 
-- 全部 17 条都是 `source: survey`(0.14.0 起含眼宽 24 / 32 GT/s 分档两条),见 `src/d2d_link/data/spec/ucie_survey.yaml`;没有一条读过规范原文。`grep -c "source: survey" src/d2d_link/data/spec/ucie_survey.yaml` = 17
+- 全部 16 条都是 `source: survey`(0.14.0 起含眼宽 24–32 GT/s 分档;0.14.5 起是一条区间 `@24-32`,此前 `@24`、`@32` 两条),见 `src/d2d_link/data/spec/ucie_survey.yaml`;没有一条读过规范原文。`grep -c "source: survey" src/d2d_link/data/spec/ucie_survey.yaml` = 16
   (文件头注释不再含该字串,测试断言这条命令的计数)。
 - 综述来源是公开材料的记忆与转述(Das Sharma 2022 的 UCIe 综述、Consortium 白皮书、Hot Chips 34 概览),**数值本身未经核对**,
   每条 note 都写了"未核实"。最不可靠的三条:收端眼宽(0.14.0 起 24 / 32 GT/s 用 0.65 UI 分档,出自二手转述;判定悬在它上面)、眼高 40 mV(眼罩表的速率档与封装归属不明)、1e-15 的 retry 口径。
-  分档只认表里的速率(`@24`、`@32`):24 与 32 之间的速率(28 GT/s)落回 0.75 UI(第五次体检,ROADMAP P2 #4)。
+  分档有两种键:`@<rate>` 精确档与 `@<lo>-<hi>` 闭区间档(0.14.5),同一层里精确档优先、区间重叠即报错。0.14.0–0.14.4 只有 `@24`、`@32`,28 GT/s 落回 0.75 UI(第五次体检)。
+  表外速率又不在任何区间里(20、40 GT/s)时退回不分档的那条,并告警一次。
 - 升级流程:用户把原文贴进 `cairn/Reference/`(只追加)→ 对应条目改 `source: spec`、加 `quote` 与 `section` → `tests/test_spec_sources.py`
   自动要求 quote 非空 → LOG 记一条。
 - **分档(0.13.5;0.13.10 定了优先级)**:目标按 `<package>.<key>@<rate>` → `<package>.<key>` → `<key>@<rate>` → `<key>` 查表(`spec.survey_tiered`)。
@@ -40,7 +41,7 @@ authoring_mode: ai_generated
 - 段 2 起模型参数有自己的表 `src/d2d_link/data/spec/model_presets.yaml`(30 条,全部 `source: model`,带 cite 与 note):R_dc、R_skin、tanδ、G、Z0、
   w、h、ε_r、行为级 FEXT 电平,两种封装各一套。L、C 由 Z0 与 Hammerstad ε_eff(w, h, ε_r)推出 —— 之前 `PACKAGE_RLGC` 自带的 L、C 隐含
   ε_eff 3.94 / 5.75,与叠层的 ε_r 3.5 / 3.3 矛盾(体检 #3)。`grep -c "source: model"` = 30(0.13.3 起含第二邻串扰偏移 −12 dB;0.13.11 起含时钟路径抖动:数据 / 时钟路径白抖 200 fs、树 100 fs、路径漫游 200 fs、漫游拐角 1 MHz,各两种封装 —— 2026-11-05 检索未找到片上 D2D 路径的公开实测值,cite 里写了最近的参照与没读到的原文);`tests/test_spec_sources.py` 守着两张表互不混放。
-- **眼罩分档(0.14.0,用户 2026-11-05 决定采用)**:`rx_eye_width_ui@24` / `@32` = 0.65 UI(source: survey),出自一篇 2025 年 UCIe 48/64 GT/s 分析论文
+- **眼罩分档(0.14.0,用户 2026-11-05 决定采用)**:`rx_eye_width_ui@24-32` = 0.65 UI(0.14.5 前是 `@24` / `@32` 两条)(source: survey),出自一篇 2025 年 UCIe 48/64 GT/s 分析论文
   (ResearchGate 395249532)对规范的转述:"4–16 GT/s 要求 EH/EW = 40 mV / 0.75 UI,24–32 GT/s 为 40 mV / 0.65 UI"。只读到检索摘要,论文与规范原文都未读,**未核实**。
   它翻转了四个 bundled 配置的判定(x1 / x16 模块 / x16 repair / x64 spare 由不过变过),x5 仍不过;原文若仍是 0.75,删这两条即回到 0.13。
 - 敏感性:`tools/budget_report.py --sensitivity` 对每条估计 ±20%(dB 值与剖面整体平移 ±3 dB;0.13.3 起含配置里的抖动值;眼罩目标 ±10 mV / ±0.05 UI)重跑,表里标出翻转结论的参数。

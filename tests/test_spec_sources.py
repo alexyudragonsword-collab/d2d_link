@@ -12,7 +12,7 @@ from d2d_link.engine.statistical import resolved_targets
 
 def test_every_entry_is_tagged_and_cited():
     table = spec.all_entries()
-    assert len(table) == 17
+    assert len(table) == 16
     for key, e in table.items():
         assert e.source in spec.SOURCES, key
         assert e.cite, key
@@ -60,7 +60,7 @@ def test_grep_lists_every_unverified_number():
     import subprocess
 
     out = subprocess.run(["grep", "-c", "source: survey", str(spec.SURVEY_FILE)], capture_output=True, text=True)
-    assert int(out.stdout.strip()) == len(spec.unverified()) == 17
+    assert int(out.stdout.strip()) == len(spec.unverified()) == 16
 
 
 def test_spec_source_needs_a_quote():
@@ -143,7 +143,7 @@ def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
     """The lookup is tiered so a mask's numbers land per tier:
     ``<package>.<key>@<rate>`` first, the plain key last (0.13.5). Since
     0.14.0 24 and 32 GT/s take the 0.65 UI tier a 2025 analysis quotes
-    (``rx_eye_width_ui@24`` / ``@32``, source: survey, unverified); every
+    (``rx_eye_width_ui@24-32``, a range since 0.14.5; source: survey, unverified); every
     other rate takes the plain 0.75 UI, and the report names the key."""
     import dataclasses
 
@@ -154,7 +154,7 @@ def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
         "standard.rx_eye_width_ui@32", "standard.rx_eye_width_ui", "rx_eye_width_ui@32", "rx_eye_width_ui"]
     cfg = LinkConfig()
     assert target_keys(cfg) == {"ber": "raw_ber_target", "eye_height_mv": "rx_eye_height_mv",
-                                "eye_width_ui": "rx_eye_width_ui@32"}             # the 24-32 GT/s tier (0.14.0)
+                                "eye_width_ui": "rx_eye_width_ui@24-32"}          # the 24-32 GT/s range (0.14.5)
     table = dict(spec.all_entries())
     base = table["rx_eye_width_ui"]
     table["rx_eye_width_ui@32"] = dataclasses.replace(base, key="rx_eye_width_ui@32", value=0.70)
@@ -193,3 +193,37 @@ def test_bundled_config_jitters_are_the_model_presets():
             v = getattr(cfg.clocking, field)
             if v:
                 assert v == spec.preset(key, cfg.package.kind).value, (path.name, field)
+
+
+def test_the_eye_width_tier_is_a_rate_range():
+    """The 0.65 UI quote is for "24 to 32 GT/s": one range entry answers
+    every rate in it, the end points and 28 GT/s alike (0.14.0-0.14.4 had
+    exact @24 / @32 entries and 28 GT/s fell back to 0.75 UI -- fifth health
+    check). An exact rate entry still outranks a range at the same tier; a
+    rate neither in the survey's list nor in a range falls back to the plain
+    entry with a warning; overlapping ranges are refused."""
+    import dataclasses
+    import warnings
+
+    from d2d_link.config import LinkConfig, with_data_rate
+    from d2d_link.engine import statistical as st
+
+    cfg = LinkConfig()
+    for rate, want, key in ((24, 0.65, "rx_eye_width_ui@24-32"), (28, 0.65, "rx_eye_width_ui@24-32"),
+                            (32, 0.65, "rx_eye_width_ui@24-32"), (16, 0.75, "rx_eye_width_ui")):
+        c = with_data_rate(cfg, rate)
+        assert st.resolved_targets(c)["eye_width_ui"] == (want, "survey"), rate
+        assert st.target_keys(c)["eye_width_ui"] == key, rate
+    st._OFF_TABLE_WARNED.clear()
+    with pytest.warns(UserWarning, match="neither in the survey's rate list"):
+        assert st.resolved_targets(with_data_rate(cfg, 40))["eye_width_ui"][0] == 0.75
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        st.resolved_targets(with_data_rate(cfg, 28))                    # inside the range: no warning
+    table = dict(spec.all_entries())
+    base = table["rx_eye_width_ui@24-32"]
+    table["rx_eye_width_ui@28"] = dataclasses.replace(base, key="rx_eye_width_ui@28", value=0.60)
+    assert spec.survey_tiered("rx_eye_width_ui", "standard", 28.0, table=table).value == 0.60     # exact beats range
+    table["rx_eye_width_ui@30-40"] = dataclasses.replace(base, key="rx_eye_width_ui@30-40", value=0.55)
+    with pytest.raises(ValueError, match="overlapping"):
+        spec.survey_tiered("rx_eye_width_ui", "standard", 31.0, table=table)

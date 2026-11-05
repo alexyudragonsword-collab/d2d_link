@@ -94,12 +94,34 @@ def target_keys(cfg: LinkConfig) -> dict:
     return out
 
 
+_OFF_TABLE_WARNED: set = set()
+
+
+def _warn_off_table_rate(cfg: LinkConfig) -> None:
+    """A data rate outside the survey's rate list that no rate tier covers
+    falls to the plain eye-width entry: say so once per rate, since that
+    value's source states it for 4-16 GT/s only (0.14.5). A rate inside a
+    range tier (28 GT/s in ``@24-32``) is covered by that tier's source."""
+    rate = float(cfg.data_rate_gtps)
+    if rate in _OFF_TABLE_WARNED or cfg.target.eye_width_ui is not None:
+        return
+    rates = [float(r) for r in survey_tiered("data_rates_gtps").value]
+    key = survey_tiered("rx_eye_width_ui", cfg.package.kind, rate).key
+    if "@" not in key and not any(abs(rate - r) < 1e-9 for r in rates):
+        _OFF_TABLE_WARNED.add(rate)
+        import warnings
+
+        warnings.warn(f"{rate:g} GT/s is neither in the survey's rate list {rates} nor in a rate tier: the eye-width "
+                      f"target falls back to {key!r}, whose source does not state it for this rate", stacklevel=3)
+
+
 def resolved_targets(cfg: LinkConfig) -> dict:
     """The BER / eye targets: the config's own values where set, else the
     spec table's most specific entry for this package and data rate, each
     with its source (``target_keys`` names the entry)."""
     t = cfg.target
     out = {}
+    _warn_off_table_rate(cfg)
     for name, key in TARGET_KEYS:
         v = getattr(t, name)
         if v is not None:

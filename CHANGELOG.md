@@ -4,6 +4,15 @@
 
 ---
 
+## [0.14.5] — 2026-11-05 — 眼宽分档改为速率区间(bundled 数字不变)
+
+- 综述表的 `rx_eye_width_ui@24` / `@32` 合成一条 `rx_eye_width_ui@24-32`(转述原文就是"24 到 32 GT/s"),`grep -c "source: survey"` 17 → 16。
+  `spec.survey_tiered` 在每个速率层先找精确档、再找闭区间档 `@<lo>-<hi>`,重叠区间报错。0.14.0–0.14.4 时 28 GT/s 落回 0.75 UI(第五次体检,中)。
+- 表外速率又不在任何区间里(20、40 GT/s)时,`resolved_targets` 退回不分档的那条并告警一次。
+- 报表 / GUI 的目标键显示 `rx_eye_width_ui@24-32`。新测试覆盖 24 / 28 / 32 / 16 / 40 GT/s、精确档压过区间、重叠报错 —— 也补上了「@24 档无套件覆盖」。
+
+---
+
 ## [0.14.4] — 2026-11-05 — Touchstone 文件按 lane 读直通(bundled 数字不变)
 
 - 单端多端口文件的 lane 数等于模块物理线数时,`run_link` 给每条物理 lane 读它自己的直通与邻线(`engine/lanes.py::file_per_lane`、

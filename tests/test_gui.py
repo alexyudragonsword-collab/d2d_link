@@ -64,7 +64,7 @@ def test_run_result_is_json_and_matches_the_example(x1_result):
     json.dumps(x1_result)                     # plain data across the process boundary
     lane = x1_result["lanes"][0]
     assert x1_result["passes"] and abs(1e3 * lane["eye_height_v"] - 204.1) < 0.1          # FAIL 0.13.0-0.13.11 against 0.75 UI;
-    assert x1_result["report"]["targets"]["eye_width_ui"]["key"] == "rx_eye_width_ui@32"      # PASS against the 0.65 UI tier (0.14.0)
+    assert x1_result["report"]["targets"]["eye_width_ui"]["key"] == "rx_eye_width_ui@24-32"   # PASS against the 0.65 UI tier (0.14.0; a range since 0.14.5)
     assert abs(lane["eye_width_ui"] - 0.709) < 0.001
     assert x1_result["report"]["jitter_budget"][-1]["term"].startswith("total")
 

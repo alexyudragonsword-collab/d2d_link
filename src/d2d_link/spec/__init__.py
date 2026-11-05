@@ -19,6 +19,8 @@ verdict.
 
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -155,14 +157,36 @@ def tier_keys(key: str, package: str | None = None, rate_gtps: float | None = No
     return out
 
 
+def _range_entry(table: dict[str, SpecNumber], base: str, rate_gtps: float) -> SpecNumber | None:
+    """The entry ``<base>@<lo>-<hi>`` whose closed range holds ``rate_gtps``
+    (``rx_eye_width_ui@24-32``), or None. Two overlapping ranges are an error
+    in the table."""
+    hits = []
+    for k, e in table.items():
+        m = re.fullmatch(re.escape(base) + r"@([0-9.]+)-([0-9.]+)", k)
+        if m and float(m.group(1)) <= rate_gtps <= float(m.group(2)):
+            hits.append(e)
+    if len(hits) > 1:
+        raise ValueError(f"overlapping rate ranges for {base!r} at {rate_gtps:g} GT/s: {[e.key for e in hits]}")
+    return hits[0] if hits else None
+
+
 def survey_tiered(key: str, package: str | None = None, rate_gtps: float | None = None,
                   table: dict[str, SpecNumber] | None = None) -> SpecNumber:
     """The most specific entry for ``key`` at this package and data rate
-    (``tier_keys``); its ``.key`` says which tier answered."""
+    (``tier_keys``); its ``.key`` says which tier answered. At each rate tier
+    an exact ``@<rate>`` entry wins, then a range ``@<lo>-<hi>`` holding the
+    rate (0.14.5: the 0.65 UI quote is for "24 to 32 GT/s", and an exact
+    ``@24`` / ``@32`` pair left 28 GT/s on the 0.75 UI fallback -- fifth
+    health check)."""
     table = _table() if table is None else table
     for k in tier_keys(key, package, rate_gtps):
         if k in table:
             return table[k]
+        if rate_gtps is not None and "@" in k:
+            hit = _range_entry(table, k.split("@", 1)[0], float(rate_gtps))
+            if hit is not None:
+                return hit
     raise KeyError(f"no spec entry for {key!r} at {package} / {rate_gtps} GT/s (tried {tier_keys(key, package, rate_gtps)})")
 
 

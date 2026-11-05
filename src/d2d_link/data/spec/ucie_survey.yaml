@@ -50,21 +50,14 @@ entries:
     unit: UI
     source: survey
     cite: "public UCIe 1.0 electrical summaries (eye mask 'EW ≥ 0.75 UI')"
-    note: "未核实:收端眼宽下限;同上,数值待确认。0.14.0 起只用于 4–16 GT/s(24 / 32 GT/s 由下面两条分档接管)。"
+    note: "未核实:收端眼宽下限;同上,数值待确认。0.14.0 起 24–32 GT/s 由下面的区间档接管;表外速率也落到这一条,并告警。"
 
-  rx_eye_width_ui@24:
+  rx_eye_width_ui@24-32:
     value: 0.65
     unit: UI
     source: survey
     cite: "Analysis of UCIe 48/64 GT/s Electrical Links (2025, ResearchGate 395249532), quoting the UCIe eye mask: 'For data rates between 4 and 16 GT/s, the required values are EH/EW = 40 mV / 0.75 UI, and for data rates between 24 and 32 GT/s, the required values are EH/EW = 40 mV / 0.65 UI'"
-    note: "未核实:二手转述(只读到检索摘要,论文原文与 UCIe 规范原文都未读)。采用于 0.14.0(用户 2026-11-05 决定);规范原文到了改 source: spec 或删去。"
-
-  rx_eye_width_ui@32:
-    value: 0.65
-    unit: UI
-    source: survey
-    cite: "Analysis of UCIe 48/64 GT/s Electrical Links (2025, ResearchGate 395249532), quoting the UCIe eye mask: 'For data rates between 4 and 16 GT/s, the required values are EH/EW = 40 mV / 0.75 UI, and for data rates between 24 and 32 GT/s, the required values are EH/EW = 40 mV / 0.65 UI'"
-    note: "未核实:二手转述(只读到检索摘要,论文原文与 UCIe 规范原文都未读)。采用于 0.14.0(用户 2026-11-05 决定);规范原文到了改 source: spec 或删去。"
+    note: "未核实:二手转述(只读到检索摘要,论文原文与 UCIe 规范原文都未读)。采用于 0.14.0(用户 2026-11-05 决定;0.14.5 起是一条 24–32 GT/s 区间,此前 @24、@32 两条只认这两个速率);规范原文到了改 source: spec 或删去。"
 
   tx_swing_vpp:
     value: 0.4

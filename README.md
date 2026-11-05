@@ -98,9 +98,9 @@ Crosstalk、Receiver、Sweeps(tracker 带宽 / 本地 PLL / reach);右栏队列(
 
 ## 规范数字
 
-本库拿不到 UCIe 规范原文。速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 17 条(眼宽按速率分档),全部在 `src/d2d_link/data/spec/ucie_survey.yaml`,
+本库拿不到 UCIe 规范原文。速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 16 条(眼宽按速率区间分档),全部在 `src/d2d_link/data/spec/ucie_survey.yaml`,
 每条 `source: survey` 并注明综述出处与"未核实";引擎只按 key 取,结果行打印 `source: xxx`。
-**0.14.0 起眼宽目标分档:4–16 GT/s 0.75 UI、24 / 32 GT/s 0.65 UI**(后者来自一篇 2025 年分析论文的转述,二手、未核实,用户决定采用)。按它 bundled 配置里 x1、x16 模块、x16 repair、x64 spare 都过,只有 x5 耦合不过。敏感性(0.14.2,示例 13):x1 +0.091、x64 spare +0.093 什么都不翻;x16 模块 +0.066 只在目标 0.70 UI 时翻(−0.010);**x16 repair +0.028 被目标 0.70 UI(−0.045)与发端 PLL 剖面 +3 dB(−0.034)翻**;x5 −0.121 什么都不翻。目标按 封装 × 速率档 分档查表(0.13.5):原文的分档数字一来,加 `standard.rx_eye_width_ui@32` 这样的条目即可,报表写明用的是哪一档。
+**0.14.0 起眼宽目标分档:4–16 GT/s 0.75 UI、24–32 GT/s 0.65 UI**(0.14.5 起是一条区间 `@24-32`,28 GT/s 也取 0.65;表外且不在区间里的速率退回 0.75 并告警)(后者来自一篇 2025 年分析论文的转述,二手、未核实,用户决定采用)。按它 bundled 配置里 x1、x16 模块、x16 repair、x64 spare 都过,只有 x5 耦合不过。敏感性(0.14.2,示例 13):x1 +0.091、x64 spare +0.093 什么都不翻;x16 模块 +0.066 只在目标 0.70 UI 时翻(−0.010);**x16 repair +0.028 被目标 0.70 UI(−0.045)与发端 PLL 剖面 +3 dB(−0.034)翻**;x5 −0.121 什么都不翻。目标按 封装 × 速率档 分档查表(0.13.5):原文的分档数字一来,加 `standard.rx_eye_width_ui@32` 这样的条目即可,报表写明用的是哪一档。
 
 ```bash
 grep "source: survey" src/d2d_link/data/spec/ucie_survey.yaml
