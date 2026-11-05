@@ -30,27 +30,33 @@ def flips(result: dict, sens_job, n_runs: int, est_s: float | None) -> html.Sect
     rows = sens["rows"]
     flipping = [r for r in rows if r["flips"]]
     nom = sens["nominal"]["margin"]
-    closest = sorted(rows, key=lambda r: min(abs(r["low"]["margin"]), abs(r["high"]["margin"])))[:3]
+    def m(r, side):
+        return abs(r[side]["margin"]) if r[side]["passes"] is not None else float("inf")
+
+    closest = sorted(rows, key=lambda r: min(m(r, "low"), m(r, "high")))[:3]
 
     def nearest(r):
-        side = "low" if abs(r["low"]["margin"]) < abs(r["high"]["margin"]) else "high"
+        side = "low" if m(r, "low") < m(r, "high") else "high"
         return f"{r['label']} {r[side]['value']:.4g} ({r[side]['margin']:+.3f})"
+
+    def cell(s):
+        if s["passes"] is None:
+            return html.Td(f"{s['value']:.4g} → n/a (refused)", className="fine")
+        return html.Td(f"{s['value']:.4g} → {'PASS' if s['passes'] else 'FAIL'} ({s['margin']:+.3f})",
+                       className="ok" if s["passes"] else "fail")
 
     if flipping:
         sentence = html.P([html.B(f"{len(flipping)} estimate(s) flip this {verdict}: "),
                            ", ".join(f"{r['label']} [{r['source']}]" for r in flipping),
                            f". Nominal margin {nom:+.3f}."], className="note callout")
     else:
-        sentence = html.P([html.B(f"No single ±20 % estimate flips this {verdict}. "),
+        sentence = html.P([html.B(f"No single ±20 % (dB ±3 dB) estimate flips this {verdict}. "),
                            f"Nominal margin {nom:+.3f}; closest to the boundary: " + "; ".join(nearest(r) for r in closest) + "."],
                           className="note callout")
-    table = html.Table([html.Thead(html.Tr([html.Th(h) for h in ("parameter", "source", "nominal", "−20 % → verdict (margin)",
-                                                                 "+20 % → verdict (margin)", "flips")])),
+    table = html.Table([html.Thead(html.Tr([html.Th(h) for h in ("parameter", "source", "nominal", "low side → verdict (margin)",
+                                                                 "high side → verdict (margin)", "flips")])),
                         html.Tbody([html.Tr([html.Td(r["label"]), html.Td(chip(r["source"])), html.Td(f"{r['nominal']:.4g}"),
-                                             html.Td(f"{r['low']['value']:.4g} → {'PASS' if r['low']['passes'] else 'FAIL'} ({r['low']['margin']:+.3f})",
-                                                     className="ok" if r["low"]["passes"] else "fail"),
-                                             html.Td(f"{r['high']['value']:.4g} → {'PASS' if r['high']['passes'] else 'FAIL'} ({r['high']['margin']:+.3f})",
-                                                     className="ok" if r["high"]["passes"] else "fail"),
+                                             cell(r["low"]), cell(r["high"]),
                                              html.Td("yes" if r["flips"] else "no", className="fail" if r["flips"] else "")])
                                     for r in rows])], className="lanes sens")
     return section("flips", "2", "What flips the verdict",

@@ -133,8 +133,12 @@ def survey(key: str, package: str | None = None) -> SpecNumber:
 
 def tier_keys(key: str, package: str | None = None, rate_gtps: float | None = None) -> list[str]:
     """The table keys a tiered lookup tries, most specific first:
-    ``<package>.<key>@<rate>``, ``<key>@<rate>``, ``<package>.<key>``, ``<key>``
-    (``@32`` for 32 GT/s). The survey has only the plain keys today -- the
+    ``<package>.<key>@<rate>``, ``<package>.<key>``, ``<key>@<rate>``, ``<key>``
+    (``@32`` for 32 GT/s). The package outranks the rate: the standard and
+    advanced packages are separate electrical specifications, so a
+    package's own number holds at every rate unless that package names the
+    rate itself; a rate-only entry is the fallback for packages that say
+    nothing (0.13.10; 0.13.5-0.13.9 tried the rate tier first, untested). The survey has only the plain keys today -- the
     eye mask its sources quote carries no rate or package -- so every tier
     resolves to them; an entry added with the original text's tier (e.g.
     ``standard.rx_eye_width_ui@32``, ``source: spec``) takes over for that
@@ -143,10 +147,10 @@ def tier_keys(key: str, package: str | None = None, rate_gtps: float | None = No
     out = []
     if package is not None and rate is not None:
         out.append(f"{package}.{key}{rate}")
-    if rate is not None:
-        out.append(f"{key}{rate}")
     if package is not None:
         out.append(f"{package}.{key}")
+    if rate is not None:
+        out.append(f"{key}{rate}")
     out.append(key)
     return out
 

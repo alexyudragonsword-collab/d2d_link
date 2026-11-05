@@ -151,7 +151,7 @@ def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
     from d2d_link.engine.statistical import resolved_targets, target_keys
 
     assert spec.tier_keys("rx_eye_width_ui", "standard", 32.0) == [
-        "standard.rx_eye_width_ui@32", "rx_eye_width_ui@32", "standard.rx_eye_width_ui", "rx_eye_width_ui"]
+        "standard.rx_eye_width_ui@32", "standard.rx_eye_width_ui", "rx_eye_width_ui@32", "rx_eye_width_ui"]
     cfg = LinkConfig()
     assert target_keys(cfg) == {"ber": "raw_ber_target", "eye_height_mv": "rx_eye_height_mv",
                                 "eye_width_ui": "rx_eye_width_ui"}
@@ -166,5 +166,8 @@ def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
     assert target_keys(cfg)["eye_width_ui"] == "standard.rx_eye_width_ui@32"
     adv = dataclasses.replace(cfg, package=dataclasses.replace(cfg.package, kind="advanced"))
     assert resolved_targets(adv)["eye_width_ui"][0] == 0.70                      # rate tier, no package tier
+    table["advanced.rx_eye_width_ui"] = dataclasses.replace(base, key="advanced.rx_eye_width_ui", value=0.60)
+    assert resolved_targets(adv)["eye_width_ui"][0] == 0.60                      # the package outranks the rate tier
+    del table["advanced.rx_eye_width_ui"]
     slow = dataclasses.replace(cfg, data_rate_gtps=16.0)
     assert resolved_targets(slow)["eye_width_ui"][0] == 0.75 and target_keys(slow)["eye_width_ui"] == "rx_eye_width_ui"

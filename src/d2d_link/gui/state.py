@@ -17,7 +17,7 @@ from ..config.form import FIELDS, config_to_values
 from ..config.schema import RLGC_PRESET_KEYS, STACKUP_KEYS
 
 MODEL_PRESET_PATHS = {f"channel.{k}" for k in (*RLGC_PRESET_KEYS, *STACKUP_KEYS)} | {
-    "channel.xtalk_adjacent_db", "channel.trace_pitch_um"}
+    "channel.xtalk_adjacent_db", "channel.xtalk_second_db", "channel.trace_pitch_um"}
 SURVEY_PATHS = {"target.ber", "target.eye_height_mv", "target.eye_width_ui"}
 
 

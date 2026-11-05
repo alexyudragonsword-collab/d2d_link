@@ -201,7 +201,8 @@ def rates(result: dict | None, cfg, job, manager) -> html.Div:
             for r in rows]
     first_fail = next((r for r in rows if not r["passes"]), None)
     note = (f"first failing rate {first_fail['rate_gtps']:g} GT/s (eye {first_fail['eye_height_mv']:.1f} mV / {first_fail['eye_width_ui']:.3f} UI "
-            f"vs {t['eye_height_mv']['value']:g} mV / {t['eye_width_ui']['value']:g} UI)" if first_fail else "every rate passes")
+            f"vs {first_fail.get('target_eye_height_mv', t['eye_height_mv']['value']):g} mV / "
+            f"{first_fail.get('target_eye_width_ui', t['eye_width_ui']['value']):g} UI at that rate)" if first_fail else "every rate passes")
     return html.Div([head, html.Div(cells + vals, className="rt-grid", style={"gridTemplateColumns": f"repeat({len(rows)}, 1fr)"}),
                      html.P(f"min eye height [mV] over lanes / min eye width [UI] at {t['ber']['value']:.0e}; {note}.", className="fine")],
                     className="card")

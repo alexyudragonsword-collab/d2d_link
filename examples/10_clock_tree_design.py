@@ -7,8 +7,9 @@ The receiver samples the data with the clock after its distribution tree (delay
 tau, a first-order bandwidth on its phase). So what reaches the sampler is the
 PLL's phase noise through ``1 - G(f)``, with ``G = exp(-j2 pi f tau) / (1 + jf/f_t)``.
 Below about ``1/(6 tau)`` that difference is small, and forwarding tracks the
-PLL. Near ``fs/2`` a 30 ps tree (about 1 UI) gives G close to -1: there,
-forwarding *doubles* the PLL's high-frequency floor instead of cancelling it.
+PLL. Near ``fs/2`` a flat 30 ps tree (about 1 UI) gives G close to -1: there,
+forwarding *doubles* the PLL's high-frequency floor instead of cancelling it
+(|1 - G|^2 = 3.98; the bundled 20 GHz tree's pole takes it to 2.94).
 How much floor there is to double depends on two things:
 
 - **the floor's level.** The bundled Tx PLL profile (a pll_simulator linear

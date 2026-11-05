@@ -104,3 +104,13 @@ def test_bundled_configs_read_profiles_that_reach_the_link_nyquist():
             if ref is not None:
                 p = ClockProfile.load(resolve_data_file(ref))
                 assert p.f_hz[-1] >= cfg.f_nyquist * (1 - 1e-9), (path.name, name)
+
+
+def test_rms_defaults_to_the_profiles_last_point():
+    """Fourth health check: rms_jitter_s defaulted to f0/2 and silently
+    dropped the band above it on the 16 GHz exports (188.2 vs 228.1 fs)."""
+    p16 = ClockProfile.load(resolve_data_file("data/clock_profiles/bench_markulic16_sspll_40m_10p24g_to16g.yaml"))
+    half = ClockProfile.load(resolve_data_file(PROFILE))
+    assert p16.rms_jitter_s(100.0) == pytest.approx(p16.rms_jitter_s(100.0, 16e9))
+    assert p16.rms_jitter_s(100.0) > 1.15 * p16.rms_jitter_s(100.0, 0.5 * p16.f0_hz)
+    assert half.rms_jitter_s(100.0) == pytest.approx(half.rms_jitter_s(100.0, 0.5 * half.f0_hz))   # f0/2 files: unchanged

@@ -178,24 +178,39 @@ def sensitivity_knobs(cfg) -> list[dict]:
         knobs.append(dict(label="trace_pitch_um", path="channel.trace_pitch_um", nominal=pitch, source=src, rel=0.2))
     elif ch.xtalk == "fext" and cfg.lanes.count > 1:
         adj, sec = cfg.xtalk_db()
+        # the second neighbour is pinned while the nearest one moves (it defaults
+        # to nearest - 12 dB and would otherwise move with it, fourth health check)
         knobs.append(dict(label="xtalk_adjacent_db", path="channel.xtalk_adjacent_db", nominal=adj,
-                          source="config" if ch.xtalk_adjacent_db is not None else "model", step=3.0))
+                          source="config" if ch.xtalk_adjacent_db is not None else "model", step=3.0,
+                          pin={"channel.xtalk_second_db": sec}))
         knobs.append(dict(label="xtalk_second_db", path="channel.xtalk_second_db", nominal=sec,
                           source="config" if ch.xtalk_second_db is not None else "model", step=3.0))
     if ch.xtalk_next == "fixed":
         knobs.append(dict(label="next_db", path="channel.next_db", nominal=ch.next_db, source="config", step=3.0))
     ck = cfg.clocking
+    from dataclasses import replace
+
+    from d2d_link.clock.forwarded import ForwardedClock
+
+    total = ForwardedClock(cfg).budget().total_s
     for name in ("data_path_rj_s", "clock_path_rj_s", "tree_rj_s", "data_path_wander_s", "clock_path_wander_s", "pll_rj_s",
                  "local_pll_rj_s"):
         v = getattr(ck, name, 0.0)
-        if v:
-            knobs.append(dict(label=name, path=f"clocking.{name}", nominal=v, source="config", rel=0.2))
+        if not v:
+            continue
+        # a jitter the clocking filters away (the clock path's white jitter behind a
+        # 1 MHz local PLL moves the total 331.54 -> 331.55 fs) is not run: two full
+        # links for nothing (fourth health check)
+        moved = ForwardedClock(replace(cfg, clocking=replace(ck, **{name: 1.2 * v}))).budget().total_s - total
+        if abs(moved) < 0.1e-15:
+            continue
+        knobs.append(dict(label=name, path=f"clocking.{name}", nominal=v, source="config", rel=0.2))
     if ck.pll_profile is not None:
         knobs.append(dict(label="pll_shift_db", path="clocking.pll_shift_db", nominal=ck.pll_shift_db,
-                          source="model", step=3.0))
+                          source="config" if ck.pll_shift_db != 0.0 else "model", step=3.0))
     if ck.local_pll_profile is not None:
         knobs.append(dict(label="local_pll_shift_db", path="clocking.local_pll_shift_db", nominal=ck.local_pll_shift_db,
-                          source="model", step=3.0))
+                          source="config" if ck.local_pll_shift_db != 0.0 else "model", step=3.0))
     if cfg.rx.bw_hz is not None:
         # the receiver's bandwidth is the design's claim, and with the noise
         # at the input it moves both the pulse and the noise
@@ -235,11 +250,20 @@ def sensitivity(cfg, eye_height_mv: float = 10.0, eye_width_ui: float = 0.05, pr
         sides = {}
         for sign, name in ((-1.0, "low"), (1.0, "high")):
             value = k["nominal"] + sign * k["step"] if "step" in k else k["nominal"] * (1.0 + sign * k["rel"])
-            res = run_link(apply_overrides(cfg, {k["path"]: value}))
+            try:
+                c = apply_overrides(cfg, {**k.get("pin", {}), k["path"]: value})
+            except ValueError as exc:
+                # a side the config refuses (a -2 dB crosstalk level moved to +1 dB)
+                # is reported, not fatal: before 0.13.10 it aborted the whole run
+                tick()
+                sides[name] = {"value": value, "passes": None, "worst_lane": None, "margin": float("nan"),
+                               "skipped": str(exc)}
+                continue
+            res = run_link(c)
             tick()
             sides[name] = {"value": value, **verdict(res)}
-        rows.append({**k, **sides, "flips": sides["low"]["passes"] != nominal["passes"]
-                     or sides["high"]["passes"] != nominal["passes"]})
+        rows.append({**k, **sides, "flips": any(sides[s]["passes"] is not None and sides[s]["passes"] != nominal["passes"]
+                                                for s in ("low", "high"))})
     # the eye-mask targets: tighter / looser by a fixed step, read off the nominal eyes
     t = resolved_targets(cfg)
     eh, ew = 1e3 * base.eye_height_min_v, base.eye_width_min_ui
@@ -250,11 +274,13 @@ def sensitivity(cfg, eye_height_mv: float = 10.0, eye_width_ui: float = 0.05, pr
         ok_low, ok_high = base.lanes.link_up and have >= low, base.lanes.link_up and have >= high
         other_ok = all(r.log10_ber <= math.log10(r.target_ber) for r in base.stat) and (
             (ew >= t["eye_width_ui"][0]) if key == "eye_height_mv" else (eh >= t["eye_height_mv"][0]))
+        other = (ew - t["eye_width_ui"][0]) / t["eye_width_ui"][0] if key == "eye_height_mv" else \
+            (eh - t["eye_height_mv"][0]) / t["eye_height_mv"][0]
         rows.append(dict(label=f"target.{label}", path=f"target.{label}", nominal=nom, source=src, rel=None,
                          low={"value": low, "passes": bool(ok_low and other_ok), "worst_lane": base.worst.lane,
-                              "margin": (have - low) / low if low > 0 else float("nan")},
+                              "margin": min((have - low) / low, other) if low > 0 else float("nan")},
                          high={"value": high, "passes": bool(ok_high and other_ok), "worst_lane": base.worst.lane,
-                               "margin": (have - high) / high},
+                               "margin": min((have - high) / high, other)},
                          flips=bool((ok_low and other_ok) != nominal["passes"] or (ok_high and other_ok) != nominal["passes"])))
     return {"nominal": nominal, "rows": rows}
 
@@ -271,9 +297,12 @@ def sensitivity_markdown(sens: dict) -> str:
              "|---|---|---:|---|---|---|"]
     for r in sens["rows"]:
         lo, hi = r["low"], r["high"]
-        lines.append(f"| {r['label']} | {r['source']} | {r['nominal']:.4g} | {lo['value']:.4g} -> "
-                     f"{'PASS' if lo['passes'] else 'FAIL'} ({lo['margin']:+.3f}) | {hi['value']:.4g} -> "
-                     f"{'PASS' if hi['passes'] else 'FAIL'} ({hi['margin']:+.3f}) | {'**yes**' if r['flips'] else 'no'} |")
+        def side(s):
+            if s["passes"] is None:
+                return f"{s['value']:.4g} -> n/a (refused by the config)"
+            return f"{s['value']:.4g} -> {'PASS' if s['passes'] else 'FAIL'} ({s['margin']:+.3f})"
+        lines.append(f"| {r['label']} | {r['source']} | {r['nominal']:.4g} | {side(lo)} | {side(hi)} | "
+                     f"{'**yes**' if r['flips'] else 'no'} |")
     flips = [r["label"] for r in sens["rows"] if r["flips"]]
     lines += ["", ("Verdict-deciding: " + ", ".join(flips)) if flips else "No single perturbation flips the verdict.", ""]
     return "\n".join(lines)

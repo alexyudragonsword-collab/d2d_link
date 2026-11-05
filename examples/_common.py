@@ -52,6 +52,10 @@ def pll_floor_variant(profile: str, floor_dbc: float, bundled_floor: float = -14
     src = resolve_data_file(profile)
     base = yaml.safe_load(src.read_text())
     level = np.asarray(base["l_dbc_hz"], dtype=float)
+    top = float(level[-1])
+    if abs(top - bundled_floor) > 0.1:
+        raise ValueError(f"{src.name} ends at {top:.2f} dBc/Hz, not the {bundled_floor:g} dBc/Hz floor this variant "
+                         "takes off (give bundled_floor)")
     s = np.maximum(10.0 ** (level / 10.0) - 10.0 ** (bundled_floor / 10.0), 0.0) + 10.0 ** (floor_dbc / 10.0)
     var = dict(base, l_dbc_hz=[float(v) for v in 10.0 * np.log10(s)],
                source=f"{base['source']}; white floor {bundled_floor:g} -> {floor_dbc:g} dBc/Hz (a design target)")

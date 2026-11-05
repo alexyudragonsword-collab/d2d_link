@@ -19,7 +19,8 @@ authoring_mode: ai_generated
   每条 note 都写了"未核实"。最不可靠的三条:收端眼高 40 mV、眼宽 0.75 UI(眼罩表的速率档与封装归属不明)、1e-15 的 retry 口径。
 - 升级流程:用户把原文贴进 `cairn/Reference/`(只追加)→ 对应条目改 `source: spec`、加 `quote` 与 `section` → `tests/test_spec_sources.py`
   自动要求 quote 非空 → LOG 记一条。
-- **分档(0.13.5)**:目标按 `<package>.<key>@<rate>` → `<key>@<rate>` → `<package>.<key>` → `<key>` 查表(`spec.survey_tiered`)。
+- **分档(0.13.5;0.13.10 定了优先级)**:目标按 `<package>.<key>@<rate>` → `<package>.<key>` → `<key>@<rate>` → `<key>` 查表(`spec.survey_tiered`)。
+  封装压过速率:标准与先进封装是两套电气规范,封装自己的数在每个速率都成立,除非该封装另给了那个速率的数;只给速率的条目是封装没说话时的退路。
   原文的眼罩若按速率档 / 封装给数,就加对应的分档条目(如 `standard.rx_eye_width_ui@32`,`source: spec`),只接管那一档;
   没写到的档继续落到综述的通用值。报表的 Targets 表多一列 table key,GUI 的未核实输入卡按这个 key 取出处。
   今天没有分档条目:综述的眼罩不带速率与封装,不为凑表复制同一个未核实的数(铁律 5)。

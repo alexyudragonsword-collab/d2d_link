@@ -170,22 +170,15 @@ jobs:
           PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
           BASE: ${{ steps.base.outputs.sha }}
         run: |
-          python tools/fingerprint.py compare base.json head.json > diff.txt || moved=1
+          python tools/fingerprint.py compare base.json head.json > diff.txt || true
           cat diff.txt
-          if [ "${moved:-0}" = "1" ]; then
-            # every commit the push (or PR) brings is read, not just the head:
-            # a fast-forward of main carrying an earlier numbers-move commit
-            # went red, and a head saying so waived any earlier unannounced move.
-            # The marker is "(numbers-move" -- "(numbers-move)", "(numbers-move:
-            # why)" -- so prose mentioning the word does not count.
-            if echo "$PR_LABELS" | grep -q '"numbers-move"' || git log --format=%B "$BASE..HEAD" | grep -qE '\(numbers-move[:,)]'; then
-              echo "numbers moved and a commit in $BASE..HEAD says so: the diff is kept as an artifact"
-              git log --format='  %h %s' "$BASE..HEAD" | grep -E '\(numbers-move[:,)]' || true
-            else
-              echo "::error::numbers moved and no commit in $BASE..HEAD carries (numbers-move) (or the PR label); explain them in CHANGELOG"
-              exit 1
-            fi
-          fi
+          # A moved range is settled commit by commit (tools/fingerprint_walk.py):
+          # unmarked range -> red; every commit marked -> green; mixed -> each
+          # commit is fingerprinted and an unmarked one that moved numbers is
+          # named and fails. Until 0.13.10 one marked commit waived the whole
+          # push (fourth health check). The marker is "(numbers-move" followed
+          # by ")", ":" or "," in a commit message, or the PR label.
+          python tools/fingerprint_walk.py --base "$BASE" --base-json base.json --head-json head.json --labels "$PR_LABELS"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -230,3 +223,11 @@ jobs:
           python tools/vendor_check.py --strict --fail-on-skip
           --siblings Halo_Serdes=${{ github.workspace }}/_siblings/Halo_Serdes
           pll_simulator=${{ github.workspace }}/_siblings/pll_simulator
+      # the _to16g clock profiles name pll_simulator@00e48a2f as their source:
+      # regenerate them from that checkout and compare (fourth health check)
+      - name: 16 GHz profiles match the pinned pll_simulator
+        working-directory: d2d_link
+        run: |
+          python -m pip install numpy scipy pyyaml
+          python tools/export_profile_to_nyquist.py --check --pllsim ${{ github.workspace }}/_siblings/pll_simulator \
+            bench_markulic16_sspll_40m_10p24g bench_wu19_spll_frac_52m_6p253g

@@ -621,7 +621,7 @@ class LinkConfig:
         mismatch ``kappa (1 - eps_eff/eps_r)``, their sum gives
         ``K_b = kappa (1 + eps_eff/eps_r) / 4`` (kappa / 2 in a stripline).
         Until 0.13.2 it was kappa / 4, which counts only one of the two
-        couplings: 4.8 dB low on the standard microstrip (third health
+        couplings: 4.7 dB low on the standard microstrip (third health
         check; the textbook form is unverified against Johnson & Graham's
         text). The configured level for ``fixed``, 0 when off."""
         ch = self.channel

@@ -48,17 +48,21 @@ def tornado_figure(sens: dict, height: int | None = None) -> go.Figure:
     """Each knob's worst-lane margin at -20 % and +20 % as a bar through the
     nominal; the verdict boundary at 0; sorted by how far the two sides
     reach. Margin = min(eye height, eye width) relative to its target."""
-    rows = sorted(sens["rows"], key=lambda r: -max(abs(r["low"]["margin"] - sens["nominal"]["margin"]),
-                                                  abs(r["high"]["margin"] - sens["nominal"]["margin"])))
+    def dev(r, side):
+        return abs(r[side]["margin"] - sens["nominal"]["margin"]) if r[side]["passes"] is not None else 0.0
+
+    rows = sorted(sens["rows"], key=lambda r: -max(dev(r, "low"), dev(r, "high")))
     height = height or (70 + 26 * len(rows))
     fig = go.Figure(layout=_base(height, margin=dict(l=190, r=16, t=22, b=40)))
     nom = sens["nominal"]["margin"]
     labels = [f"{r['label']}  [{r['source']}]" for r in rows]
-    for side, color, name in (("low", "#9ca3af", "−20 % (targets −10 mV / −0.05 UI)"), ("high", "#374151", "+20 %")):
-        xs = [r[side]["margin"] - nom for r in rows]
+    for side, color, name in (("low", "#9ca3af", "low side (−20 %, dB −3 dB; targets −10 mV / −0.05 UI)"),
+                              ("high", "#374151", "high side (+20 %, dB +3 dB)")):
+        xs = [(r[side]["margin"] - nom) if r[side]["passes"] is not None else 0.0 for r in rows]
         fig.add_trace(go.Bar(y=labels, x=xs, base=[nom] * len(rows), orientation="h", name=name,
                              marker=dict(color=color), width=0.55,
-                             customdata=[[r[side]["value"], r[side]["margin"], "PASS" if r[side]["passes"] else "FAIL"] for r in rows],
+                             customdata=[[r[side]["value"], r[side]["margin"], "n/a" if r[side]["passes"] is None
+                                          else ("PASS" if r[side]["passes"] else "FAIL")] for r in rows],
                              hovertemplate="%{y}<br>value %{customdata[0]:.4g} → margin %{customdata[1]:+.3f} %{customdata[2]}<extra></extra>"))
     fig.add_vline(x=nom, line=dict(color=BLUE, width=1, dash="dot"), annotation_text=f"nominal {nom:+.3f}",
                   annotation_position="bottom left", annotation_font=dict(size=11, color=BLUE))
@@ -67,7 +71,8 @@ def tornado_figure(sens: dict, height: int | None = None) -> go.Figure:
     # the axis follows the knobs near the boundary; a far-off side (the eye-height
     # target of a link failing on width sits at +3.8) runs off the edge, which
     # the hover still reports
-    near = [m for r in rows for m in (r["low"]["margin"], r["high"]["margin"]) if abs(m - nom) <= 0.5] or [nom]
+    near = [r[s]["margin"] for r in rows for s in ("low", "high")
+            if r[s]["passes"] is not None and abs(r[s]["margin"] - nom) <= 0.5] or [nom]
     lo, hi = min(near), max(near)
     pad = 0.15 * max(hi - lo, 0.05)
     fig.add_vrect(x0=0.0, x1=max(hi, 0.0) + pad, fillcolor="#dcfce7", opacity=0.35, line_width=0, layer="below")

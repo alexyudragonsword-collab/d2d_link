@@ -178,3 +178,26 @@ def test_sensitivity_knobs_cover_the_clock_claims_and_step_db_levels(budget_tool
     assert {"data_path_wander_s", "clock_path_wander_s", "local_pll_shift_db", "xtalk_second_db"} <= set(m)
     assert m["xtalk_adjacent_db"]["step"] == 3.0 and "rel" not in m["xtalk_adjacent_db"]
     assert m["xtalk_second_db"]["nominal"] == m["xtalk_adjacent_db"]["nominal"] - 12.0 and m["xtalk_second_db"]["source"] == "model"
+
+
+def test_sensitivity_knob_defects_from_the_fourth_health_check(budget_tool):
+    """The nearest-neighbour knob pins the second neighbour; a side the config
+    refuses is reported, not fatal; a profile shift the config sets is its
+    own claim; a jitter the clocking filters away is not run."""
+    import dataclasses
+
+    from d2d_link.config import load_config
+
+    m = load_config(REPO / "configs" / "standard_32g_x16_module.yaml")
+    knobs = {k["label"]: k for k in budget_tool.sensitivity_knobs(m)}
+    assert knobs["xtalk_adjacent_db"]["pin"] == {"channel.xtalk_second_db": knobs["xtalk_second_db"]["nominal"]}
+    assert "clock_path_rj_s" not in knobs                     # behind the 1 MHz local PLL: 331.54 -> 331.55 fs
+    assert "data_path_rj_s" in knobs
+    shifted = dataclasses.replace(m, clocking=dataclasses.replace(m.clocking, pll_shift_db=6.0))
+    assert {k["label"]: k for k in budget_tool.sensitivity_knobs(shifted)}["pll_shift_db"]["source"] == "config"
+    small = LinkConfig(channel=dataclasses.replace(ChannelConfig(length_mm=2.0), xtalk="fext", xtalk_adjacent_db=-2.0),
+                       lanes=LaneConfig(count=2), sim=SimConfig(stat_phase_points=16))
+    sens = budget_tool.sensitivity(small)                     # +3 dB would make the level positive: refused
+    adj = next(r for r in sens["rows"] if r["label"] == "xtalk_adjacent_db")
+    assert adj["high"]["passes"] is None and "skipped" in adj["high"] and adj["low"]["passes"] is not None
+    assert "n/a (refused by the config)" in budget_tool.sensitivity_markdown(sens)

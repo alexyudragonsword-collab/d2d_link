@@ -89,9 +89,12 @@ if plt is not None:
     for name, rows in results.items():
         axes[0].plot([r for r, _, _ in rows], [1e3 * m.eye_height_v for _, m, _ in rows], "o-", label=name)
         axes[1].plot([r for r, _, _ in rows], [m.eye_width_ui for _, m, _ in rows], "o-", label=name)
-    t = results["standard"][0][1].targets
-    axes[0].axhline(t["eye_height_mv"][0], color="r", ls="--", lw=0.8, label=f"target (source: {t['eye_height_mv'][1]})")
-    axes[1].axhline(t["eye_width_ui"][0], color="r", ls="--", lw=0.8, label=f"target (source: {t['eye_width_ui'][1]})")
+    # each rate's own target (spec.survey_tiered may give a tiered mask); today one value
+    for name, rows in results.items():
+        axes[0].step([r for r, _, _ in rows], [m.targets["eye_height_mv"][0] for _, m, _ in rows], where="mid",
+                     color="r", ls="--", lw=0.8, label="target" if name == "standard" else None)
+        axes[1].step([r for r, _, _ in rows], [m.targets["eye_width_ui"][0] for _, m, _ in rows], where="mid",
+                     color="r", ls="--", lw=0.8, label="target" if name == "standard" else None)
     axes[0].set_xlabel("data rate [GT/s]")
     axes[1].set_xlabel("data rate [GT/s]")
     axes[0].set_ylabel("eye height at 1e-27 [mV]")

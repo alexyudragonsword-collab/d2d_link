@@ -32,6 +32,7 @@ import numpy as np
 from _common import CONFIGS, OUT, plt_or_none
 from d2d_link.channel import ChannelModel, link_response
 from d2d_link.channel.coupled import describe
+from d2d_link.channel.model import xtalk_response
 from d2d_link.config import load_config
 from d2d_link.engine import run_link
 
@@ -90,8 +91,8 @@ if skrf is not None:
     f = ChannelModel.grid(module)[1:]
     thru = ChannelModel.from_config(module).H[1:]    # the analytic 25 mm line itself, as the file's through terms
     level = 10 ** (-20.0 / 20.0)                     # the synthetic file's coupling: -20 dB at Nyquist, FEXT shape
-    tau = np.arcsin(level) / (2 * np.pi * module.f_nyquist)
-    kx = 1j * np.sin(2 * np.pi * f * tau)            # the two-mode far-end shape (channel.model.xtalk_response, 0.13.6)
+    fext = dataclasses.replace(module, channel=dataclasses.replace(module.channel, xtalk="fext", xtalk_adjacent_db=-20.0))
+    kx = xtalk_response(fext, f, 1)                  # the library's far-end shape, not a copy of it (0.13.6 drifted on one)
     n = 3
     s = np.zeros((f.size, 2 * n, 2 * n), dtype=complex)
     for i in range(n):

@@ -116,8 +116,12 @@ class ClockProfile:
         return self.s_phi(f, above) / (TWOPI * self.f0_hz) ** 2
 
     def rms_jitter_s(self, f1: float, f2: float | None = None) -> float:
-        """RMS timing jitter [s] of the continuous part over [f1, f2] (f2 default f0/2)."""
-        f2 = 0.5 * self.f0_hz if f2 is None else f2
+        """RMS timing jitter [s] of the continuous part over [f1, f2]; f2
+        defaults to the profile's last point (f0/2 for the format's own
+        exports, 16 GHz for the ``_to16g`` ones -- before 0.13.10 the default
+        was f0/2 and silently dropped the band above it: 188.2 against
+        228.1 fs on the 16 GHz Markulic file)."""
+        f2 = float(self.f_hz[-1]) if f2 is None else f2
         return float(np.sqrt(integrate_pn(self.f_hz, sphi_from_ldbc(self.l_dbc_hz), f1, f2))
                      / (TWOPI * self.f0_hz))
 
@@ -134,7 +138,7 @@ class ClockProfile:
                             tuple((a, b + shift_db) for a, b in self.spurs), self.source)
 
     def scaled_to_rms(self, rms_s: float, f1: float, f2: float | None = None) -> "ClockProfile":
-        f2 = 0.5 * self.f0_hz if f2 is None else f2
+        f2 = float(self.f_hz[-1]) if f2 is None else f2
         have = self.rms_jitter_s(f1, f2)
         if not (have > 0 and rms_s > 0):
             raise ValueError("scaled_to_rms needs a non-zero profile and target")

@@ -56,16 +56,9 @@
 3. **Touchstone 路径只测过合成文件**(`tests/test_channel.py`:无损 4 端口、有损 + 直流补齐、单端 6 端口、有损 50 GHz 截断 + 直通与耦合项的带外延拓);没有真实封装 S 参数文件。接口留着,数据没有。
    延拓是外推(直通按最后十倍频的斜率,耦合沿直通的衰减):合成文件上剩 0.005 UI 的直通延拓误差;真实文件的带外行为未知,文件带宽低于 4 × Nyquist 时把这一项列进该链路的不确定度。
 
-4. **第四次体检(2026-11-04)挂出的工程项**(报告:scratchpad `health_check_2026-11-04.md`;探针 `audit4_code/`、`audit4_docs/`;闸门两项 0.13.9 已修):
-   - **指纹 CI**:推送区间里任一提交带 `(numbers-move` 就放行全区间,未标记提交里的意外变动会被带过(本轮核过 4d9ed57 → 08472f7 逐位相同,未漏)。
-   - **分档查表**:速率档压过封装档(`advanced.x` 与 `x@32` 冲突时取后者),未说明也未测;GUI 速率栏与示例 07 的图仍用名义配置的目标;测试 monkeypatch 了 `_table`,没走 YAML / 报表 / GUI。
-   - **敏感性旋钮**:最近邻 ±3 dB 连带移动第二邻(未设 `xtalk_second_db` 时);最近邻 −2 dB 时 +3 dB 一侧抛 ValueError 让整轮中止;`pll_shift_db` 被配置显式设置时仍标 model;
-     有 1 MHz 本地 PLL 时 `clock_path_rj_s` 旋钮无效(331.54 → 331.55 fs),白跑两次。
-   - **剖面**:`ClockProfile.rms_jitter_s` / `scaled_to_rms` 默认 f2 = f0/2,对 `_to16g` 文件静默丢掉 f0/2 以上(Markulic 188.2 对 228.1 fs);`pll_floor_variant` 假定底噪 −145,
-     用在 Wu19(−154)上会把底噪抬高;`_to16g` 文件的来源 CI 不复算(vendor-drift 作业已 checkout 了 pll_simulator@00e48a2f,可以加一步)。
-   - **小项**:FEXT 只加了耦合项、受害方直通的 cos(2πfτ) 没乘(x5 中间 lane 0.5676 → 0.5713 UI,不翻);示例 08 仍自带一份 FEXT 形状;示例 10 的「G ≈ −1」只对平坦树成立
-     (20 GHz 树 |1 − G|² = 2.94 对 3.98);NEXT 文档里「少 4.8 dB」应为 4.7;GUI tornado 图例写死 ±20 %、`xtalk_second_db` 空值显示 default;
-     敏感性 Markdown 目标行的裕度与表头定义不符;没有任何期望输出或测试产出敏感性数字(ROADMAP / spec-sources 里的数只能手跑核对)。
+4. **第四次体检(2026-11-04)的余项**(其余 0.13.9 / 0.13.10 已修;报告:scratchpad `health_check_2026-11-04.md`):
+   - FEXT 只加了耦合项,受害方直通的 cos(2πfτ) 没乘(x5 中间 lane 0.5676 → 0.5713 UI,判定不翻)—— 会动数字,单独一段做。
+   - 没有任何期望输出或测试产出敏感性数字:ROADMAP P1 #1 / spec-sources 里的裕度只能手跑 `budget_report.py --sensitivity` 核对(x16 模块约 8 分钟)。
 
 ## P3 — 能力扩展
 

@@ -53,3 +53,29 @@ def test_engines_are_deterministic(fp):
     t1, t2 = run_time(cfg, phase_ui=0.0), run_time(cfg, phase_ui=0.0)
     assert fp.time_values(t1) == fp.time_values(t2)
     assert fp.digest(np.arange(3.0)) == fp.digest([0.0, 1.0, 2.0])
+
+
+def test_fingerprint_walk_names_the_unmarked_commit_that_moved():
+    """Fourth health check: one (numbers-move commit in a push waived the
+    whole range. The walk settles a moved range commit by commit."""
+    import importlib.util
+
+    from conftest import REPO
+
+    spec = importlib.util.spec_from_file_location("fingerprint_walk", REPO / "tools" / "fingerprint_walk.py")
+    w = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(w)
+    fps = {"base": {"x": 1}, "a": {"x": 1}, "b": {"x": 2}, "c": {"x": 3}}
+    rec = lambda sha, out: fps[sha]                                       # noqa: E731
+    ok, _ = w.settle("base", fps["base"], fps["base"], [], 12, rec, ["a"], lambda s: False)
+    assert ok                                                             # nothing moved
+    ok, _ = w.settle("base", fps["base"], fps["c"], [], 12, rec, ["a", "b", "c"], lambda s: False)
+    assert not ok                                                         # moved, nothing marked
+    ok, _ = w.settle("base", fps["base"], fps["c"], [], 12, rec, ["a", "b", "c"], lambda s: True)
+    assert ok                                                             # every commit marked
+    ok, msgs = w.settle("base", fps["base"], fps["c"], [], 12, rec, ["a", "b", "c"], lambda s: s == "b")
+    assert not ok and any("error: c" in m for m in msgs)                  # b says so, c does not
+    ok, msgs = w.settle("base", fps["base"], fps["c"], [], 12, rec, ["a", "b", "c"], lambda s: s in ("b", "c"))
+    assert ok and any(m.startswith("a unmarked: 0") for m in msgs)        # a moved nothing
+    assert w.settle("base", fps["base"], fps["c"], ["numbers-move"], 12, rec, ["a"], lambda s: False)[0]
+    assert w.MARKER.search("x (numbers-move: why)") and not w.MARKER.search("no numbers-move needed")

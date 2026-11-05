@@ -119,6 +119,9 @@ def execute(kind: str, cfg_dict: dict, params: dict | None = None, progress=None
             rows.append({"rate_gtps": rate, "passes": bool(res.passes), "worst_lane": w.lane,
                          "eye_height_mv": 1e3 * res.eye_height_min_v, "eye_width_ui": res.eye_width_min_ui,
                          "log10_ber": float(w.log10_ber),
+                         # the rate's own targets (spec.survey_tiered): a tiered mask may differ per rate
+                         "target_eye_height_mv": float(res.targets["eye_height_mv"][0]),
+                         "target_eye_width_ui": float(res.targets["eye_width_ui"][0]),
                          "il_db": float(res.stat[0].extras["insertion_loss_nyquist_db"]) if res.stat else None})
             tick(i + 1, len(rates))
         return {"kind": kind, "rows": rows, "package": cfg.package.kind, "length_mm": cfg.channel.length_mm,

@@ -76,7 +76,7 @@ def export(preset: str, f_hi: float, out_dir: Path) -> Path:
     out = out_dir / f"{preset}_to{f_hi / 1e9:g}g.yaml"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     terms = {k: float(ldbc_from_sphi(v)[-1]) for k, v in ar.pn_breakdown.items()}
-    print(f"{out.relative_to(REPO)}: {f.size} points to {f_hi / 1e9:g} GHz; L at the top "
+    print(f"{out.name}: {f.size} points to {f_hi / 1e9:g} GHz; L at the top "
           + ", ".join(f"{k} {v:.2f}" for k, v in terms.items()) + " dBc/Hz")
     return out
 
@@ -87,12 +87,33 @@ def main(argv=None) -> int:
     ap.add_argument("--pllsim", type=Path, help="pll_simulator checkout (its src/ goes on sys.path)")
     ap.add_argument("--f-hi", type=float, default=16e9, help="top of the grid [Hz] (default 16e9: 32 GT/s Nyquist)")
     ap.add_argument("--out", type=Path, default=OUT)
+    ap.add_argument("--check", action="store_true",
+                    help="export to a temporary directory and compare with the bundled files (CI's vendor-drift job)")
     a = ap.parse_args(argv)
     if a.pllsim is not None:
         sys.path.insert(0, str(a.pllsim.resolve() / "src"))
-    for p in a.presets:
-        export(p, a.f_hi, a.out)
-    return 0
+    if not a.check:
+        for p in a.presets:
+            export(p, a.f_hi, a.out)
+        return 0
+    import tempfile
+
+    import yaml
+
+    bad = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        for p in a.presets:
+            fresh = yaml.safe_load(export(p, a.f_hi, Path(tmp)).read_text(encoding="utf-8"))
+            ship = a.out / f"{p}_to{a.f_hi / 1e9:g}g.yaml"
+            have = yaml.safe_load(ship.read_text(encoding="utf-8"))
+            same = (fresh["f0_hz"] == have["f0_hz"] and fresh["source"] == have["source"]
+                    and np.allclose(fresh["f_hz"], have["f_hz"], rtol=1e-12, atol=0.0)
+                    and np.allclose(fresh["l_dbc_hz"], have["l_dbc_hz"], rtol=0.0, atol=1e-6)
+                    and len(fresh["spurs"]) == len(have["spurs"])
+                    and all(abs(x["dbc"] - y["dbc"]) < 1e-6 and x["f_hz"] == y["f_hz"] for x, y in zip(fresh["spurs"], have["spurs"])))
+            print(f"{ship.name}: {'matches the pinned pll_simulator' if same else 'DIFFERS from a fresh export'}")
+            bad += not same
+    return 1 if bad else 0
 
 
 if __name__ == "__main__":
