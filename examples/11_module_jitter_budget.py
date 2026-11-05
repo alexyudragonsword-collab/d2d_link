@@ -12,7 +12,7 @@ design levers buy the difference?
    Gaussian RMS of the sampling residual alone. The curve is read by scaling
    every jitter source together (the config's white and wander terms by g,
    both PLL profiles by 20 log10 g dB), and sigma* is where it crosses the
-   0.75 UI target. (Until 0.13.5 only the data path's white term moved; with
+   eye-width target (0.65 UI at 32 GT/s since 0.14.0; 0.75 UI before). (Until 0.13.5 only the data path's white term moved; with
    the 0.13.6 far-end shape the module's eye no longer reaches the target
    even with that term at zero.)
 2. **Levers one at a time**, in closed form (``ForwardedClock.budget``):

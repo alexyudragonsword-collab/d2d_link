@@ -1,0 +1,25 @@
+x16 repair: 16 lanes, failed [5] -> width_degrade; tree 30 ps / 20 GHz, tracker 2 MHz, no local PLL, PI step 0.0624 UI (1.95 ps)
+  residual (closed form) 365.5 fs RMS:
+    Tx PLL leak through the tree     223.4 fs  (37.4 % of the power)
+    data path white                  199.9 fs  (29.9 % of the power)
+    data path wander                   0.0 fs  ( 0.0 % of the power)
+    clock path white                 183.6 fs  (25.2 % of the power)
+    clock path wander                  0.0 fs  ( 0.0 % of the power)
+    tree                             100.0 fs  ( 7.5 % of the power)
+  and the PI step: a bounded box of 1.95 ps (RMS 563 fs, but at the target BER a box costs about its width, not 14 sigma of its RMS)
+
+levers one at a time (worst-lane margin = eye width over the 0.65 UI target, source: survey, relative):
+  lever                      residual [fs]   margin  eye [UI]  at +3 dB  withstands
+  bundled                            365.5   +0.028    0.6683    -0.034     +1.5 dB
+  PI step 1/32 UI                    365.5   +0.074    0.6979    +0.011     +3.4 dB
+  PI step 1/64 UI (as x16)           365.5   +0.096    0.7122    +0.033     +4.1 dB
+  data path white 150 fs             340.8   +0.052    0.6839    -0.013     +2.4 dB
+  data path white 100 fs             321.9   +0.071    0.6959    +0.002     +3.0 dB
+  clock path white 100 fs            329.1   +0.063    0.6913    -0.004     +2.8 dB
+  tree 15 ps                         333.6   +0.059    0.6884    +0.021     +4.1 dB
+  tree 0 ps                          295.8   +0.096    0.7122    +0.090     > 12 dB
+  tracker 5 MHz                      365.4   +0.028    0.6684    -0.034     +1.5 dB
+  local PLL as x16                   297.9   +0.094    0.7109    +0.047     +4.9 dB
+
+  bundled: the module withstands +1.5 dB of Tx PLL level; the strongest single lever is 'tree 0 ps' (> 12 dB)
+  levers that keep it passing at +3 dB: PI step 1/32 UI, PI step 1/64 UI (as x16), data path white 100 fs, tree 15 ps, tree 0 ps, local PLL as x16
