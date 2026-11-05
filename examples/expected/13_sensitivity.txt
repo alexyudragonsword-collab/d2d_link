@@ -1,0 +1,87 @@
+
+standard_32g_x1: nominal PASS, worst lane 0 margin +0.091 (eye 204.1 mV / 0.709 UI)
+  parameter               source   nominal       low -> verdict           high -> verdict      flips
+  rdc_ohm_m                model        10         8 -> PASS +0.091         12 -> PASS +0.091
+  r_skin                   model     0.008    0.0064 -> PASS +0.107     0.0096 -> PASS +0.071
+  loss_tangent             model      0.01     0.008 -> PASS +0.096      0.012 -> PASS +0.085
+  z0_ohm                   model        50        40 -> PASS +0.054         60 -> PASS +0.104
+  data_path_rj_s          config     2e-13   1.6e-13 -> PASS +0.111    2.4e-13 -> PASS +0.068
+  clock_path_rj_s         config     2e-13   1.6e-13 -> PASS +0.108    2.4e-13 -> PASS +0.071
+  tree_rj_s               config     1e-13     8e-14 -> PASS +0.096    1.2e-13 -> PASS +0.085
+  pll_shift_db             model         0        -3 -> PASS +0.126          3 -> PASS +0.029
+  target.eye_height_mv    survey        40        30 -> PASS +0.091         50 -> PASS +0.091
+  target.eye_width_ui     survey      0.65       0.6 -> PASS +0.182        0.7 -> PASS +0.013
+  nearest to flipping: target.eye_width_ui high 0.7 +0.013, pll_shift_db high 3 +0.029, z0_ohm low 40 +0.054
+
+standard_32g_x16_module: nominal PASS, worst lane 4 margin +0.066 (eye 226.3 mV / 0.693 UI)
+  parameter               source   nominal       low -> verdict           high -> verdict      flips
+  rdc_ohm_m                model        10         8 -> PASS +0.066         12 -> PASS +0.066
+  r_skin                   model     0.008    0.0064 -> PASS +0.076     0.0096 -> PASS +0.047
+  loss_tangent             model      0.01     0.008 -> PASS +0.069      0.012 -> PASS +0.057
+  z0_ohm                   model        50        40 -> PASS +0.031         60 -> PASS +0.074
+  xtalk_adjacent_db        model       -30       -33 -> PASS +0.085        -27 -> PASS +0.034
+  xtalk_second_db          model       -42       -45 -> PASS +0.069        -39 -> PASS +0.057
+  data_path_rj_s          config     2e-13   1.6e-13 -> PASS +0.086    2.4e-13 -> PASS +0.042
+  tree_rj_s               config     1e-13     8e-14 -> PASS +0.071    1.2e-13 -> PASS +0.060
+  data_path_wander_s      config     2e-13   1.6e-13 -> PASS +0.073    2.4e-13 -> PASS +0.057
+  clock_path_wander_s     config     2e-13   1.6e-13 -> PASS +0.069    2.4e-13 -> PASS +0.062
+  pll_shift_db             model         0        -3 -> PASS +0.088          3 -> PASS +0.025
+  local_pll_shift_db       model         0        -3 -> PASS +0.071          3 -> PASS +0.055
+  target.eye_height_mv    survey        40        30 -> PASS +0.066         50 -> PASS +0.066
+  target.eye_width_ui     survey      0.65       0.6 -> PASS +0.154        0.7 -> FAIL -0.010  yes
+  nearest to flipping: target.eye_width_ui high 0.7 -0.010 (flips), pll_shift_db high 3 +0.025, z0_ohm low 40 +0.031
+
+standard_32g_x16_repair: nominal PASS, worst lane 0 margin +0.028 (eye 224.9 mV / 0.668 UI)
+  parameter               source   nominal       low -> verdict           high -> verdict      flips
+  rdc_ohm_m                model        10         8 -> PASS +0.028         12 -> PASS +0.028
+  r_skin                   model     0.008    0.0064 -> PASS +0.038     0.0096 -> PASS +0.018
+  loss_tangent             model      0.01     0.008 -> PASS +0.032      0.012 -> PASS +0.024
+  z0_ohm                   model        50        40 -> PASS +0.006         60 -> PASS +0.036
+  data_path_rj_s          config     2e-13   1.6e-13 -> PASS +0.048    2.4e-13 -> PASS +0.005
+  clock_path_rj_s         config     2e-13   1.6e-13 -> PASS +0.045    2.4e-13 -> PASS +0.009
+  tree_rj_s               config     1e-13     8e-14 -> PASS +0.033    1.2e-13 -> PASS +0.022
+  pll_shift_db             model         0        -3 -> PASS +0.063          3 -> FAIL -0.034  yes
+  target.eye_height_mv    survey        40        30 -> PASS +0.028         50 -> PASS +0.028
+  target.eye_width_ui     survey      0.65       0.6 -> PASS +0.114        0.7 -> FAIL -0.045  yes
+  nearest to flipping: target.eye_width_ui high 0.7 -0.045 (flips), pll_shift_db high 3 -0.034 (flips), data_path_rj_s high 2.4e-13 +0.005
+
+advanced_32g_x64_spare: nominal PASS, worst lane 0 margin +0.093 (eye 293.1 mV / 0.710 UI)
+  parameter               source   nominal       low -> verdict           high -> verdict      flips
+  rdc_ohm_m                model      2000      1600 -> PASS +0.093       2400 -> PASS +0.093
+  r_skin                   model     0.025      0.02 -> PASS +0.093       0.03 -> PASS +0.092
+  loss_tangent             model     0.004    0.0032 -> PASS +0.093     0.0048 -> PASS +0.093
+  z0_ohm                   model        50        40 -> PASS +0.093         60 -> PASS +0.093
+  data_path_rj_s          config     2e-13   1.6e-13 -> PASS +0.116    2.4e-13 -> PASS +0.067
+  clock_path_rj_s         config     2e-13   1.6e-13 -> PASS +0.113    2.4e-13 -> PASS +0.070
+  tree_rj_s               config     1e-13     8e-14 -> PASS +0.098    1.2e-13 -> PASS +0.086
+  pll_shift_db             model         0        -3 -> PASS +0.114          3 -> PASS +0.055
+  target.eye_height_mv    survey        40        30 -> PASS +0.093         50 -> PASS +0.093
+  target.eye_width_ui     survey      0.65       0.6 -> PASS +0.184        0.7 -> PASS +0.015
+  nearest to flipping: target.eye_width_ui high 0.7 +0.015, pll_shift_db high 3 +0.055, data_path_rj_s high 2.4e-13 +0.067
+
+standard_32g_x5_coupled: nominal FAIL, worst lane 2 margin -0.121 (eye 191.8 mV / 0.572 UI)
+  parameter               source   nominal       low -> verdict           high -> verdict      flips
+  rdc_ohm_m                model        10         8 -> FAIL -0.121         12 -> FAIL -0.121
+  r_skin                   model     0.008    0.0064 -> FAIL -0.101     0.0096 -> FAIL -0.144
+  loss_tangent             model      0.01     0.008 -> FAIL -0.113      0.012 -> FAIL -0.129
+  z0_ohm                   model        50        40 -> FAIL -0.159         60 -> FAIL -0.105
+  trace_width_um           model        20        16 -> FAIL -0.125         24 -> FAIL -0.117
+  dielectric_height_um     model        30        24 -> FAIL -0.054         36 -> FAIL -0.244
+  eps_r                    model       3.5       2.8 -> FAIL -0.086        4.2 -> FAIL -0.158
+  trace_pitch_um          survey       115        92 -> FAIL -0.259        138 -> FAIL -0.067
+  data_path_rj_s          config     2e-13   1.6e-13 -> FAIL -0.100    2.4e-13 -> FAIL -0.145
+  tree_rj_s               config     1e-13     8e-14 -> FAIL -0.116    1.2e-13 -> FAIL -0.127
+  data_path_wander_s      config     2e-13   1.6e-13 -> FAIL -0.113    2.4e-13 -> FAIL -0.130
+  clock_path_wander_s     config     2e-13   1.6e-13 -> FAIL -0.117    2.4e-13 -> FAIL -0.125
+  pll_shift_db             model         0        -3 -> FAIL -0.098          3 -> FAIL -0.162
+  local_pll_shift_db       model         0        -3 -> FAIL -0.115          3 -> FAIL -0.131
+  target.eye_height_mv    survey        40        30 -> FAIL -0.121         50 -> FAIL -0.121
+  target.eye_width_ui     survey      0.65       0.6 -> FAIL -0.047        0.7 -> FAIL -0.184
+  nearest to flipping: target.eye_width_ui low 0.6 -0.047, dielectric_height_um low 24 -0.054, trace_pitch_um high 138 -0.067
+
+summary (+-20 %, dB +-3 dB, targets +-10 mV / +-0.05 UI):
+  standard_32g_x1            PASS +0.091  flipped by: nothing
+  standard_32g_x16_module    PASS +0.066  flipped by: target.eye_width_ui
+  standard_32g_x16_repair    PASS +0.028  flipped by: pll_shift_db, target.eye_width_ui
+  advanced_32g_x64_spare     PASS +0.093  flipped by: nothing
+  standard_32g_x5_coupled    FAIL -0.121  flipped by: nothing

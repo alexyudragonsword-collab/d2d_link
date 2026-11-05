@@ -1,8 +1,9 @@
 """Example 12: where each bundled module's eye width goes.
 
-Since 0.13.6 every bundled 32 GT/s config fails on eye width, not height. The
-far-end crosstalk is the aggressor's derivative: it lifts the eye's height
-and eats its edges. This example splits each config's worst-lane eye-width
+Every bundled 32 GT/s config is limited by eye width, not height (from
+0.13.6 to 0.13.11 all of them failed the 0.75 UI target; since 0.14.0 only
+x5 fails the 0.65 UI tier). The far-end crosstalk is the aggressor's
+derivative: it lifts the eye's height and eats its edges. This example splits each config's worst-lane eye-width
 gap into its causes with ``report.attribution`` (also
 ``tools/budget_report.py --attribution``). The model is not changed; each
 cause is switched off by a replace of the config (``report.switched_off``):
