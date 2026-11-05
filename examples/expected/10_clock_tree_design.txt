@@ -40,7 +40,7 @@ Tx PLL profile bench_markulic16_sspll_40m_10p24g.yaml: floor -145 dBc/Hz above ~
   -145    floor        30      176.4               0.693                226.3  PASS
   -145     zero        30      120.4               0.714                227.0  PASS
   -150    floor        30      120.0               0.708                226.8  PASS
-  -150     zero        30       95.7               0.719                227.2  PASS
+  -150     zero        30       95.7               0.719                227.1  PASS
   -155    floor        30       95.5               0.714                227.0  PASS
   -155     zero        30       86.3               0.721                227.2  PASS
   -145    floor         0      176.4               0.693                226.3  PASS

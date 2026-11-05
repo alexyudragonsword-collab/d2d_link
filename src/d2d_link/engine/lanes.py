@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..channel.model import LinkResponse, link_response
+from ..channel.model import LinkResponse, lane_response, link_response
 from ..clock.forwarded import ForwardedClock
 from ..config.schema import LinkConfig
 from ..spec import survey
@@ -195,6 +195,17 @@ def aggressors_of(cfg: LinkConfig, lm: LaneMap, phys: int, skews_ps: np.ndarray)
     return tuple(out)
 
 
+def coupled_lines(cfg: LinkConfig, phys: int) -> tuple[int, int]:
+    """Physical lines one and two places from ``phys`` (the module's
+    ``count + spare_count`` lines, driven or not): what splits the victim's
+    own modes (``channel.model.through_factor``). (0, 0) without behavioural
+    crosstalk."""
+    if cfg.channel.xtalk in ("none", "touchstone"):
+        return (0, 0)
+    n = cfg.lanes.count + cfg.lanes.spare_count
+    return tuple(sum(0 <= phys + s * d < n for s in (-1, 1)) for d in (1, 2))
+
+
 def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     resp = resp if resp is not None else link_response(cfg)
     clock = ForwardedClock(cfg)
@@ -204,17 +215,23 @@ def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     aggr = {phys: aggressors_of(cfg, lm, phys, skews) for _, phys in active}
     stat = []
     seen: dict[tuple, StatResult] = {}
+    through: dict[tuple, LinkResponse] = {}
+    lane_resp = {}
     for lane, phys in active:
+        lines = coupled_lines(cfg, phys)
+        if lines not in through:
+            through[lines] = lane_response(cfg, resp, lines)
+        lane_resp[phys] = through[lines]
         key_aggr = tuple((d, sk) for d, sk, _ in aggr[phys])
         resid = residual_skew_ui(cfg, skews[phys], clock.alpha > 0.0)
-        key = (key_aggr, resid)
+        key = (key_aggr, resid, lines)
         if key in seen:
             # the same neighbours at the same relative skews and the same
             # residual: the statistical result is the same lane for lane
             # (the engine is deterministic), so it is reused, not recomputed
             stat.append(dataclasses.replace(seen[key], lane=lane))
             continue
-        engine = StatisticalEngine(cfg, resp, clock, key_aggr)
+        engine = StatisticalEngine(cfg, lane_resp[phys], clock, key_aggr)
         seen[key] = engine.run(lane, resid)
         stat.append(seen[key])
     time: list[TimeResult] = []
@@ -222,10 +239,11 @@ def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
         n_active = len(stat)
         jit = clock.synthesize(cfg.sim.n_symbols, np.random.default_rng([cfg.sim.seed, 0xC10C]), n_active)
         for i, (r, (_, phys)) in enumerate(zip(stat, active)):
-            time.append(run_time(cfg, resp, r.lane, r.phase_ui - r.skew_residual_ui, r.skew_residual_ui,
+            time.append(run_time(cfg, lane_resp[phys], r.lane, r.phase_ui - r.skew_residual_ui, r.skew_residual_ui,
                                  jit[i], clock, aggr[phys]))
     rows = {k: survey(k, cfg.package.kind) for k in ("reach_mm", "module_width_lanes", "bump_pitch_um")}
     return LinkResult(cfg, lm, stat, time, skews, resolved_targets(cfg), rows)
 
 
-__all__ = ["LaneMap", "lane_map", "physical_skews_ps", "residual_skew_ui", "aggressors_of", "LinkResult", "run_link"]
+__all__ = ["LaneMap", "lane_map", "physical_skews_ps", "residual_skew_ui", "aggressors_of", "coupled_lines", "LinkResult",
+           "run_link"]

@@ -32,9 +32,10 @@ import numpy as np
 from _common import CONFIGS, OUT, plt_or_none
 from d2d_link.channel import ChannelModel, link_response
 from d2d_link.channel.coupled import describe
-from d2d_link.channel.model import xtalk_response
+from d2d_link.channel.model import through_factor, xtalk_response
 from d2d_link.config import load_config
 from d2d_link.engine import run_link
+from d2d_link.engine.lanes import coupled_lines
 
 module = load_config(CONFIGS / "standard_32g_x5_coupled.yaml")
 mid = module.lanes.count // 2
@@ -94,9 +95,13 @@ if skrf is not None:
     fext = dataclasses.replace(module, channel=dataclasses.replace(module.channel, xtalk="fext", xtalk_adjacent_db=-20.0))
     kx = xtalk_response(fext, f, 1)                  # the library's far-end shape, not a copy of it (0.13.6 drifted on one)
     n = 3
+    analytic_cfg = dataclasses.replace(module, channel=dataclasses.replace(module.channel, xtalk="fext", xtalk_adjacent_db=-20.0,
+                                                                              xtalk_second_db=-32.0),
+                                       lanes=dataclasses.replace(module.lanes, count=n))
     s = np.zeros((f.size, 2 * n, 2 * n), dtype=complex)
     for i in range(n):
-        s[:, n + i, i] = s[:, i, n + i] = thru
+        # each lane's own through as the two-mode picture leaves it: cos(2 pi f tau) per coupled line (0.14.1)
+        s[:, n + i, i] = s[:, i, n + i] = thru * through_factor(analytic_cfg, f, coupled_lines(analytic_cfg, i))
         for j in range(n):
             if abs(i - j) == 1:
                 s[:, n + i, j] = s[:, j, n + i] = kx * thru
@@ -108,9 +113,6 @@ if skrf is not None:
         module.channel, kind="touchstone", file=str(path) + ".s6p", touchstone_mode="single_ended", xtalk="touchstone",
         coupled_length_mm=module.channel.length_mm),
         lanes=dataclasses.replace(module.lanes, count=n))
-    analytic_cfg = dataclasses.replace(module, channel=dataclasses.replace(module.channel, xtalk="fext", xtalk_adjacent_db=-20.0,
-                                                                              xtalk_second_db=-32.0),
-                                       lanes=dataclasses.replace(module.lanes, count=n))
     res_f, res_a = run_link(file_cfg), run_link(analytic_cfg)
     ch = ChannelModel.from_config(file_cfg)
     k = int(np.argmin(np.abs(ch.f - module.f_nyquist)))
@@ -123,8 +125,12 @@ if skrf is not None:
     for a, b in zip(res_f.stat, res_a.stat):
         print(f"{a.lane:5d} {1e3 * a.eye_height_v:12.1f} / {a.eye_width_ui:<6.3f} {1e3 * b.eye_height_v:22.1f} / {b.eye_width_ui:<6.3f}")
     worst = max(abs(a.eye_height_v - b.eye_height_v) for a, b in zip(res_f.stat, res_a.stat))
-    print(f"  file path and analytic path agree to {1e3 * worst:.2f} mV on a file built from the analytic model: the reader is exercised "
-          "end to end; a real package extraction would replace both numbers -- the reader is ready, the data is not")
+    edge = max(abs(a.eye_height_v - b.eye_height_v) for a, b in zip(res_f.stat, res_a.stat)
+               if coupled_lines(analytic_cfg, a.lane) == coupled_lines(analytic_cfg, file_cfg.channel.lane))
+    print(f"  file path and analytic path agree to {1e3 * edge:.2f} mV on the lanes whose own through is lane "
+          f"{file_cfg.channel.lane}'s, {1e3 * worst:.2f} mV overall: the reader takes one lane's through for every lane, and the "
+          "middle lane's has one more coupled line (0.14.1). The reader is exercised end to end on a file built from the analytic "
+          "model; a real package extraction would replace both numbers -- the reader is ready, the data is not")
 else:
     print("\nscikit-rf not installed: the single-ended Touchstone part is skipped")
 

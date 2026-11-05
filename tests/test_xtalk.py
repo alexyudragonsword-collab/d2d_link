@@ -180,3 +180,44 @@ def test_far_end_shape_is_the_two_mode_result():
     assert x[1] == pytest.approx(1j * 2 * math.pi * f[1] * tau, rel=1e-3)          # the derivative
     assert abs(x[3]) == pytest.approx(math.sin(4 * math.asin(0.1)), rel=1e-12)     # rises past Nyquist, no saturation at k
     assert abs(xtalk_response(cfg, f, 2)[2]) == pytest.approx(10 ** (-32 / 20), rel=1e-12)   # second neighbour -12 dB
+
+
+def test_victim_through_carries_the_cos_of_its_coupled_lines():
+    """The two-mode picture that puts j sin(2 pi f tau) of a neighbour on the
+    victim leaves cos(2 pi f tau) of the victim's own signal: per pair the
+    two add up to the whole (cos^2 + sin^2 = 1). Each physical line one or
+    two places away counts, driven or not; edge lanes have fewer; a single
+    lane, xtalk off or a Touchstone file (its own through) leave H alone
+    (0.14.1; the fourth health check found it missing)."""
+    import math
+
+    from d2d_link.channel.model import lane_response, through_factor
+    from d2d_link.engine.lanes import coupled_lines
+
+    cfg = LinkConfig(channel=dataclasses.replace(X, xtalk_adjacent_db=-20.0), lanes=LaneConfig(count=5))
+    fn = cfg.f_nyquist
+    f = np.array([0.0, 0.5 * fn, fn, 3 * fn])
+    t1 = through_factor(cfg, f, (1, 0))
+    assert t1[0] == 1.0 and t1[2] == pytest.approx(math.sqrt(1 - 0.01), rel=1e-12)
+    np.testing.assert_allclose(t1 ** 2 + np.abs(xtalk_response(cfg, f, 1)) ** 2, 1.0, rtol=1e-12)
+    t22 = through_factor(cfg, f, (2, 2))
+    np.testing.assert_allclose(t22, t1 ** 2 * through_factor(cfg, f, (0, 1)) ** 2, rtol=1e-12)
+    assert [coupled_lines(cfg, p) for p in range(5)] == [(1, 1), (2, 1), (2, 2), (2, 1), (1, 1)]
+    spare = dataclasses.replace(cfg, lanes=LaneConfig(count=4, spare_count=1, repair="spare"))
+    assert coupled_lines(spare, 3) == (2, 1)                       # the idle spare is still a line
+    assert coupled_lines(LinkConfig(channel=X), 0) == (0, 0)        # a single lane has no neighbour
+    assert coupled_lines(LinkConfig(lanes=LaneConfig(count=5)), 2) == (0, 0)   # xtalk off
+    r = link_response(cfg)
+    assert lane_response(cfg, r, (0, 0)) is r
+    mid = lane_response(cfg, r, (2, 2))
+    assert mid.main_amplitude < r.main_amplitude and mid.xtalk_pulses is r.xtalk_pulses
+    # the module's middle lane reads the cos through; the run is per line count
+    from d2d_link.engine.lanes import residual_skew_ui
+
+    fast = dataclasses.replace(cfg, sim=SimConfig(engine="statistical", stat_phase_points=8))
+    res = run_link(fast)
+    skews = physical_skews_ps(fast)
+    aggr = tuple((d, sk) for d, sk, _ in aggressors_of(fast, lane_map(fast), 2, skews))
+    ref = run_statistical(fast, lane_response(fast, link_response(fast), (2, 2)), 2,
+                          residual_skew_ui(fast, skews[2], False), aggressors=aggr)
+    assert res.stat[2].eye_height_v == pytest.approx(ref.eye_height_v, rel=1e-12)

@@ -22,12 +22,12 @@ training centres the eye at its own BER:
                     x1         1e-03     -0.01876     -0.00161    0.7059     203.8
                     x1         1e-06     -0.01849     -0.00134    0.7064     203.8
                     x1         1e-09     -0.01823     -0.00109    0.7069     203.9
-    x5 coupled, lane 0         1e-03     -0.00302     -0.00502    0.6243     197.8   (target-centred 0.6344 UI)
-    x5 coupled, lane 1         1e-03     -0.02715     +0.00150    0.6166     194.2   (target-centred 0.6196 UI)
-    x5 coupled, lane 2         1e-03     +0.00138     -0.00907    0.5572     191.2   (target-centred 0.5753 UI)
-    x5 coupled, lane 3         1e-03     -0.00881     -0.00443    0.5918     193.3   (target-centred 0.6006 UI)
-    x5 coupled, lane 4         1e-03     -0.02101     -0.00086    0.6719     199.5   (target-centred 0.6736 UI)
-  x5 module FAIL target-centred, FAIL trained at 1e-3 (worst lane 2 -> 2); x1's bathtub is nearly symmetric and training costs 0.002 UI, the crosstalk-laden lanes pay up to 0.018 UI (lane 2)
+    x5 coupled, lane 0         1e-03     -0.00017     -0.00472    0.6239     198.0   (target-centred 0.6334 UI)
+    x5 coupled, lane 1         1e-03     -0.02274     +0.01048    0.5764     194.2   (target-centred 0.5974 UI)
+    x5 coupled, lane 2         1e-03     +0.00475     -0.00839    0.5548     191.2   (target-centred 0.5715 UI)
+    x5 coupled, lane 3         1e-03     -0.00460     -0.00335    0.5894     193.4   (target-centred 0.5961 UI)
+    x5 coupled, lane 4         1e-03     -0.01691     -0.00042    0.6724     199.7   (target-centred 0.6732 UI)
+  x5 module FAIL target-centred, FAIL trained at 1e-3 (worst lane 2 -> 2); x1's bathtub is nearly symmetric and training costs 0.002 UI, the crosstalk-laden lanes pay up to 0.021 UI (lane 1)
 
 time engine on a 1 mm line, 45 mV at the input of a 24 GHz front end, 400000 symbols:
   statistics: sigma at the sampler 69.07 mV (gain 1.535), BER 2.40e-03

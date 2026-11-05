@@ -121,7 +121,10 @@ def test_identical_lanes_share_one_statistical_run():
     assert len(inner) == 2 and inner[0].eye_height_v == inner[1].eye_height_v and inner[0].lane != inner[1].lane
     assert res.stat[0].eye_height_v == res.stat[5].eye_height_v            # the two edge lanes
     assert res.stat[0].eye_height_v != inner[0].eye_height_v
-    direct = run_statistical(LinkConfig(lanes=LaneConfig(count=6), channel=ChannelConfig(xtalk="fext"), clocking=ck, sim=sim),
+    from d2d_link.channel.model import lane_response, link_response
+
+    one = LinkConfig(lanes=LaneConfig(count=6), channel=ChannelConfig(xtalk="fext"), clocking=ck, sim=sim)
+    direct = run_statistical(one, lane_response(one, link_response(one), (2, 2)),      # its own through: 2 + 2 coupled lines (0.14.1)
                              lane=2, aggressors=((1, 0.0), (2, 0.0), (1, 0.0), (2, 0.0)))
     assert direct.eye_height_v == inner[0].eye_height_v
 

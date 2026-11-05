@@ -16,6 +16,7 @@ front end and CTLE do to white input noise (``rx.noise_at: input``).
 
 from __future__ import annotations
 
+import dataclasses
 import math
 import warnings
 from dataclasses import dataclass
@@ -305,12 +306,40 @@ def xtalk_response(cfg: LinkConfig, f: np.ndarray, neighbour: int) -> np.ndarray
     (third health check: the x5 middle lane read 60 mV apart between the two).
     Zero when crosstalk is off or the neighbour is further than two lanes."""
     f = np.asarray(f, dtype=np.float64)
-    if cfg.channel.xtalk in ("none", "touchstone") or neighbour not in (1, 2):
+    tau = fext_tau_s(cfg, neighbour)
+    if tau == 0.0:
         return np.zeros_like(f, dtype=complex)
+    return 1j * np.sin(2.0 * math.pi * f * tau)
+
+
+def fext_tau_s(cfg: LinkConfig, neighbour) -> float:
+    """Half the even / odd mode delay difference of the pair ``neighbour``
+    lanes apart (``xtalk_response``); 0 when the behavioural crosstalk is off
+    (``none``, or ``touchstone``, whose file carries its own through)."""
+    if cfg.channel.xtalk in ("none", "touchstone") or neighbour not in (1, 2):
+        return 0.0
     adj, sec = cfg.xtalk_db()          # configured level, or the coupled-line estimate
     level = min(10.0 ** ((adj if neighbour == 1 else sec) / 20.0), 1.0)
-    tau = math.asin(level) / (2.0 * math.pi * cfg.f_nyquist)
-    return 1j * np.sin(2.0 * math.pi * f * tau)
+    return math.asin(level) / (2.0 * math.pi * cfg.f_nyquist)
+
+
+def through_factor(cfg: LinkConfig, f: np.ndarray, lines: tuple[int, int]) -> np.ndarray:
+    """What the coupled lines next to a victim do to its own through path:
+    the same two-mode picture that gives the far end ``j sin(2 pi f tau)``
+    of a neighbour's signal leaves ``cos(2 pi f tau)`` of the victim's own
+    (half the sum of the even and odd modes, relative to their mean delay).
+    ``lines`` counts the physical lines one and two places away, driven or
+    not -- a silent or failed neighbour still splits the modes. Each pair is
+    taken on its own (the product of the cosines: right to the second order
+    in tau, which is the order the estimate is good to). 1 without behavioural
+    crosstalk. Until 0.14.0 the through was H alone (fourth health check)."""
+    f = np.asarray(f, dtype=np.float64)
+    out = np.ones_like(f)
+    for d, n in zip((1, 2), lines):
+        tau = fext_tau_s(cfg, d)
+        if tau and n:
+            out = out * np.cos(2.0 * math.pi * f * tau) ** n
+    return out
 
 
 def next_response(cfg: LinkConfig, f: np.ndarray) -> np.ndarray:
@@ -401,6 +430,17 @@ class LinkResponse:
     def main_amplitude(self) -> float:
         return float(self.pulse.y[self.main_index])
 
+    def with_through(self, factor: np.ndarray, amp: float) -> "LinkResponse":
+        """The same response with the victim's own through multiplied by
+        ``factor`` (on ``channel.f``; ``through_factor``); the crosstalk
+        pulses and the noise path are the neighbours' and the front end's,
+        unchanged. ``amp`` is half the swing, as in ``link_response``."""
+        f = self.channel.f
+        H = self.H_total * factor
+        h = freq2impulse(H, f)
+        pulse = np.convolve(h.y, np.ones(self.osr))[: h.y.size] * amp
+        return dataclasses.replace(self, pulse=Waveform(pulse, h.dt), impulse=h, H_total=H)
+
     def cursors(self, phase_ui: float, n_max: int | None = None) -> tuple[np.ndarray, int]:
         """Baud-spaced cursors of the pulse at ``phase_ui`` from the peak
         (linear interpolation between waveform samples): ``(c, i_main)`` with
@@ -427,6 +467,15 @@ class LinkResponse:
         c, _ = read_cursors(pulses[neighbour].y, pos, self.osr, n_max, keep_centre=False, floor=self.cursor_floor,
                             peak=self._xt_peak.get(neighbour))
         return c
+
+
+def lane_response(cfg: LinkConfig, resp: LinkResponse, lines: tuple[int, int]) -> LinkResponse:
+    """``resp`` for a victim with ``lines`` coupled physical lines one and two
+    places away (``through_factor``); ``resp`` itself when nothing couples."""
+    factor = through_factor(cfg, resp.channel.f, lines)
+    if np.all(factor == 1.0):
+        return resp
+    return resp.with_through(factor, 0.5 * cfg.tx.swing_vpp)
 
 
 def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkResponse:
@@ -465,5 +514,6 @@ def link_response(cfg: LinkConfig, channel: ChannelModel | None = None) -> LinkR
 
 
 __all__ = ["ChannelModel", "LinkResponse", "link_response", "tx_response", "rx_response", "ctle_response",
-           "noise_shaping_gain", "sampler_noise_rms_v", "xtalk_response", "next_response", "read_cursors",
+           "noise_shaping_gain", "sampler_noise_rms_v", "xtalk_response", "fext_tau_s", "through_factor", "lane_response",
+           "next_response", "read_cursors",
            "fill_dc"]

@@ -1,29 +1,29 @@
 x16 standard package, 20 mm, 32 GT/s, crosstalk fext, PI step 0.0156 UI; local PLL 1 MHz, tracker 2 MHz (4 UI latency)
 bundled residual 331.5 fs = Tx leak 176.4 + local PLL 87.6 + data path 200.0 + data wander 120.3 + clock path 2.1 + clock wander 81.4 + tree 100.0 + spurs 1.8 fs (in power)
-worst lane 4: 0.6928 UI against 0.65 UI -> link PASS
+worst lane 4: 0.6927 UI against 0.65 UI -> link PASS
 
 1. worst-lane eye width against the residual's Gaussian RMS (every jitter source scaled by g)
      g  sigma [fs]  eye width min [UI]  worst lane
-  0.25        82.9              0.8259           4
-   0.5       165.8              0.7871           4
-  0.75       248.7              0.7416           4
-     1       331.5              0.6928           4
-  1.25       414.4              0.6418           2
-  sigma* = 401.5 fs (eye 0.6500 UI at g = 1.211): the module affords 401 fs against 331.5 fs today -- 226 fs (in power) of headroom
+  0.25        82.9              0.8256           4
+   0.5       165.8              0.7870           4
+  0.75       248.7              0.7415           4
+     1       331.5              0.6927           4
+  1.25       414.4              0.6415           2
+  sigma* = 400.6 fs (eye 0.6502 UI at g = 1.208): the module affords 401 fs against 331.5 fs today -- 225 fs (in power) of headroom
 
-2. levers one at a time (closed form; eye predicted from the curve in 1, sigma* 401.5 fs)
+2. levers one at a time (closed form; eye predicted from the curve in 1, sigma* 400.6 fs)
                      lever  sigma [fs]  change [fs]  eye width [UI]  pass
-                   bundled       331.5         +0.0          0.6928   yes
+                   bundled       331.5         +0.0          0.6927   yes
   Tx PLL floor -150 dBc/Hz       305.3        -26.3          0.7082   yes
   Tx PLL floor -155 dBc/Hz       296.5        -35.1          0.7134   yes
-             tracker 5 MHz       306.7        -24.8          0.7074   yes
+             tracker 5 MHz       306.7        -24.8          0.7073   yes
             tracker 10 MHz       296.3        -35.3          0.7135   yes
-         local PLL 0.1 MHz       327.1         -4.5          0.6954   yes
-          local PLL 10 MHz       334.8         +3.2          0.6908   yes
-    wander 100 fs per path       306.7        -24.8          0.7074   yes
-                 no wander       298.0        -33.5          0.7125   yes
+         local PLL 0.1 MHz       327.1         -4.5          0.6953   yes
+          local PLL 10 MHz       334.8         +3.2          0.6907   yes
+    wander 100 fs per path       306.7        -24.8          0.7073   yes
+                 no wander       298.0        -33.5          0.7124   yes
           data path 100 fs       282.7        -48.9          0.7215   yes
-         tree jitter 50 fs       320.0        -11.5          0.6996   yes
+         tree jitter 50 fs       320.0        -11.5          0.6995   yes
   'data path 100 fs' alone reaches sigma*
 
 3. combinations, total sigma [fs] (* = within sigma*, predicted to pass)
