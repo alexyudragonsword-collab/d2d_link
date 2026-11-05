@@ -58,7 +58,7 @@ authoring_mode: ai_generated
   未核实条目数,`source: spec` 必须带 `quote`,引擎代码里没有 1e-27 / 25.0 / 0.75 字面量。
 - 边界:综述来源本身的可靠性不在测试范围 —— 见 `spec-sources.md` 的逐条备注。
 - 延伸(段 2):规范不管、仿真又必须有的数(走线 R / tanδ / Z0、叠层 w / h / ε_r、行为级串扰电平)是**模型估计**,在
-  `src/d2d_link/data/spec/model_presets.yaml` 里每条 `source: model` + cite + note;`grep -c "source: model"` = 20。L、C 不在表里,由 Z0 与
+  `src/d2d_link/data/spec/model_presets.yaml` 里每条 `source: model` + cite + note;`grep -c "source: model"` = 30(0.13.11 起含时钟路径抖动五项 × 两种封装)。L、C 不在表里,由 Z0 与
   Hammerstad ε_eff 推出,信道延时与串扰估计共用一个介电常数。`tools/budget_report.py --sensitivity` 把每条 ±20%(dB 值 ±3 dB)看结论翻不翻 ——
   "哪些猜测决定结论"不再靠记忆。
 

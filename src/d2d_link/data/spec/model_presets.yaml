@@ -148,3 +148,75 @@ entries:
     source: model
     cite: "behavioural far-end crosstalk level at Nyquist for dense RDL routing (placeholder for xtalk: fext)"
     note: "估计:只在 channel.xtalk = fext 时用;coupled 模式几何估计给 2 mm −56.9 dB。"
+
+  # ---- clock-path jitter (0.13.11): the values the bundled configs set, with what is known about them
+
+  standard.data_path_rj_s:
+    value: 2.0e-13
+    unit: s RMS
+    source: model
+    cite: "Tx serializer + driver white jitter on the data path, per lane. searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s. Nearest public figures: a die-to-die PLL's period jitter 160 fs RMS at 12 GHz over PVT (Silicon Creations, chipestimate.com, 2024-11); discrete LVCMOS buffers < 100 fs RMS 12 kHz-20 MHz (TI CDCLVC11xx)"
+    note: "估计:量级取「一级 PLL 加几级 CMOS 缓冲 / 驱动」的 100–300 fs 中值。示例 12:抖动占 x16 模块眼宽缺口 73 %,这条是其中最大的一项(示例 11:200 → 100 fs 最大单杠杆)。"
+
+  standard.clock_path_rj_s:
+    value: 2.0e-13
+    unit: s RMS
+    source: model
+    cite: "Tx forwarded-clock driver white jitter, per module. searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s; same reference points as data_path_rj_s"
+    note: "估计:与数据路径同量级。有 1 MHz 本地 PLL 的模块里它被滤掉(331.54 → 331.55 fs),敏感性不跑它。"
+
+  standard.tree_rj_s:
+    value: 1.0e-13
+    unit: s RMS
+    source: model
+    cite: "Rx clock-distribution tree's own jitter. searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s. Mo, Wu, Wary, Chan Carusone, 'Design Methodologies for Low-Jitter CMOS Clock Distribution', IEEE OJ-SSCS vol. 1 pp. 94-103, 2021 (16 nm FinFET, measured) is the closest study; its numbers were not retrieved"
+    note: "估计:CMOS 时钟树的电源噪声致抖动 + 本征抖动,取数据路径的一半。未核实:Mo 2021 的实测数待读原文。"
+
+  standard.path_wander_s:
+    value: 2.0e-13
+    unit: s RMS
+    source: model
+    cite: "slow (below wander_corner_hz) per-path timing wander, data and clock path each (x16 module, x5 coupled). searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s"
+    note: "估计:温度 / 电源慢变化引起的路径延时漂移,跟踪器在 2 MHz 以下吃掉大半;数值无出处。"
+
+  standard.wander_corner_hz:
+    value: 1.0e+06
+    unit: Hz
+    source: model
+    cite: "corner of the path-wander spectrum. searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s"
+    note: "估计:漫游谱的拐角,与跟踪器 2 MHz 同量级时跟踪器的作用最敏感;数值无出处。"
+
+  advanced.data_path_rj_s:
+    value: 2.0e-13
+    unit: s RMS
+    source: model
+    cite: "Tx serializer + driver white jitter on the data path, per lane. searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s. Nearest public figures: a die-to-die PLL's period jitter 160 fs RMS at 12 GHz over PVT (Silicon Creations, chipestimate.com, 2024-11); discrete LVCMOS buffers < 100 fs RMS 12 kHz-20 MHz (TI CDCLVC11xx)"
+    note: "估计:量级取「一级 PLL 加几级 CMOS 缓冲 / 驱动」的 100–300 fs 中值。示例 12:抖动占 x16 模块眼宽缺口 73 %,这条是其中最大的一项(示例 11:200 → 100 fs 最大单杠杆)。"
+
+  advanced.clock_path_rj_s:
+    value: 2.0e-13
+    unit: s RMS
+    source: model
+    cite: "Tx forwarded-clock driver white jitter, per module. searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s; same reference points as data_path_rj_s"
+    note: "估计:与数据路径同量级。有 1 MHz 本地 PLL 的模块里它被滤掉(331.54 → 331.55 fs),敏感性不跑它。"
+
+  advanced.tree_rj_s:
+    value: 1.0e-13
+    unit: s RMS
+    source: model
+    cite: "Rx clock-distribution tree's own jitter. searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s. Mo, Wu, Wary, Chan Carusone, 'Design Methodologies for Low-Jitter CMOS Clock Distribution', IEEE OJ-SSCS vol. 1 pp. 94-103, 2021 (16 nm FinFET, measured) is the closest study; its numbers were not retrieved"
+    note: "估计:CMOS 时钟树的电源噪声致抖动 + 本征抖动,取数据路径的一半。未核实:Mo 2021 的实测数待读原文。"
+
+  advanced.path_wander_s:
+    value: 2.0e-13
+    unit: s RMS
+    source: model
+    cite: "slow (below wander_corner_hz) per-path timing wander, data and clock path each (x16 module, x5 coupled). searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s"
+    note: "估计:温度 / 电源慢变化引起的路径延时漂移,跟踪器在 2 MHz 以下吃掉大半;数值无出处。"
+
+  advanced.wander_corner_hz:
+    value: 1.0e+06
+    unit: Hz
+    source: model
+    cite: "corner of the path-wander spectrum. searched 2026-11-05 (web search; hotchips.org and isl.utoronto.ca outside this session's network): no public measured value for an on-die die-to-die data / clock path at 32 GT/s"
+    note: "估计:漫游谱的拐角,与跟踪器 2 MHz 同量级时跟踪器的作用最敏感;数值无出处。"

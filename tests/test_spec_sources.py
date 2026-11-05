@@ -28,7 +28,7 @@ def test_model_presets_are_tagged_and_grep_able():
     import subprocess
 
     presets = spec.all_presets()
-    assert len(presets) == 20 and all(e.estimated and e.cite and e.note for e in presets.values())
+    assert len(presets) == 30 and all(e.estimated and e.cite and e.note for e in presets.values())
     out = subprocess.run(["grep", "-c", "source: model"], input=spec.PRESETS_FILE.read_text(encoding="utf-8"),
                          capture_output=True, text=True)
     assert int(out.stdout.strip()) == len(presets)
@@ -171,3 +171,25 @@ def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
     del table["advanced.rx_eye_width_ui"]
     slow = dataclasses.replace(cfg, data_rate_gtps=16.0)
     assert resolved_targets(slow)["eye_width_ui"][0] == 0.75 and target_keys(slow)["eye_width_ui"] == "rx_eye_width_ui"
+
+
+def test_bundled_config_jitters_are_the_model_presets():
+    """The clock-path jitters every bundled config sets (data / clock path
+    white, tree, path wander and its corner) decide the module verdicts
+    (example 12: jitter is 51-100 % of every eye-width gap) and no public
+    source gives them: since 0.13.11 they are ``source: model`` presets
+    with what is known in their cite, and the configs must say the same
+    number (a config that changes one is making its own claim -- then this
+    test says so)."""
+    from conftest import REPO
+    from d2d_link.config import load_config
+
+    keys = {"data_path_rj_s": "data_path_rj_s", "clock_path_rj_s": "clock_path_rj_s", "tree_rj_s": "tree_rj_s",
+            "data_path_wander_s": "path_wander_s", "clock_path_wander_s": "path_wander_s",
+            "wander_corner_hz": "wander_corner_hz"}
+    for path in sorted((REPO / "configs").glob("*.yaml")):
+        cfg = load_config(path)
+        for field, key in keys.items():
+            v = getattr(cfg.clocking, field)
+            if v:
+                assert v == spec.preset(key, cfg.package.kind).value, (path.name, field)
