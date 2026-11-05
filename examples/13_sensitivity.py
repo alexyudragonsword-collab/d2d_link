@@ -22,12 +22,14 @@ flipping it (smallest |margin|).
 import os
 from concurrent.futures import ProcessPoolExecutor
 
-from _common import CONFIGS
+from _common import CONFIGS, SMOKE
 from d2d_link.config import load_config
 from d2d_link.report import sensitivity
 
 NAMES = ("standard_32g_x1", "standard_32g_x16_module", "standard_32g_x16_repair", "advanced_32g_x64_spare",
          "standard_32g_x5_coupled")
+if SMOKE:                       # tools/run_examples.py --smoke: the two cheap configs, enough to run every code path
+    NAMES = ("standard_32g_x1", "standard_32g_x16_repair")
 
 
 def run(name):

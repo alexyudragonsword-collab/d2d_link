@@ -10,6 +10,10 @@ sys.path.insert(0, str(REPO / "src"))
 OUT = REPO / "examples" / "output"
 OUT.mkdir(exist_ok=True)
 CONFIGS = REPO / "configs"
+#: set by ``tools/run_examples.py --smoke``: examples whose cost is not in
+#: n_symbols (13's sensitivity reruns, 14's bisections) run a subset; the
+#: numbers they print are then not the documented ones (0.14.8)
+SMOKE = __import__("os").environ.get("D2D_LINK_SMOKE") == "1"
 
 
 def plt_or_none():

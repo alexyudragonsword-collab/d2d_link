@@ -105,6 +105,10 @@ def run(paths: list[Path], cap: int, timeout: float, jobs: int = 1,
     env = dict(os.environ, MPLBACKEND="Agg",
                PYTHONPATH=os.pathsep.join(filter(None, [str(REPO / "src"),
                                                         os.environ.get("PYTHONPATH")])))
+    # the examples whose cost is not in n_symbols (the sensitivity reruns of
+    # example 13, the bisections of 14) read this and run a subset under
+    # --smoke; their full-size output is unchanged (0.14.8)
+    env["D2D_LINK_SMOKE"] = "1" if cap > 0 else "0"
     if save is not None:
         save.mkdir(parents=True, exist_ok=True)
     failed = []

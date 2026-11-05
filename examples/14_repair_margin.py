@@ -28,7 +28,7 @@ dataclass replace of the repair config; no model changes.
 
 import dataclasses
 
-from _common import CONFIGS
+from _common import CONFIGS, SMOKE
 from d2d_link.clock.forwarded import ForwardedClock
 from d2d_link.config import load_config
 from d2d_link.engine import run_link
@@ -92,6 +92,8 @@ levers = [
     ("local PLL as x16", clocked(rep, local_pll_profile=x16.clocking.local_pll_profile,
                                  local_pll_fn_hz=x16.clocking.local_pll_fn_hz)),
 ]
+if SMOKE:                       # tools/run_examples.py --smoke: three levers, the code paths only
+    levers = levers[:3]
 target = resolved_targets(rep)["eye_width_ui"]
 print(f"\nlevers one at a time (worst-lane margin = eye width over the {target[0]:g} UI target, source: {target[1]}, relative):")
 print(f"  {'lever':<26s} {'residual [fs]':>13s} {'margin':>8s} {'eye [UI]':>9s} {'at +3 dB':>9s} {'withstands':>11s}")

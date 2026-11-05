@@ -4,6 +4,14 @@
 
 ---
 
+## [0.14.8] — 2026-11-05 — CI 冒烟提速(不动数字)
+
+- `tools/run_examples.py --smoke` 给子进程设 `D2D_LINK_SMOKE=1`(`examples/_common.py::SMOKE`):示例 13 只跑 x1 与 x16 repair 的敏感性、示例 14 只跑前三个杠杆
+  —— 它们的开销不在 n_symbols 上,原来冒烟时跑全量(13 约 9 分钟、14 约 2 分钟,CI examples 作业 25 分钟)。冒烟下 13 / 14 共约 55 s。
+  全尺寸输出与期望输出不变(标志为 0 时走原路径);examples-full 仍逐字比对。
+
+---
+
 ## [0.14.7] — 2026-11-05 — 第五次体检余项:线数与 API(眼不动;插损列与示例 08 的 NEXT 边缘 lane 动)
 
 - `coupled_lines`:`lanes.reverse_adjacent` 边缘外的回程 lane 算一位的耦合线(示例 08 加 NEXT 的边缘 lane 0.615 → 0.613、0.650 → 0.647 UI)。
