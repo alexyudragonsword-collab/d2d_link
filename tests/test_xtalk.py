@@ -207,6 +207,9 @@ def test_victim_through_carries_the_cos_of_its_coupled_lines():
     assert coupled_lines(spare, 3) == (2, 1)                       # the idle spare is still a line
     assert coupled_lines(LinkConfig(channel=X), 0) == (0, 0)        # a single lane has no neighbour
     assert coupled_lines(LinkConfig(lanes=LaneConfig(count=5)), 2) == (0, 0)   # xtalk off
+    ts = LinkConfig(channel=ChannelConfig(kind="touchstone", file="any.s10p", touchstone_mode="single_ended", xtalk="touchstone"),
+                    lanes=LaneConfig(count=5))
+    assert coupled_lines(ts, 2) == (0, 0)                           # the file carries its own through
     r = link_response(cfg)
     assert lane_response(cfg, r, (0, 0)) is r
     mid = lane_response(cfg, r, (2, 2))

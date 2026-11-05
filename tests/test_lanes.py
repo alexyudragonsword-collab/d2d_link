@@ -144,3 +144,30 @@ def test_deskew_step_is_the_pi_step_under_a_tracker():
     assert dataclasses.replace(cfg, clocking=dataclasses.replace(cfg.clocking, pi_step_ui=1 / 64)).pi_step_ui == 1 / 64
     assert dataclasses.replace(cfg, lanes=dataclasses.replace(cfg.lanes, deskew_with_tracker="ideal")).pi_step_ui == 0.0
     assert dataclasses.replace(cfg, clocking=ClockingConfig()).pi_step_ui == 0.0          # no tracker: the modulo rule
+
+
+def test_dedup_key_separates_lanes_with_the_same_aggressors_but_other_lines():
+    """The through's cos factor counts physical lines, driven or not, so two
+    lanes can see the same aggressors and still differ: on a 4-lane
+    width_degrade module with lane 0 dead, physical lanes 2 and 3 both have
+    one driven neighbour, but lane 2 sits between two lines. The dedup key
+    carries the line count; without it lane 3 would reuse lane 2's result
+    (fifth health check: no test could see this)."""
+    from d2d_link.channel.model import lane_response, link_response
+    from d2d_link.config import ChannelConfig
+    from d2d_link.engine import run_statistical
+    from d2d_link.engine.lanes import aggressors_of, coupled_lines, lane_map, physical_skews_ps
+
+    cfg = LinkConfig(lanes=LaneConfig(count=4, failed=(0,), repair="width_degrade"),
+                     channel=ChannelConfig(xtalk="fext", xtalk_adjacent_db=-18.0), sim=SimConfig(stat_phase_points=16))
+    lm, sk = lane_map(cfg), physical_skews_ps(cfg)
+    a2 = tuple((d, s) for d, s, _ in aggressors_of(cfg, lm, 2, sk))
+    a3 = tuple((d, s) for d, s, _ in aggressors_of(cfg, lm, 3, sk))
+    assert lm.logical_to_physical == (2, 3) and a2 == a3 and coupled_lines(cfg, 2) != coupled_lines(cfg, 3)
+    res = run_link(cfg)
+    assert res.stat[0].eye_width_ui != res.stat[1].eye_width_ui
+    resp = link_response(cfg)
+    for r, phys in zip(res.stat, (2, 3)):
+        direct = run_statistical(cfg, lane_response(cfg, resp, coupled_lines(cfg, phys)), r.lane, r.skew_residual_ui,
+                                 aggressors=a2)
+        assert direct.eye_width_ui == r.eye_width_ui

@@ -48,9 +48,10 @@ def margin(cfg, shift_db=0.0):
     return res.passes, res.worst.margin, res.worst.eye_width_ui, res.worst.lane
 
 
-def withstands(cfg, hi=12.0, tol=0.1):
-    """The largest Tx PLL shift [dB] the module still passes at (bisection)."""
-    if not margin(cfg)[0]:
+def withstands(cfg, nominal_passes, hi=12.0, tol=0.1):
+    """The largest Tx PLL shift [dB] the module still passes at (bisection);
+    nan when it fails at the nominal level already."""
+    if not nominal_passes:
         return float("nan")
     if margin(cfg, hi)[0]:
         return float("inf")
@@ -99,14 +100,14 @@ for name, cfg in levers:
     s = ForwardedClock(cfg).budget().gaussian_s
     ok, m, ew, _ = margin(cfg)
     ok3, m3, _, _ = margin(cfg, 3.0)
-    w = withstands(cfg)
-    rows.append((name, s, m, m3, w))
+    w = withstands(cfg, ok)
+    rows.append((name, s, m, ok3, w))
     ws = "> 12 dB" if w == float("inf") else ("fails" if w != w else f"+{w:.1f} dB")
     print(f"  {name:<26s} {1e15 * s:13.1f} {m:+8.3f} {ew:9.4f} {m3:+9.3f} {ws:>11s}")
 
 base_w = rows[0][4]
-best = max(rows[1:], key=lambda r: r[4])
+best = max((r for r in rows[1:] if r[4] == r[4]), key=lambda r: r[4])            # skip a lever that fails outright (nan)
 print(f"\n  bundled: the module withstands +{base_w:.1f} dB of Tx PLL level; the strongest single lever is "
       f"'{best[0]}' ({'> 12 dB' if best[4] == float('inf') else f'+{best[4]:.1f} dB'})")
-three = [r[0] for r in rows[1:] if r[3] >= 0.0]
+three = [r[0] for r in rows[1:] if r[3]]
 print(f"  levers that keep it passing at +3 dB: {', '.join(three) if three else 'none'}")

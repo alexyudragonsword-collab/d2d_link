@@ -92,7 +92,7 @@ print("1. worst-lane eye width against the residual's Gaussian RMS (every jitter
 print(f"{'g':>6s} {'sigma [fs]':>11s} {'eye width min [UI]':>19s} {'worst lane':>11s}")
 curve = []                                                  # (sigma fs, eye width UI)
 by_g = {}
-for g in (0.25, 0.5, 0.75, 1.0, 1.25):
+for g in (0.25, 0.5, 0.75, 1.0, 1.25, 1.5):           # 1.5 since 0.14.6: section 4's points past sigma* need the curve
     c = scaled(g)
     r = base if g == 1.0 else run_link(c)
     curve.append((sigma_fs(c), r.eye_width_min_ui))
@@ -129,13 +129,15 @@ print(f"  sigma* = {sigma_star:.1f} fs (eye {wm:.4f} UI at g = {m:.3f}): the mod
 
 def predicted(s: float) -> float:
     """The worst lane's eye at residual sigma ``s`` read off the curve (nan
-    below the curve's lowest point, g = 0.25)."""
-    return float(np.interp(s, sig, ew)) if s >= sig[0] else float("nan")
+    outside the curve's range, g = 0.25 .. 1.5)."""
+    return float(np.interp(s, sig, ew)) if sig[0] <= s <= sig[-1] else float("nan")
 
 
 def fmt_pred(s: float) -> str:
     v = predicted(s)
-    return f"> {ew[0]:.4f}" if np.isnan(v) else f"{v:.4f}"
+    if np.isnan(v):
+        return f"> {ew[0]:.4f}" if s < sig[0] else f"< {ew[-1]:.4f}"
+    return f"{v:.4f}"
 
 
 # ------------------------------------------------------ 2. levers one by one
@@ -160,8 +162,13 @@ for name, kw in LEVERS:
     lever_sigma[name] = s
     print(f"{name:>26s} {s:11.1f} {s - lever_sigma['bundled']:+12.1f} {fmt_pred(s):>15s} {'yes' if s <= sigma_star else 'no':>5s}")
 best_single = min(lever_sigma.items(), key=lambda kv: kv[1])
-print(f"  no single lever reaches sigma*; the largest, '{best_single[0]}', leaves {best_single[1]:.1f} fs\n"
-      if best_single[1] > sigma_star else f"  '{best_single[0]}' alone reaches sigma*\n")
+if lever_sigma["bundled"] <= sigma_star:
+    print(f"  the bundled design is already within sigma*; the largest single lever, '{best_single[0]}', "
+          f"widens the headroom to {np.sqrt(sigma_star ** 2 - best_single[1] ** 2):.0f} fs (in power)\n")
+elif best_single[1] > sigma_star:
+    print(f"  no single lever reaches sigma*; the largest, '{best_single[0]}', leaves {best_single[1]:.1f} fs\n")
+else:
+    print(f"  '{best_single[0]}' alone reaches sigma*\n")
 
 # --------------------------------------------------------- 3. combinations
 FLOORS = (-145.0, -150.0, -155.0)
@@ -191,24 +198,45 @@ if cheapest:
 print()
 
 # -------------------------------------------------------- 4. confirmation
+def raised(field: str, s_target: float):
+    """The bundled module with one jitter term raised until the closed-form
+    total reaches ``s_target`` fs (bisection): a point beyond sigma* whose
+    sigma comes from a single source, not from scaling them all."""
+    lo, hi = getattr(ck0, field), 5e-12
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if sigma_fs(clocked(**{field: mid})) < s_target else (lo, mid)
+    return clocked(**{field: hi})
+
+
+# either side of the line: the cheapest and the dearest passing combination of 3,
+# and -- when every combination passes (0.65 UI, 0.14.0 on) -- two designs past
+# sigma*, each with its extra jitter from one source only
+picks = []
+if passing:
+    for s, k in (passing[-1], passing[0]):
+        picks.append((f"-{-k[0]:g} / {k[1] / 1e6:g} M / dp {1e15 * k[2]:g} / w {1e15 * k[3]:g}", clocked(**dict(combos[k][1]))))
 fails = sorted((v[0], k) for k, v in combos.items() if v[0] > sigma_star)
-picks = [passing[-1], passing[0], fails[0], fails[len(fails) // 2]] if passing and fails else []
+for s, k in fails[:1] + fails[len(fails) // 2:len(fails) // 2 + 1] if fails else []:
+    picks.append((f"-{-k[0]:g} / {k[1] / 1e6:g} M / dp {1e15 * k[2]:g} / w {1e15 * k[3]:g}", clocked(**dict(combos[k][1]))))
+if not fails:
+    picks.append((f"data path raised to {1.08:g} sigma*", raised("data_path_rj_s", 1.08 * sigma_star)))
+    picks.append((f"wander raised to {1.15:g} sigma*", raised("data_path_wander_s", 1.15 * sigma_star)))
 print("4. confirmation: full module runs either side of the line")
-print(f"{'floor':>6s} {'tracker':>8s} {'dp [fs]':>8s} {'wander':>7s} {'sigma [fs]':>11s} {'predicted [UI]':>15s} "
-      f"{'computed [UI]':>14s} {'worst lane':>11s} {'link':>5s}")
+print(f"{'design':>36s} {'sigma [fs]':>11s} {'predicted [UI]':>15s} {'computed [UI]':>14s} {'worst lane':>11s} {'link':>5s}")
 confirm = []
-for s, k in picks:
-    r = run_link(clocked(**dict(combos[k][1])))
+for label, c in picks:
+    s = sigma_fs(c)
+    r = run_link(c)
     confirm.append((s, r.eye_width_min_ui))
-    print(f"{k[0]:6g} {k[1] / 1e6:6g} M {1e15 * k[2]:8g} {1e15 * k[3]:7g} {s:11.1f} {fmt_pred(s):>15s} "
-          f"{r.eye_width_min_ui:14.4f} {r.worst.lane:11d} {'PASS' if r.passes else 'FAIL':>5s}")
-if confirm:
-    inside = [(s, w) for s, w in confirm if not np.isnan(predicted(s))]
+    print(f"{label:>36s} {s:11.1f} {fmt_pred(s):>15s} {r.eye_width_min_ui:14.4f} {r.worst.lane:11d} {'PASS' if r.passes else 'FAIL':>5s}")
+inside = [(s, w) for s, w in confirm if not np.isnan(predicted(s)) and s <= sig[-1]]
+if inside:
     err = max(abs(predicted(s) - w) for s, w in inside)
     print(f"  largest prediction error on the curve's range {err:.4f} UI ({len(inside)} points): the statistical engine takes the "
           "residual as one Gaussian sigma, so whichever term the sigma comes from the curve holds; what is left is its "
           "linear interpolation")
-    print("  (a point below the curve's lowest sigma is only bounded from below by it)\n")
+    print("  (a point outside the curve's range is only bounded by its end)\n")
 
 # ------------------------------------------------------------------ figure
 plt = plt_or_none()

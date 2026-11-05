@@ -9,6 +9,7 @@ worst lane 4: 0.6927 UI against 0.65 UI -> link PASS
   0.75       248.7              0.7415           4
      1       331.5              0.6927           4
   1.25       414.4              0.6415           2
+   1.5       497.3              0.5886           2
   sigma* = 400.6 fs (eye 0.6502 UI at g = 1.208): the module affords 401 fs against 331.5 fs today -- 225 fs (in power) of headroom
 
 2. levers one at a time (closed form; eye predicted from the curve in 1, sigma* 400.6 fs)
@@ -24,7 +25,7 @@ worst lane 4: 0.6927 UI against 0.65 UI -> link PASS
                  no wander       298.0        -33.5          0.7124   yes
           data path 100 fs       282.7        -48.9          0.7215   yes
          tree jitter 50 fs       320.0        -11.5          0.6995   yes
-  'data path 100 fs' alone reaches sigma*
+  the bundled design is already within sigma*; the largest single lever, 'data path 100 fs', widens the headroom to 284 fs (in power)
 
 3. combinations, total sigma [fs] (* = within sigma*, predicted to pass)
  floor  tracker    dp 200 / w 200    dp 200 / w 100    dp 100 / w 200    dp 100 / w 100
@@ -38,5 +39,12 @@ worst lane 4: 0.6927 UI against 0.65 UI -> link PASS
   at the bundled -145 dBc/Hz floor: tracker 10 MHz, data path 100 fs, wander 100 fs; tracker 10 MHz, data path 100 fs, wander 200 fs; tracker 2 MHz, data path 100 fs, wander 100 fs; tracker 2 MHz, data path 100 fs, wander 200 fs; tracker 10 MHz, data path 200 fs, wander 100 fs; tracker 10 MHz, data path 200 fs, wander 200 fs; tracker 2 MHz, data path 200 fs, wander 100 fs; tracker 2 MHz, data path 200 fs, wander 200 fs
 
 4. confirmation: full module runs either side of the line
- floor  tracker  dp [fs]  wander  sigma [fs]  predicted [UI]  computed [UI]  worst lane  link
+                              design  sigma [fs]  predicted [UI]  computed [UI]  worst lane  link
+         -145 / 2 M / dp 200 / w 200       331.5          0.6927         0.6927           4  PASS
+        -155 / 10 M / dp 100 / w 100       179.8          0.7793         0.7800           4  PASS
+     data path raised to 1.08 sigma*       432.7          0.6298         0.6299           2  FAIL
+        wander raised to 1.15 sigma*       460.7          0.6120         0.6121           2  FAIL
+  largest prediction error on the curve's range 0.0007 UI (4 points): the statistical engine takes the residual as one Gaussian sigma, so whichever term the sigma comes from the curve holds; what is left is its linear interpolation
+  (a point outside the curve's range is only bounded by its end)
+
 wrote examples/output/11_module_jitter_budget.png

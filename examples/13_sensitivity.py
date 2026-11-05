@@ -15,8 +15,8 @@ nothing produced them). This example prints them, so the accept gate of
 ``tools/example_drift.py`` flags a doc that still quotes an old one.
 
 For each config: the nominal verdict and margin, every knob's two sides,
-and the three sides nearest to flipping the verdict (the smallest margins
-of a passing link, the largest of a failing one).
+the sides that flip the verdict, and the three that come closest without
+flipping it (smallest |margin|).
 """
 
 import os
@@ -53,7 +53,7 @@ if __name__ == "__main__":
         n = s["nominal"]
         ok = n["passes"]
         print(f"\n{name}: nominal {'PASS' if ok else 'FAIL'}, worst lane {n['worst_lane']} margin {n['margin']:+.3f} "
-              f"(eye {n['eye_height_mv']:.1f} mV / {n['eye_width_ui']:.3f} UI)")
+              f"(smallest eye over the lanes {n['eye_height_mv']:.1f} mV / {n['eye_width_ui']:.3f} UI)")
         print(f"  {'parameter':<22s} {'source':>7s} {'nominal':>9s} {'low':>9s} -> {'verdict':<12s} {'high':>9s} -> {'verdict':<12s} flips")
         sides = []
         for r in s["rows"]:
@@ -63,10 +63,12 @@ if __name__ == "__main__":
             for tag, side in (("low", lo), ("high", hi)):
                 if side["passes"] is not None:
                     sides.append((side["margin"], f"{r['label']} {tag} {value(side['value'])}", side["passes"] != ok))
-        sides.sort(key=lambda t: t[0], reverse=not ok)
-        near = ", ".join(f"{label} {m:+.3f}{' (flips)' if flip else ''}" for m, label, flip in sides[:3])
+        flipped = sorted((t for t in sides if t[2]), key=lambda t: abs(t[0]))
+        held = sorted((t for t in sides if not t[2]), key=lambda t: abs(t[0]))
         flips = [r["label"] for r in s["rows"] if r["flips"]]
-        print(f"  nearest to flipping: {near}")
+        if flipped:
+            print("  flipped by: " + ", ".join(f"{label} {m:+.3f}" for m, label, _ in flipped))
+        print("  closest to flipping: " + ", ".join(f"{label} {m:+.3f}" for m, label, _ in held[:3]))
         summary.append((name, ok, n["margin"], flips))
     print("\nsummary (+-20 %, dB +-3 dB, targets +-10 mV / +-0.05 UI):")
     for name, ok, m, flips in summary:
