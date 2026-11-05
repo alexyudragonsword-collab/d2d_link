@@ -12,7 +12,7 @@ from d2d_link.engine.statistical import resolved_targets
 
 def test_every_entry_is_tagged_and_cited():
     table = spec.all_entries()
-    assert len(table) == 15
+    assert len(table) == 17
     for key, e in table.items():
         assert e.source in spec.SOURCES, key
         assert e.cite, key
@@ -60,7 +60,7 @@ def test_grep_lists_every_unverified_number():
     import subprocess
 
     out = subprocess.run(["grep", "-c", "source: survey", str(spec.SURVEY_FILE)], capture_output=True, text=True)
-    assert int(out.stdout.strip()) == len(spec.unverified()) == 15
+    assert int(out.stdout.strip()) == len(spec.unverified()) == 17
 
 
 def test_spec_source_needs_a_quote():
@@ -140,11 +140,11 @@ def test_data_ships_inside_the_package(tmp_path, monkeypatch):
 
 
 def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
-    """The eye mask the survey quotes carries no rate or package. The lookup
-    is tiered so the original text's numbers can land per tier:
-    ``<package>.<key>@<rate>`` first, the plain key last (0.13.5; on x1 the
-    0.75 UI target alone decides the verdict, sensitivity 0.13.6). Today
-    every tier resolves to the plain key and the report names it."""
+    """The lookup is tiered so a mask's numbers land per tier:
+    ``<package>.<key>@<rate>`` first, the plain key last (0.13.5). Since
+    0.14.0 24 and 32 GT/s take the 0.65 UI tier a 2025 analysis quotes
+    (``rx_eye_width_ui@24`` / ``@32``, source: survey, unverified); every
+    other rate takes the plain 0.75 UI, and the report names the key."""
     import dataclasses
 
     from d2d_link.config import LinkConfig
@@ -154,7 +154,7 @@ def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
         "standard.rx_eye_width_ui@32", "standard.rx_eye_width_ui", "rx_eye_width_ui@32", "rx_eye_width_ui"]
     cfg = LinkConfig()
     assert target_keys(cfg) == {"ber": "raw_ber_target", "eye_height_mv": "rx_eye_height_mv",
-                                "eye_width_ui": "rx_eye_width_ui"}
+                                "eye_width_ui": "rx_eye_width_ui@32"}             # the 24-32 GT/s tier (0.14.0)
     table = dict(spec.all_entries())
     base = table["rx_eye_width_ui"]
     table["rx_eye_width_ui@32"] = dataclasses.replace(base, key="rx_eye_width_ui@32", value=0.70)

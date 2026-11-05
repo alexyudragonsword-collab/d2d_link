@@ -120,9 +120,11 @@ sigma_star = sigma_fs(scaled(m))
 curve.append((sigma_star, wm))
 curve.sort()
 sig, ew = np.array(curve).T
+today = 1e15 * b0.total_s
+gap = np.sqrt(abs(today ** 2 - sigma_star ** 2))
 print(f"  sigma* = {sigma_star:.1f} fs (eye {wm:.4f} UI at g = {m:.3f}): the module affords {sigma_star:.0f} fs "
-      f"against {1e15 * b0.total_s:.1f} fs today -- {np.sqrt(max((1e15 * b0.total_s) ** 2 - sigma_star ** 2, 0.0)):.0f} fs "
-      f"(in power) has to go\n")
+      f"against {today:.1f} fs today -- " + (f"{gap:.0f} fs (in power) has to go\n" if today > sigma_star
+                                              else f"{gap:.0f} fs (in power) of headroom\n"))
 
 
 def predicted(s: float) -> float:

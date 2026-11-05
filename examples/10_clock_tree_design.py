@@ -1,8 +1,9 @@
 """Example 10: how short must the clock tree be, and how low the Tx PLL's floor,
 for the 32 GT/s standard-package link to pass?
 
-Since 0.13.0 the bundled links fail the 0.75 UI eye-width target. The reason is
-the forwarded clock's own tree. Data and clock leave the die on the same Tx PLL.
+From 0.13.0 to 0.13.11 the bundled links failed the 0.75 UI eye-width target
+(since 0.14.0 32 GT/s takes the 0.65 UI tier, an unverified second-hand quote,
+and they pass it). The reason was the forwarded clock's own tree. Data and clock leave the die on the same Tx PLL.
 The receiver samples the data with the clock after its distribution tree (delay
 tau, a first-order bandwidth on its phase). So what reaches the sampler is the
 PLL's phase noise through ``1 - G(f)``, with ``G = exp(-j2 pi f tau) / (1 + jf/f_t)``.
@@ -161,8 +162,14 @@ for fl in FLOORS:
 i_b = int(np.argmin(np.abs(DELAYS - x1.clocking.tree_delay_ps)))
 ok_b = [f"{fl:g} / {rd}" for (fl, rd), w in curves.items() if w[i_b] >= ew_target]
 no_b = [f"{fl:g} / {rd}" for (fl, rd), w in curves.items() if w[i_b] < ew_target]
-print(f"  the bundled {x1.clocking.tree_delay_ps:g} ps tree passes with {', '.join(ok_b)} and fails with {', '.join(no_b)} "
-      "(floor dBc/Hz / reading)\n")
+if not no_b:
+    print(f"  the bundled {x1.clocking.tree_delay_ps:g} ps tree passes with every floor and reading here "
+          f"(target {ew_target:g} UI)\n")
+elif not ok_b:
+    print(f"  the bundled {x1.clocking.tree_delay_ps:g} ps tree fails with every floor and reading here\n")
+else:
+    print(f"  the bundled {x1.clocking.tree_delay_ps:g} ps tree passes with {', '.join(ok_b)} and fails with {', '.join(no_b)} "
+          "(floor dBc/Hz / reading)\n")
 
 # --------------------------------------------------- 3. the tree's bandwidth
 print("3. longest passing x1 tree [ps] against the tree's bandwidth (floor reading)")
@@ -205,10 +212,17 @@ for fl in (FLOORS[0], FLOORS[-1]):
           + " + ".join(f"{k} {1e15 * v:.1f}" for k, v in parts.items() if v > 0.0) + " fs (in power)")
 d_tau = module[-145.0, "floor", 0.0].eye_width_min_ui - module[-145.0, "floor", x16.clocking.tree_delay_ps].eye_width_min_ui
 print(f"  a {x16.clocking.tree_delay_ps:g} ps shorter tree moves the module's eye by {d_tau:+.4f} UI: "
-      "on the module, the local PLL's bandwidth sets how much of the Tx floor is tracked (example 04),")
+      "the local PLL re-times the forwarded clock, so the tree's delay does not enter the module's leak,")
 best = max(module.values(), key=lambda r: r.eye_width_min_ui)
-print(f"  and the floor alone does not pass it: the best point here reads {best.eye_width_min_ui:.3f} UI; "
-      "the rest of its budget (wander, the local PLL's own noise, crosstalk, the PI step) is what stays\n")
+worst = min(module.values(), key=lambda r: r.eye_width_min_ui)
+if worst.passes:
+    print(f"  and the module passes at every floor and reading here (worst {worst.eye_width_min_ui:.3f} UI against the "
+          f"{worst.worst.targets['eye_width_ui'][0]:g} UI target)\n")
+elif not best.passes:
+    print(f"  and the floor alone does not pass it: the best point here reads {best.eye_width_min_ui:.3f} UI; "
+          "the rest of its budget (wander, the local PLL's own noise, crosstalk, the PI step) is what stays\n")
+else:
+    print(f"  the floor decides it: {sum(r.passes for r in module.values())} of {len(module)} points pass\n")
 
 # ------------------------------------------------------------------ figure
 plt = plt_or_none()

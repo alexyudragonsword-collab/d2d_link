@@ -1,8 +1,8 @@
 x5 module, standard package, 25 mm, 32 GT/s, coupled-line crosstalk estimate
    routing  eps_eff  FEXT adj [dB]  delay [ps]  mid eye [mV]  mid eye [UI] worst lane  verdict
 microstrip     2.54          -18.7       132.8         193.3         0.575          2     FAIL
- stripline     3.50 none (1st order)       156.0         200.3         0.717          0     FAIL
-  both routings fail at 32 GT/s: the stripline's zero first-order FEXT buys +0.142 UI on the middle lane, not enough against the 0.75 UI target
+ stripline     3.50 none (1st order)       156.0         200.3         0.717          0     PASS
+  the 32 GT/s verdict on the standard package is a routing assumption: a stripline of the same geometry passes where the microstrip fails
 
 near-end crosstalk from the return module on edge lanes [0, 4]: K_b = (kappa_L + kappa_C)/4 = -31.2 dB, two lobes 266 ps = 8.5 UI apart, peak 5.6 mV of 164.6 mV main
  lane aggressors xtalk [mV]  eye [mV] off/on  eye [UI] off/on

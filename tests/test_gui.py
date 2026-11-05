@@ -63,7 +63,8 @@ def x1_result():
 def test_run_result_is_json_and_matches_the_example(x1_result):
     json.dumps(x1_result)                     # plain data across the process boundary
     lane = x1_result["lanes"][0]
-    assert not x1_result["passes"] and abs(1e3 * lane["eye_height_v"] - 204.1) < 0.1      # FAIL since 0.13.0 (the clock tree)
+    assert x1_result["passes"] and abs(1e3 * lane["eye_height_v"] - 204.1) < 0.1          # FAIL 0.13.0-0.13.11 against 0.75 UI;
+    assert x1_result["report"]["targets"]["eye_width_ui"]["key"] == "rx_eye_width_ui@32"      # PASS against the 0.65 UI tier (0.14.0)
     assert abs(lane["eye_width_ui"] - 0.709) < 0.001
     assert x1_result["report"]["jitter_budget"][-1]["term"].startswith("total")
 
@@ -122,7 +123,7 @@ def test_app_builds_and_edits_queue_runs(tmp_path):
     result, stale = core.current_result()
     assert result is not None and not stale
     page = json.dumps(core.page().to_plotly_json(), default=str)
-    assert "204.1" in page and "FAIL" in page
+    assert "204.1" in page and "PASS" in page              # x1 passes the 0.65 UI tier at 32 GT/s (0.14.0)
     assert core.apply_edit("channel.length_mm", 30.0) and core.state.overrides == {"channel.length_mm": 30.0}
     assert not core.apply_edit("channel.length_mm", 30.0)          # unchanged: no new run
     assert not core.apply_edit("lanes.count", -4)                   # invalid: dropped, config intact

@@ -13,9 +13,9 @@ jitter budget at the sampler (RMS, closed form):
 statistical engine [~s]:
   sampling phase -0.0171 UI from the pulse's reference sample (eye centre), BER there 10^-371.7
   eye height at BER 1e-27: 204.1 mV  vs target 40 mV (source: survey) -> margin +164.1 mV
-  eye width  at BER 1e-27: 0.709 UI  vs target 0.75 UI (source: survey) -> margin -0.041 UI
+  eye width  at BER 1e-27: 0.709 UI  vs target 0.65 UI (source: survey) -> margin +0.059 UI
   BER target 1e-27 (source: survey); 260 ISI cursors, 17.06 mV RMS, exact distribution on 1769 bins of 50 uV
-  verdict: FAIL
+  verdict: PASS
 
 time engine [~s]: 0 errors in 400000 symbols (statistics predict 10^-366.1); sampled eye opening 254.0 mV; jitter the sampler saw 365.8 fs RMS
 wrote examples/output/00_single_lane_eye.png
