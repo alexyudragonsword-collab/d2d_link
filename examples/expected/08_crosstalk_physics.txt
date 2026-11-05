@@ -10,8 +10,8 @@ near-end crosstalk from the return module on edge lanes [0, 4]: K_b = (kappa_L +
     1    3 -> 3    2.1 -> 2.1    191.8 / 191.8    0.597 / 0.597
     2    4 -> 4    3.2 -> 3.2    193.2 / 193.2    0.572 / 0.572
     3    3 -> 3    2.9 -> 2.9    194.2 / 194.2    0.596 / 0.596
-    4    2 -> 3    1.5 -> 7.9    199.8 / 179.0    0.673 / 0.647
-  module FAIL with NEXT (worst lane 2); the reverse lane's symbols sit 0 UI off this module's sampling instant (a config choice)
+    4    2 -> 3    1.5 -> 7.9    199.8 / 179.0    0.673 / 0.646
+  module FAIL with NEXT (worst lane 2). The return module's clock has no fixed phase to this one, so each edge lane takes the worst of 8 reverse-lane phases (0.14.9): lane 0 at 0 UI, lane 4 at 0.5 UI; over the phases the edge lanes' eye width spans 0.6132..0.6140, 0.6465..0.6476 UI
 
 synthetic single-ended 6-port file 08_synthetic_3lane.s6p (the analytic 25 mm line as 3 lanes, FEXT -20 dB / -32 dB at Nyquist):
   read back for lane 0: |H| -2.80 dB at Nyquist (analytic -2.75 dB), coupling from the neighbour -22.8 dB, second -34.8 dB
