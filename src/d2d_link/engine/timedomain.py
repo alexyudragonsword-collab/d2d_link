@@ -223,8 +223,10 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
     ``(neighbour distance, relative skew [UI], seed)`` for the neighbour
     lanes whose crosstalk lands on this one (their own PRBS, their symbols
     arriving ``rel skew`` later); ``mode`` overrides ``sim.time_mode``."""
-    from .statistical import run_statistical
+    from .statistical import run_statistical, warn_base_response
 
+    if resp is None:
+        warn_base_response(cfg)
     resp = resp if resp is not None else link_response(cfg)
     clock = clock if clock is not None else ForwardedClock(cfg)
     if phase_ui is None:

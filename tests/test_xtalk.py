@@ -224,3 +224,35 @@ def test_victim_through_carries_the_cos_of_its_coupled_lines():
     ref = run_statistical(fast, lane_response(fast, link_response(fast), (2, 2)), 2,
                           residual_skew_ui(fast, skews[2], False), aggressors=aggr)
     assert res.stat[2].eye_height_v == pytest.approx(ref.eye_height_v, rel=1e-12)
+
+
+def test_line_count_and_bookkeeping_follow_the_physical_lines():
+    """Fifth health check leftovers (0.14.7): the return module's lane next to
+    a ``reverse_adjacent`` edge is a coupled line too; the per-lane response
+    reports its own line (insertion loss with the cos factor) and grid top;
+    a single driven lane with idle spares still has crosstalk knobs and an
+    attribution cause; a direct single-lane run on a multi-lane crosstalk
+    config without a response warns."""
+    import warnings
+
+    from d2d_link.channel.model import lane_response, through_factor
+    from d2d_link.engine.lanes import coupled_lines
+    from d2d_link.report import attribution_causes, sensitivity_knobs
+
+    cfg = LinkConfig(channel=dataclasses.replace(X, xtalk_adjacent_db=-20.0), lanes=LaneConfig(count=4, reverse_adjacent=(0,)))
+    assert coupled_lines(cfg, 0) == (2, 1) and coupled_lines(cfg, 3) == (1, 1)
+    r = link_response(cfg)
+    mid = lane_response(cfg, r, (2, 2))
+    fn = cfg.f_nyquist
+    k = int(np.argmin(np.abs(r.channel.f - fn)))
+    cos2 = float(through_factor(cfg, r.channel.f[k:k + 1], (2, 2))[0])
+    assert mid.channel.insertion_loss_db(fn) == pytest.approx(r.channel.insertion_loss_db(fn) + 20 * np.log10(cos2), abs=0.02)
+    assert mid.grid_top_response < r.grid_top_response
+    one = LinkConfig(channel=X, lanes=LaneConfig(count=1, spare_count=2, repair="spare"))
+    assert any(kn["label"].startswith("xtalk_adjacent") for kn in sensitivity_knobs(one))
+    assert "crosstalk" in attribution_causes(one)
+    with pytest.warns(UserWarning, match="lacks its coupled lines' cos factor"):
+        run_statistical(dataclasses.replace(cfg, sim=SimConfig(engine="statistical", stat_phase_points=8)))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        run_statistical(LinkConfig(sim=SimConfig(engine="statistical", stat_phase_points=8)))   # single lane: quiet

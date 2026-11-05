@@ -4,6 +4,15 @@
 
 ---
 
+## [0.14.7] — 2026-11-05 — 第五次体检余项:线数与 API(眼不动;插损列与示例 08 的 NEXT 边缘 lane 动)
+
+- `coupled_lines`:`lanes.reverse_adjacent` 边缘外的回程 lane 算一位的耦合线(示例 08 加 NEXT 的边缘 lane 0.615 → 0.613、0.650 → 0.647 UI)。
+- `LinkResponse.with_through`:`channel` 带上 cos(插损列是耦合环境里的线:示例 07 的 32 GT/s −2.75 → −2.88 dB,8 GT/s −1.24 → −1.25),`grid_top_response` 按新 H 重算。
+- 敏感性旋钮与归因原因按物理线数(`count + spare_count`)判断有无串扰;单 lane 入口在多 lane 行为级串扰配置上不给响应时告警(`warn_base_response`)。
+- 指纹 26 / 3194 值变,全是 x16 模块与 x5 的 `insertion_loss_nyquist_db` 与 `grid_top_response`;眼高、眼宽、BER 一个没动。ROADMAP P2 #4(第五次体检余项)清空删除。
+
+---
+
 ## [0.14.6] — 2026-11-05 — 第五次体检余项:测试与示例(不动数字)
 
 - 示例 11:曲线加 g = 1.5(497 fs);第 4 节在组合全过时取「数据路径加大到 1.08 σ\*」「漫游加大到 1.15 σ\*」两个单源设计,四点与曲线差 ≤ 0.0007 UI。

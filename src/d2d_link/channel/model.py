@@ -435,11 +435,17 @@ class LinkResponse:
         ``factor`` (on ``channel.f``; ``through_factor``); the crosstalk
         pulses and the noise path are the neighbours' and the front end's,
         unchanged. ``amp`` is half the swing, as in ``link_response``."""
-        f = self.channel.f
+        ch = self.channel
+        f = ch.f
         H = self.H_total * factor
         h = freq2impulse(H, f)
         pulse = np.convolve(h.y, np.ones(self.osr))[: h.y.size] * amp
-        return dataclasses.replace(self, pulse=Waveform(pulse, h.dt), impulse=h, H_total=H)
+        # the line itself with its neighbours' mode split: what the insertion-loss column reads (0.14.7;
+        # it read the uncoupled line, 0.13 dB short on the x5 middle lane -- fifth health check)
+        line = ChannelModel(ch.H * factor, f, name=ch.name, xtalk_H=ch.xtalk_H)
+        top = float(abs(H[-1]) / max(abs(H[0]), 1e-300))
+        return dataclasses.replace(self, pulse=Waveform(pulse, h.dt), impulse=h, H_total=H, channel=line,
+                                   grid_top_response=top)
 
     def cursors(self, phase_ui: float, n_max: int | None = None) -> tuple[np.ndarray, int]:
         """Baud-spaced cursors of the pulse at ``phase_ui`` from the peak

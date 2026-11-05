@@ -31,6 +31,7 @@ authoring_mode: ai_generated
   物理图:受害方自己的脉冲劈成两半、相隔 2τ(−18.7 dB 时 2.3 ps = 0.074 UI),所以伤眼宽多于眼高、伤边沿受串扰少的 lane 更多。
   数字:x5 中间 lane 0.5753 → 0.5715 UI(193.3 → 193.2 mV),lane 1 0.6196 → 0.5974(它的右边沿原本不被串扰限制,劈开的脉冲直接吃掉它);
   x16 模块(−30 dB)最差 lane 0.6928 → 0.6927;x64 + FEXT 最小 0.599 → 0.601。判定都不变。示例 12:x5 缺口 0.312 → 0.316,串扰份额 45 → 48 %。
+- **线数与口径(0.14.7,第五次体检余项)**:`coupled_lines` 把 `reverse_adjacent` 边缘外的回程 lane 算作一位的线(回程模块更远的 lane 不建模,与 NEXT 同);每 lane 响应的 `channel` 带上 cos,插损列是耦合环境里的线(x5 中间 lane 32 GT/s −2.75 → −2.88 dB),网格顶也按它重算;单 lane 加 spare 时敏感性与归因按物理线数看串扰;单 lane 入口(`run_statistical` 等)在多 lane 行为级串扰配置上不给响应时告警。示例 08 边缘 lane 加 NEXT:0.615 → 0.613、0.650 → 0.647 UI。
 - **按 lane 读文件(0.14.4)**:文件的单端 lane 数等于模块物理线数(`count + spare_count`)时,`run_link` 给每条物理 lane 读它自己的直通与邻线(`engine/lanes.py::file_per_lane`);别的 lane 数仍当代表性线组,全部读 `channel.lane`。0.14.1 起行为级路径的直通随线数不同,此前的读法让示例 08 的中间 lane 差 0.21 mV,现在 0.02 mV。
 - **`xtalk: touchstone`**(段 6):单端 2N 端口文件自己的耦合项 —— 端口 1..N 是 lane 0..N−1 的近端、N+1..2N 远端;`channel/touchstone_se.py`
   对每个 2 端口子网络用 vendored 的内插与端接(其余端口按文件参考阻抗端接,这是唯一近似),距离 d 取两侧较强的那条。合成无损 3 lane 文件上

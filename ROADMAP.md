@@ -53,11 +53,6 @@
 3. **Touchstone 路径只测过合成文件**(`tests/test_channel.py`:无损 4 端口、有损 + 直流补齐、单端 6 端口、有损 50 GHz 截断 + 直通与耦合项的带外延拓);没有真实封装 S 参数文件。接口留着,数据没有。
    延拓是外推(直通按最后十倍频的斜率,耦合沿直通的衰减):合成文件上剩 0.005 UI 的直通延拓误差;真实文件的带外行为未知,文件带宽低于 4 × Nyquist 时把这一项列进该链路的不确定度。
 
-4. **第五次体检(2026-11-05,0.14.0–0.14.3)的余项**(报告:scratchpad `health_check_2026-11-05.md`;分档区间 0.14.5、测试与示例 0.14.6 已做,剩下的会动非 bundled 路径的数):
-   - `LinkResponse.with_through` 留着基础响应的 `grid_top_response`(偏大,告警只会多报)与 `channel`(插损列不含 cos,x5 中间 lane 少算 0.13 dB)。
-   - `coupled_lines` 不算 `lanes.reverse_adjacent` 的反向线(算上时示例 08 边缘 lane 0.615 → 0.613 UI,判定不变);`count = 1` 带 spare 时串扰生效但敏感性 / 归因看不到(按 `count > 1` 判断)。
-   - 单 lane API(`run_statistical`、`run_time`)默认不加直通 cos 也不加攻击方;bundled 调用方都没碰到。
-
 ## P3 — 能力扩展
 
 1. 串扰:NEXT 的反向 lane 相位是固定配置值(`lanes.reverse_phase_ui`),没有随机相位平均;回程模块的时钟与本模块无关的建模没有;

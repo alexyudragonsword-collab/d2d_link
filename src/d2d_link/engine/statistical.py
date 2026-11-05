@@ -468,6 +468,20 @@ class StatResult:
                 + f", noise {1e3 * self.sigma_noise_v:.2f} mV")
 
 
+def warn_base_response(cfg: LinkConfig) -> None:
+    """A single-lane entry point (``run_statistical``, ``StatisticalEngine``,
+    ``run_time``) handed no response on a config whose lanes see behavioural
+    crosstalk: it reads the line without its neighbours' cos factor (and
+    without aggressors unless given). ``run_link`` builds the per-lane
+    response; a direct caller passes ``channel.model.lane_response`` (0.14.7)."""
+    if cfg.channel.xtalk in ("fext", "coupled") and cfg.lanes.count + cfg.lanes.spare_count > 1:
+        import warnings
+
+        warnings.warn("single-lane engine on a multi-lane config with behavioural crosstalk and no response given: the "
+                      "victim's through lacks its coupled lines' cos factor; use run_link, or pass "
+                      "lane_response(cfg, link_response(cfg), coupled_lines(cfg, physical_lane))", stacklevel=3)
+
+
 class StatisticalEngine:
     """The engine bound to one config and one pulse response."""
 
@@ -476,6 +490,8 @@ class StatisticalEngine:
         """``aggressors`` are ``(neighbour distance, relative skew [UI])`` pairs
         for the active lanes whose crosstalk lands on this one."""
         self.cfg = cfg
+        if resp is None:
+            warn_base_response(cfg)
         self.resp = resp if resp is not None else link_response(cfg)
         self.clock = clock if clock is not None else ForwardedClock(cfg)
         self.aggressors = tuple(aggressors)

@@ -169,14 +169,14 @@ def sensitivity_knobs(cfg) -> list[dict]:
             if r[k] != 0.0:
                 knobs.append(dict(label=k, path=f"channel.{k}", nominal=r[k],
                                   source="config" if getattr(ch, k) is not None else "model", rel=0.2))
-    if ch.xtalk == "coupled" and cfg.lanes.count > 1:
+    if ch.xtalk == "coupled" and cfg.lanes.count + cfg.lanes.spare_count > 1:
         st = cfg.stackup()
         for k in STACKUP_KEYS:
             knobs.append(dict(label=k, path=f"channel.{k}", nominal=st[k],
                               source="config" if getattr(ch, k) is not None else "model", rel=0.2))
         pitch, src = trace_pitch_um(cfg)
         knobs.append(dict(label="trace_pitch_um", path="channel.trace_pitch_um", nominal=pitch, source=src, rel=0.2))
-    elif ch.xtalk == "fext" and cfg.lanes.count > 1:
+    elif ch.xtalk == "fext" and cfg.lanes.count + cfg.lanes.spare_count > 1:
         adj, sec = cfg.xtalk_db()
         # the second neighbour is pinned while the nearest one moves (it defaults
         # to nearest - 12 dB and would otherwise move with it, fourth health check)
@@ -325,7 +325,7 @@ def attribution_causes(cfg) -> tuple[str, ...]:
     """The causes this config has: crosstalk (lanes > 1 and any xtalk mode),
     jitter (always), the PI step (``LinkConfig.pi_step_ui`` > 0)."""
     out = []
-    if (cfg.channel.xtalk != "none" or cfg.channel.xtalk_next != "none") and cfg.lanes.count > 1:
+    if (cfg.channel.xtalk != "none" or cfg.channel.xtalk_next != "none") and cfg.lanes.count + cfg.lanes.spare_count > 1:
         out.append("crosstalk")
     out.append("jitter")
     if cfg.pi_step_ui > 0.0:

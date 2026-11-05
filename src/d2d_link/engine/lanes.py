@@ -197,13 +197,16 @@ def aggressors_of(cfg: LinkConfig, lm: LaneMap, phys: int, skews_ps: np.ndarray)
 
 def coupled_lines(cfg: LinkConfig, phys: int) -> tuple[int, int]:
     """Physical lines one and two places from ``phys`` (the module's
-    ``count + spare_count`` lines, driven or not): what splits the victim's
-    own modes (``channel.model.through_factor``). (0, 0) without behavioural
-    crosstalk."""
+    ``count + spare_count`` lines, driven or not, plus the return module's
+    lane next to a ``lanes.reverse_adjacent`` edge since 0.14.7): what splits
+    the victim's own modes (``channel.model.through_factor``). The return
+    module's further lanes are not modelled, as for its near-end crosstalk.
+    (0, 0) without behavioural crosstalk."""
     if cfg.channel.xtalk in ("none", "touchstone"):
         return (0, 0)
     n = cfg.lanes.count + cfg.lanes.spare_count
-    return tuple(sum(0 <= phys + s * d < n for s in (-1, 1)) for d in (1, 2))
+    one, two = (sum(0 <= phys + s * d < n for s in (-1, 1)) for d in (1, 2))
+    return (one + (phys in cfg.lanes.reverse_adjacent), two)
 
 
 def file_per_lane(cfg: LinkConfig) -> bool:
