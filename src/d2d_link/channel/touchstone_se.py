@@ -63,4 +63,20 @@ def read_single_ended(path: str, f: np.ndarray, zs: float, zl: float, lane: int,
     return H, xt
 
 
-__all__ = ["read_single_ended"]
+def file_lanes(path: str, n_lanes: int | None = None) -> int:
+    """How many single-ended lanes the file holds: ``n_lanes`` when given
+    (``channel.touchstone_lanes``), else half the port count -- read from the
+    ``.sNp`` extension, or from the file when the name does not say."""
+    import re
+
+    if n_lanes is not None:
+        return int(n_lanes)
+    m = re.search(r"\.s(\d+)p$", str(path), re.I)
+    if m:
+        return int(m.group(1)) // 2
+    import skrf as rf
+
+    return rf.Network(str(path)).s.shape[1] // 2
+
+
+__all__ = ["read_single_ended", "file_lanes"]

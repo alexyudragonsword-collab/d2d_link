@@ -125,12 +125,10 @@ if skrf is not None:
     for a, b in zip(res_f.stat, res_a.stat):
         print(f"{a.lane:5d} {1e3 * a.eye_height_v:12.1f} / {a.eye_width_ui:<6.3f} {1e3 * b.eye_height_v:22.1f} / {b.eye_width_ui:<6.3f}")
     worst = max(abs(a.eye_height_v - b.eye_height_v) for a, b in zip(res_f.stat, res_a.stat))
-    edge = max(abs(a.eye_height_v - b.eye_height_v) for a, b in zip(res_f.stat, res_a.stat)
-               if coupled_lines(analytic_cfg, a.lane) == coupled_lines(analytic_cfg, file_cfg.channel.lane))
-    print(f"  file path and analytic path agree to {1e3 * edge:.2f} mV on the lanes whose own through is lane "
-          f"{file_cfg.channel.lane}'s, {1e3 * worst:.2f} mV overall: the reader takes one lane's through for every lane, and the "
-          "middle lane's has one more coupled line (0.14.1). The reader is exercised end to end on a file built from the analytic "
-          "model; a real package extraction would replace both numbers -- the reader is ready, the data is not")
+    print(f"  file path and analytic path agree to {1e3 * worst:.2f} mV on a file built from the analytic model: each lane reads "
+          "its own through and neighbours from a file that holds the module's lanes (0.14.4; until then every lane read lane "
+          f"{file_cfg.channel.lane}'s, 0.21 mV off on the middle lane). The reader is exercised end to end; a real package "
+          "extraction would replace both numbers -- the reader is ready, the data is not")
 else:
     print("\nscikit-rf not installed: the single-ended Touchstone part is skipped")
 

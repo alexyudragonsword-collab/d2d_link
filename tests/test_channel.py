@@ -411,3 +411,38 @@ def test_dielectric_is_causal_and_matched_at_its_reference():
         return float(np.max(np.abs(r.pulse.y[:n])) / r.main_amplitude)
 
     assert early(cfg) < 1e-3 < early(const)          # 6e-5 against 3e-3 of the main cursor before the LC delay
+
+
+def test_single_ended_file_with_the_modules_lanes_is_read_lane_by_lane(tmp_path):
+    """A file holding exactly the module's physical lines gives each lane its
+    own through and neighbours (0.14.4); until then every lane read
+    ``channel.lane``'s (example 08's middle lane was 0.21 mV off). A file
+    with another lane count stays a representative group: every lane reads
+    ``channel.lane``."""
+    skrf = pytest.importorskip("skrf")
+    from d2d_link.channel.touchstone_se import file_lanes
+    from d2d_link.config import LaneConfig
+    from d2d_link.engine import run_link
+    from d2d_link.engine.lanes import file_per_lane
+
+    cfg = LinkConfig(sim=SimConfig(stat_phase_points=16))
+    f = ChannelModel.grid(cfg)[1:]
+    beta = 2 * np.pi * f * np.sqrt(2.656e-7 * 1.063e-10) * 0.025
+    n = 3
+    s = np.zeros((f.size, 2 * n, 2 * n), dtype=complex)
+    for i, loss in enumerate((1.0, 0.9, 0.8)):                       # each lane its own flat loss
+        s[:, n + i, i] = s[:, i, n + i] = loss * np.exp(-1j * beta)
+    skrf.Network(f=f, s=s, z0=50.0, f_unit="Hz").write_touchstone(str(tmp_path / "three"), form="ri")
+    file = str(tmp_path / "three.s6p")
+    assert file_lanes(file) == 3 and file_lanes(file, 2) == 2
+    own = dataclasses.replace(cfg, channel=ChannelConfig(kind="touchstone", file=file, touchstone_mode="single_ended"),
+                              lanes=LaneConfig(count=3))
+    assert file_per_lane(own)
+    res = run_link(own)
+    mains = [r.main_cursor_v for r in res.stat]
+    assert mains[1] / mains[0] == pytest.approx(0.9, rel=2e-3) and mains[2] / mains[0] == pytest.approx(0.8, rel=2e-3)
+    group = dataclasses.replace(own, lanes=LaneConfig(count=2))      # two lanes of a three-lane file: representative
+    assert not file_per_lane(group)
+    g = run_link(group)
+    assert g.stat[0].main_cursor_v == g.stat[1].main_cursor_v == pytest.approx(mains[0], rel=1e-12)
+    assert not file_per_lane(LinkConfig(lanes=LaneConfig(count=3)))

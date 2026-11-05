@@ -206,8 +206,23 @@ def coupled_lines(cfg: LinkConfig, phys: int) -> tuple[int, int]:
     return tuple(sum(0 <= phys + s * d < n for s in (-1, 1)) for d in (1, 2))
 
 
+def file_per_lane(cfg: LinkConfig) -> bool:
+    """A single-ended Touchstone file that holds exactly the module's
+    physical lines: then each physical lane reads its own through and its
+    own neighbours from it (0.14.4). Any other file (fewer or more lanes) is
+    a representative group: every lane reads ``channel.lane``'s, as before."""
+    ch = cfg.channel
+    if ch.kind != "touchstone" or ch.touchstone_mode != "single_ended":
+        return False
+    from ..channel.touchstone_se import file_lanes
+
+    return file_lanes(ch.file, ch.touchstone_lanes) == cfg.lanes.count + cfg.lanes.spare_count
+
+
 def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     resp = resp if resp is not None else link_response(cfg)
+    per_lane = file_per_lane(cfg)
+    file_resp = {cfg.channel.lane: resp} if per_lane else {}
     clock = ForwardedClock(cfg)
     lm = lane_map(cfg)
     skews = physical_skews_ps(cfg)
@@ -219,12 +234,18 @@ def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     lane_resp = {}
     for lane, phys in active:
         lines = coupled_lines(cfg, phys)
-        if lines not in through:
-            through[lines] = lane_response(cfg, resp, lines)
-        lane_resp[phys] = through[lines]
+        if per_lane:
+            # the file's own lane: its through and its neighbours (the behavioural cos factor does not apply)
+            if phys not in file_resp:
+                file_resp[phys] = link_response(dataclasses.replace(cfg, channel=dataclasses.replace(cfg.channel, lane=phys)))
+            lane_resp[phys] = file_resp[phys]
+        else:
+            if lines not in through:
+                through[lines] = lane_response(cfg, resp, lines)
+            lane_resp[phys] = through[lines]
         key_aggr = tuple((d, sk) for d, sk, _ in aggr[phys])
         resid = residual_skew_ui(cfg, skews[phys], clock.alpha > 0.0)
-        key = (key_aggr, resid, lines)
+        key = (key_aggr, resid, lines, phys if per_lane else None)
         if key in seen:
             # the same neighbours at the same relative skews and the same
             # residual: the statistical result is the same lane for lane
@@ -245,5 +266,5 @@ def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     return LinkResult(cfg, lm, stat, time, skews, resolved_targets(cfg), rows)
 
 
-__all__ = ["LaneMap", "lane_map", "physical_skews_ps", "residual_skew_ui", "aggressors_of", "coupled_lines", "LinkResult",
+__all__ = ["LaneMap", "lane_map", "physical_skews_ps", "residual_skew_ui", "aggressors_of", "coupled_lines", "file_per_lane", "LinkResult",
            "run_link"]

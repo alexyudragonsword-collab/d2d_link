@@ -17,7 +17,7 @@ synthetic single-ended 6-port file 08_synthetic_3lane.s6p (the analytic 25 mm li
   read back for lane 0: |H| -2.80 dB at Nyquist (analytic -2.75 dB), coupling from the neighbour -22.8 dB, second -34.8 dB
  lane  file: eye [mV] / [UI] analytic -20 dB: eye [mV] / [UI]
     0        200.0 / 0.645                   200.0 / 0.645
-    1        197.2 / 0.650                   197.4 / 0.649
+    1        197.4 / 0.649                   197.4 / 0.649
     2        199.4 / 0.645                   199.5 / 0.645
-  file path and analytic path agree to 0.02 mV on the lanes whose own through is lane 0's, 0.21 mV overall: the reader takes one lane's through for every lane, and the middle lane's has one more coupled line (0.14.1). The reader is exercised end to end on a file built from the analytic model; a real package extraction would replace both numbers -- the reader is ready, the data is not
+  file path and analytic path agree to 0.02 mV on a file built from the analytic model: each lane reads its own through and neighbours from a file that holds the module's lanes (0.14.4; until then every lane read lane 0's, 0.21 mV off on the middle lane). The reader is exercised end to end; a real package extraction would replace both numbers -- the reader is ready, the data is not
 wrote examples/output/08_crosstalk_physics.png

@@ -49,8 +49,6 @@
    复现:`examples/09_receiver_front_end.py` 第一张表(x1);模块用 `dataclasses.replace(cfg, rx=dataclasses.replace(cfg.rx, bw_hz=…))` 后 `run_link`。
 
 3. **Touchstone 路径只测过合成文件**(`tests/test_channel.py`:无损 4 端口、有损 + 直流补齐、单端 6 端口、有损 50 GHz 截断 + 直通与耦合项的带外延拓);没有真实封装 S 参数文件。接口留着,数据没有。
-   读法对模块里每个 lane 都用 `channel.lane` 那一条直通(0.14.1 发现):行为级路径起各 lane 直通随耦合线数不同(cos 项),示例 08 的合成文件上中间 lane 因此差 0.21 mV
-   (直通同 lane 的 lane 差 0.02 mV)。真实文件到了应按 lane 读直通;今天 bundled 配置不走这条路。
    延拓是外推(直通按最后十倍频的斜率,耦合沿直通的衰减):合成文件上剩 0.005 UI 的直通延拓误差;真实文件的带外行为未知,文件带宽低于 4 × Nyquist 时把这一项列进该链路的不确定度。
 
 4. **第五次体检(2026-11-05,0.14.0–0.14.3)的余项**(报告:scratchpad `health_check_2026-11-05.md`;没有判定或文档数字错,文档里的过期数已改):

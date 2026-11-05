@@ -4,6 +4,15 @@
 
 ---
 
+## [0.14.4] — 2026-11-05 — Touchstone 文件按 lane 读直通(bundled 数字不变)
+
+- 单端多端口文件的 lane 数等于模块物理线数时,`run_link` 给每条物理 lane 读它自己的直通与邻线(`engine/lanes.py::file_per_lane`、
+  `channel/touchstone_se.py::file_lanes` 从 `.sNp` 扩展名读端口数);其他 lane 数仍是代表性线组,全部读 `channel.lane`。去重键带上物理 lane。
+- 示例 08:文件路径与解析路径 0.21 → 0.02 mV(中间 lane 曾读边缘 lane 的直通)。指纹 3194 值逐位相同(bundled 配置不走文件)。
+- 第五次体检(bd3bc94,只出报告):文档里的过期数已改,余项进 ROADMAP P2 #4。
+
+---
+
 ## [0.14.3] — 2026-11-05 — x16 repair 的余量拆解(不动数字)
 
 - 新示例 `14_repair_margin.py`:x16 repair 的残余按来源拆(Tx PLL 经树泄漏 223.4 fs = 37 % 功率,数据路径 200、时钟路径 184、树 100 fs;另有 1.95 ps 的 PI 箱),
