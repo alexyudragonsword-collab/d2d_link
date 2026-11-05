@@ -242,13 +242,13 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
     feed = _JitterFeed(cfg, clock, jitter_s, n)
     pulse = resp.pulse.y
     i0 = resp.main_index
-    dcd = clock.sampling_dcd_ui()
+    offsets = np.asarray(clock.sampling_offsets_ui())        # one per clock phase in turn (DDR 2, QDR 4)
     # past symbols whose postcursors reach the chunk, and future ones whose
     # precursors do, each with one more UI of slack; a sampling instant that
     # the phase, the skew, the duty-cycle offset and the jitter carry further
     # than that slack needs more padding on both ends (an eye read from a
     # window extended to +-1 UI sits up to a whole symbol away)
-    reach_ui = abs(phase_ui + skew_residual_ui) + 0.5 * dcd + feed.max_abs_s / cfg.ui
+    reach_ui = abs(phase_ui + skew_residual_ui) + float(np.max(np.abs(offsets))) + feed.max_abs_s / cfg.ui
     margin = max(0, int(np.ceil(reach_ui)) - 1)
     n_tail = int(np.ceil(pulse.size / osr)) + 1 + margin
     n_pre = int(np.ceil(i0 / osr)) + 1 + margin
@@ -299,9 +299,10 @@ def run_time(cfg: LinkConfig, resp: LinkResponse | None = None, lane: int = 0,
         m = min(chunk, n - pos)
         seq, b = victim.next(m)
         k = np.arange(m)
-        # the sampling instant of symbol k: its main cursor plus phase, DDR
-        # duty-cycle offset (odd symbols) and the forwarded clock's residual
-        offs = (phase_ui + skew_residual_ui) + dcd * 0.5 * (2 * ((pos + k) & 1) - 1)
+        # the sampling instant of symbol k: its main cursor plus phase, the
+        # clock phase's offset (DDR odd / even, QDR the four phases) and the
+        # forwarded clock's residual
+        offs = (phase_ui + skew_residual_ui) + (offsets[(pos + k) % offsets.size] if offsets.size > 1 else offsets[0])
         jit = feed.next(m)
         if mode == "samples":
             pos_main = i0 + offs * osr + jit / cfg.dt            # fractional pulse index of the main cursor

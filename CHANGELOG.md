@@ -4,6 +4,16 @@
 
 ---
 
+## [0.15.0] — 2026-11-05 — 四分之一速率前向时钟(新能力;bundled 数字不变)
+
+- `clocking.scheme: forwarded_qdr` 与 `clocking.qdr_quadrature_ui`(4 相发生器的 I/Q 偏差,source: model)。`ForwardedClock.h_edges`:边沿间线性内插的相位传递 sinc²(2f/fs),
+  进 `g_clock`、时钟路径合成、杂散项与 Tx DCD 泄漏;`ForwardedClock.sampling_offsets_ui`:DDR 两相 / QDR 四相偏移,统计引擎的采样相位与时域引擎的逐符号偏移都用它。
+- 新示例 `15_quarter_rate_clock.py`:x1 泄漏 223.4 → 151.1 fs、眼宽 0.709 → 0.755 UI;x16 模块不变;I/Q 偏差按宽度收费(0.02 UI → 0.019 UI)。
+  **边沿采样的混叠没有建模**,改善可能偏乐观(cairn/forwarded-clock.md 的坑、ROADMAP P3 #2)。
+- 测试:QDR + DCD + I/Q 偏差下两个引擎 2× 内(铁律 3);偏移、sinc² 取值、校验。GUI 表单加 `forwarded_qdr` 与 I/Q 偏差一格。指纹 3194 值逐位相同。
+
+---
+
 ## [0.14.9] — 2026-11-05 — NEXT 反向 lane 相位取最差(bundled 数字不变)
 
 - `lanes.reverse_phase_ui` 默认 None:回程模块的时钟与本模块没有固定相位,每个边缘 lane 在 `REVERSE_PHASES`(8 个,1/8 UI 一步)上各跑一次、按余量取最差,

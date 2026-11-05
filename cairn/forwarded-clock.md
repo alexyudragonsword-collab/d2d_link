@@ -76,6 +76,16 @@ t_rx[k]   = (h_tree ⊛ t_pll)[k − τ] + n_t[k]                   树:延时 �
   量化核的两端节点带小数权重,使方差正好是 w²/12(0.12 取整到整数个节点,x5 的 1/64 UI 多 11 % 方差)。
 - **发端 DCD**(段 15,`ForwardedClock.sampling_dcd_ui()`):fs/2 的单音,无本地 PLL 时经 Re E(1 − ρG)(fs/2) 到达采样器(30 ps 树 ≈ 1.7),有本地 PLL 时全额;0.12 当作完全抵消。
 
+## 四分之一速率前向时钟(0.15.0,示例 15;全部 source: model)
+
+- `clocking.scheme: forwarded_qdr`:时钟 fs/4、边沿 2 UI 一个、4 相发生器在边沿间内插。模型两处变化:
+  `ForwardedClock.h_edges` = sinc²(2f/fs)(线性内插在边沿率 fs/2 上的相位传递,fs/4 处 0.405、fs/2 处 0)乘进 `g_clock` 与合成的时钟路径;
+  `sampling_offsets_ui` 给四相偏移 (−dcd − q, −dcd + q, dcd − q, dcd + q)/2(`qdr_quadrature_ui` = q),两个引擎都按 k mod 4 用。DDR 路径逐位不变。
+- 数字:x1(无本地 PLL)泄漏 223.4 → 151.1 fs、残余 365.5 → 292.5 fs、眼宽 0.709 → 0.755 UI —— 30 ps 树在 fs/2 附近把 |1 − G|² 翻到约 3,
+  QDR 下 G → 0,泄漏回到 1 倍底噪;x16 模块(1 MHz 本地 PLL)不变。I/Q 偏差 q 像 PI 箱一样按宽度收费:q = 0.02 UI 费 0.019 UI。
+- **坑**:边沿采样的混叠没建模。fs/4 以上的相噪在 fs/2 的边沿率上会折回带内,真实 QDR 未必有这 0.046 UI 的改善;在混叠项加上之前不要拿它做判定。
+  contains: pitfall
+
 ## 决策记录
 
 - **跟踪器默认零延迟**:θ 用当前 Δ 更新;"带宽 → ∞ 残余 → 0"的验收只对 d = 0 成立。里程碑 2 起延迟(`track_delay_ui`)与量化

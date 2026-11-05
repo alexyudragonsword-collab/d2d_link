@@ -74,3 +74,36 @@ def test_wander_dominated_with_tracker():
                      rx=RxConfig(noise_rms_v=0.01), sim=dataclasses.replace(SIM, n_symbols=1_000_000))
     r, s, t = _ratio(cfg)
     assert 0.5 < r < 2.0, (r, s.ber, t.ber)
+
+
+def test_quarter_rate_clock_with_quadrature_skew():
+    """0.15.0: ``forwarded_qdr`` samples on four phases; a quadrature skew
+    splits them -+q/2 on top of the duty-cycle split, and the edges' view of
+    the clock (sinc^2(2 f / fs), linear interpolation at fs/2 edges) shapes
+    the common-mode leak. Both engines see the same four offsets."""
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=2.0),
+                     clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=PROFILE, data_path_rj_s=1e-12,
+                                             clock_path_rj_s=1e-12, dcd_ui=0.04, qdr_quadrature_ui=0.06),
+                     rx=RxConfig(noise_rms_v=0.045), sim=SIM)
+    r, s, t = _ratio(cfg)
+    assert 0.5 < r < 2.0, (r, s.ber, t.ber)
+
+
+def test_quarter_rate_clock_pieces():
+    import numpy as np
+    import pytest
+
+    from d2d_link.clock.forwarded import ForwardedClock
+
+    ddr = ForwardedClock(LinkConfig(clocking=ClockingConfig(pll_profile=PROFILE, dcd_ui=0.04)))
+    assert ddr.sampling_offsets_ui() == (-0.02, 0.02) and ddr.h_edges(np.array([1e9])) is None
+    q = ForwardedClock(LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=PROFILE, dcd_ui=0.04,
+                                                          qdr_quadrature_ui=0.06)))
+    assert q.sampling_offsets_ui() == pytest.approx((-0.05, 0.01, -0.01, 0.05))
+    fs = q.fs
+    he = q.h_edges(np.array([0.0, fs / 4, fs / 2]))
+    assert he[0] == 1.0 and he[1] == pytest.approx((2 / np.pi) ** 2) and he[2] == pytest.approx(0.0, abs=1e-30)
+    plain = ForwardedClock(LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=PROFILE)))
+    assert plain.sampling_offsets_ui() == (0.0,)
+    with pytest.raises(ValueError, match="forwarded_qdr"):
+        ClockingConfig(qdr_quadrature_ui=0.01)

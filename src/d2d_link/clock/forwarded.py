@@ -246,9 +246,26 @@ class ForwardedClock:
         a = 1.0 + 2.0 * ck.local_pll_damping ** 2
         return ck.local_pll_fn_hz * math.sqrt(a + math.sqrt(a * a + 1.0))
 
+    def h_edges(self, f: np.ndarray) -> np.ndarray | None:
+        """What the receiver can follow of the forwarded clock's phase between
+        its edges. ``forwarded_ddr``: both edges sample, one per UI -- the
+        clock's phase is seen at the data's own rate (None: nothing to apply).
+        ``forwarded_qdr``: the clock runs at fs/4, its edges come every 2 UI,
+        and the 4-phase generator interpolates the phase between them; a
+        linear interpolation at edge rate fs/2 passes sinc^2(2 f / fs) of a
+        phase tone (0.405 at fs/4, 0 at fs/2) -- the Tx PLL's noise there
+        reaches the data but not the sampler. A first-order estimate
+        (source: model): the aliasing of the edge sampling is not modelled."""
+        if self.cfg.clocking.scheme != "forwarded_qdr":
+            return None
+        return np.sinc(2.0 * np.asarray(f, dtype=np.float64) / self.fs) ** 2
+
     def g_clock(self, f: np.ndarray) -> np.ndarray:
-        """Forwarded-clock input to sampler clock: local PLL then tree."""
-        return self.h_tree(f) * self.h_pll(f)
+        """Forwarded-clock input to sampler clock: the edges' view of it
+        (quarter rate), local PLL, then tree."""
+        g = self.h_tree(f) * self.h_pll(f)
+        he = self.h_edges(f)
+        return g if he is None else g * he
 
     def e_track(self, f: np.ndarray) -> np.ndarray:
         """1 - L(z) of the tracker at z = exp(j 2 pi f UI): what it leaves.
@@ -366,6 +383,20 @@ class ForwardedClock:
             f = np.array([0.5 * self.fs])
             leak = float(abs((self.e_track(f) * (1.0 - self.rho * self.g_clock(f)))[0].real))
         return ck.dcd_ui + leak * ck.tx_dcd_ui
+
+    def sampling_offsets_ui(self) -> tuple[float, ...]:
+        """The sampler's phase offsets [UI], one per clock phase in turn
+        (symbol k uses entry k mod len): DDR the odd / even pair -+dcd/2;
+        QDR the four phases 0 / 90 / 180 / 270 degrees, the duty-cycle error
+        splitting rising from falling and ``qdr_quadrature_ui`` q the I pair
+        from the Q pair: (-dcd - q, -dcd + q, dcd - q, dcd + q) / 2. A single
+        (0,) when there is no offset at all."""
+        dcd = self.sampling_dcd_ui()
+        ck = self.cfg.clocking
+        if ck.scheme == "forwarded_qdr" and ck.qdr_quadrature_ui > 0.0:
+            q = ck.qdr_quadrature_ui
+            return (0.5 * (-dcd - q), 0.5 * (-dcd + q), 0.5 * (dcd - q), 0.5 * (dcd + q))
+        return (-0.5 * dcd, 0.5 * dcd) if dcd > 0.0 else (0.0,)
 
     def pll_rms_s(self, n: int | None = None) -> float:
         """The Tx PLL's own jitter over the same band (what an independent clock
@@ -490,11 +521,15 @@ class ForwardedClock:
         """Local PLL (forwarded phase through H, local noise through 1 - H),
         then the tree's delay and lowpass, in the FFT domain of the block
         (circular, like the synthesis itself)."""
-        if local is None and self.tau == 0.0 and self.cfg.clocking.tree_bw_hz is None:
+        if local is None and self.tau == 0.0 and self.cfg.clocking.tree_bw_hz is None \
+                and self.cfg.clocking.scheme == "forwarded_ddr":
             return x
         n = x.size
         f = np.fft.rfftfreq(n, d=self.ui)
         spec = np.fft.rfft(x)
+        he = self.h_edges(f)
+        if he is not None:
+            spec = spec * he
         if local is not None:
             h = self.h_pll(f)
             spec = spec * h + np.fft.rfft(local) * (1.0 - h)

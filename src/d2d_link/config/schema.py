@@ -286,7 +286,8 @@ class ClockingConfig:
     path, the clock path and the receiver tree add on top.
     """
 
-    scheme: Literal["forwarded_ddr"] = "forwarded_ddr"
+    scheme: Literal["forwarded_ddr", "forwarded_qdr"] = "forwarded_ddr"   # qdr (0.15.0): the clock at a quarter of
+                                          # the data rate, four sampling phases from a 4-phase generator
     pll_profile: Optional[str] = None     # clock profile file; None -> white PLL (pll_rj_s only)
     pll_f0_hz: Optional[float] = None     # carrier override for the profile's phase scale
     pll_shift_db: float = 0.0             # uniform dB shift of the profile (same shape, other RMS)
@@ -304,6 +305,8 @@ class ClockingConfig:
     profile_above: Literal["floor", "zero"] = "floor"   # PLL profile above its last point: the last level held
                                                          # flat to fs/2 ("floor", phase 15) or zero ("zero", 0.12)
     dcd_ui: float = 0.0                   # receiver-side DDR duty-cycle error: odd/even sampling offset [UI]
+    qdr_quadrature_ui: float = 0.0        # forwarded_qdr: I/Q skew of the 4-phase generator, the 90 / 270 degree
+                                          # phases' offset from the 0 / 180 ones [UI] (source: model; no spec text)
     tx_dcd_ui: float = 0.0                # Tx PLL duty-cycle error, common to data and forwarded clock [UI]:
                                           # cancels at a receiver that samples on the forwarded clock's own
                                           # edges, shows in full once a local PLL regenerates a 50 % clock
@@ -331,7 +334,11 @@ class ClockingConfig:
         return self.local_pll_profile is not None or self.local_pll_rj_s > 0.0
 
     def __post_init__(self):
-        _require_in(self.scheme, {"forwarded_ddr"}, "clocking.scheme")
+        _require_in(self.scheme, {"forwarded_ddr", "forwarded_qdr"}, "clocking.scheme")
+        _finite_nonneg(self.qdr_quadrature_ui, "clocking.qdr_quadrature_ui")
+        _require(self.qdr_quadrature_ui < 0.5, f"clocking.qdr_quadrature_ui must be < 0.5 UI, got {self.qdr_quadrature_ui}")
+        _require(self.qdr_quadrature_ui == 0.0 or self.scheme == "forwarded_qdr",
+                 "clocking.qdr_quadrature_ui needs clocking.scheme: forwarded_qdr")
         _require(self.track_delay_ui >= 0, f"clocking.track_delay_ui must be >= 0, got {self.track_delay_ui}")
         _finite_nonneg(self.pi_step_ui, "clocking.pi_step_ui")
         _require(self.pi_step_ui < 0.5, f"clocking.pi_step_ui must be < 0.5 UI, got {self.pi_step_ui}")

@@ -500,6 +500,7 @@ class StatisticalEngine:
         self.spurs_ui = tuple(a / cfg.ui for a in self.clock.spur_amplitudes_s())
         self.quant_ui = cfg.pi_step_ui if self.clock.alpha > 0.0 else 0.0
         self.dcd_ui = self.clock.sampling_dcd_ui()
+        self.offsets_ui = self.clock.sampling_offsets_ui()     # DDR odd / even, QDR four phases (0.15.0)
         self.nodes, self.weights = jitter_quadrature(self.sigma_j_ui, cfg.sim.stat_phase_points,
                                                      cfg.sim.stat_jitter_sigmas, self.quant_ui, self.spurs_ui)
         self.bin_v = cfg.sim.stat_isi_bin_v
@@ -527,8 +528,7 @@ class StatisticalEngine:
     def sampling_phases(self, phase_ui: float) -> list[tuple[float, float]]:
         """``(phase, weight)`` pairs the sampler really lands on: the jitter
         quadrature's offsets, split again by the DDR duty-cycle error."""
-        dcd = self.dcd_ui
-        offs = (-0.5 * dcd, 0.5 * dcd) if dcd > 0.0 else (0.0,)
+        offs = self.offsets_ui
         out = []
         for x, w in zip(self.nodes, self.weights):
             for d in offs:

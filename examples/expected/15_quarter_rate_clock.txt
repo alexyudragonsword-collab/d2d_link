@@ -1,0 +1,15 @@
+config                     scheme         Tx leak [fs] residual [fs]  eye [UI]  eye [mV]  link
+standard_32g_x1            forwarded_ddr         223.4         365.5    0.7091     204.1  PASS
+standard_32g_x1            forwarded_qdr         151.1         292.5    0.7553     205.2  PASS
+standard_32g_x16_module    forwarded_ddr         176.4         331.5    0.6927     226.3  PASS
+standard_32g_x16_module    forwarded_qdr         176.4         331.5    0.6927     226.3  PASS
+  x1 has no local PLL: the quarter-rate edges stop the tree's phase flip near fs/2 from doubling the Tx floor; the x16 module's 1 MHz local PLL had already cut the clock off up there, so the scheme changes nothing
+
+quadrature skew of the 4-phase generator (x1, forwarded_qdr):
+ q [UI]                     offsets [UI]  eye [UI]  cost [UI]  link
+   0.00                           +0.000    0.7553     0.0000  PASS
+   0.01   -0.005, +0.005, -0.005, +0.005    0.7466     0.0087  PASS
+   0.02   -0.010, +0.010, -0.010, +0.010    0.7366     0.0187  PASS
+   0.04   -0.020, +0.020, -0.020, +0.020    0.7166     0.0387  PASS
+   0.06   -0.030, +0.030, -0.030, +0.030    0.6966     0.0587  PASS
+  a box of total width q costs about q of eye width at the target BER (the phases are bounded, not Gaussian)
