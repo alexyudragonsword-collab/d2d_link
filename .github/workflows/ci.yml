@@ -228,6 +228,6 @@ jobs:
       - name: 16 GHz profiles match the pinned pll_simulator
         working-directory: d2d_link
         run: |
-          python -m pip install numpy scipy pyyaml
+          python -m pip install numpy scipy pyyaml matplotlib   # pllsim imports matplotlib at package import
           python tools/export_profile_to_nyquist.py --check --pllsim ${{ github.workspace }}/_siblings/pll_simulator \
             bench_markulic16_sspll_40m_10p24g bench_wu19_spll_frac_52m_6p253g
