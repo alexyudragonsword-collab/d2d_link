@@ -5,7 +5,7 @@ summary: "规范数字的来源状态:哪些是综述、各自待核实什么、
 tags: [spec, ucie, sources]
 contains: [decision]
 created: "2026-10-12"
-updated: "2026-11-04"
+updated: "2026-11-05"
 related: [architecture-invariants.md]
 authoring_mode: ai_generated
 ---
@@ -13,10 +13,11 @@ authoring_mode: ai_generated
 
 ## 当前结论
 
-- 全部 17 条都是 `source: survey`(0.14.0 起含眼宽 24 / 32 GT/s 分档两条),见 `src/d2d_link/data/spec/ucie_survey.yaml`;没有一条读过规范原文。`grep -c "source: survey" src/d2d_link/data/spec/ucie_survey.yaml` = 15
+- 全部 17 条都是 `source: survey`(0.14.0 起含眼宽 24 / 32 GT/s 分档两条),见 `src/d2d_link/data/spec/ucie_survey.yaml`;没有一条读过规范原文。`grep -c "source: survey" src/d2d_link/data/spec/ucie_survey.yaml` = 17
   (文件头注释不再含该字串,测试断言这条命令的计数)。
 - 综述来源是公开材料的记忆与转述(Das Sharma 2022 的 UCIe 综述、Consortium 白皮书、Hot Chips 34 概览),**数值本身未经核对**,
-  每条 note 都写了"未核实"。最不可靠的三条:收端眼高 40 mV、眼宽 0.75 UI(眼罩表的速率档与封装归属不明)、1e-15 的 retry 口径。
+  每条 note 都写了"未核实"。最不可靠的三条:收端眼宽(0.14.0 起 24 / 32 GT/s 用 0.65 UI 分档,出自二手转述;判定悬在它上面)、眼高 40 mV(眼罩表的速率档与封装归属不明)、1e-15 的 retry 口径。
+  分档只认表里的速率(`@24`、`@32`):24 与 32 之间的速率(28 GT/s)落回 0.75 UI(第五次体检,ROADMAP P2 #4)。
 - 升级流程:用户把原文贴进 `cairn/Reference/`(只追加)→ 对应条目改 `source: spec`、加 `quote` 与 `section` → `tests/test_spec_sources.py`
   自动要求 quote 非空 → LOG 记一条。
 - **分档(0.13.5;0.13.10 定了优先级)**:目标按 `<package>.<key>@<rate>` → `<package>.<key>` → `<key>@<rate>` → `<key>` 查表(`spec.survey_tiered`)。
@@ -45,6 +46,6 @@ authoring_mode: ai_generated
 - 敏感性:`tools/budget_report.py --sensitivity` 对每条估计 ±20%(dB 值与剖面整体平移 ±3 dB;0.13.3 起含配置里的抖动值;眼罩目标 ±10 mV / ±0.05 UI)重跑,表里标出翻转结论的参数。
   0.13.3 重跑:x1 名义裕度 −0.055、x16 模块 −0.051 —— **只有眼宽目标翻转**(0.70 UI 时 +0.013 / +0.017);离翻转最近的估计是 PLL 剖面 −3 dB(−0.024 / −0.031)
   与数据路径白抖 −20 %(−0.037 / −0.032)。x5 耦合 −0.214,什么都不翻(最近的是介质厚 24 µm −0.140、bump 间距 138 µm −0.154)。
-  0.14.2 起这些数由示例 13 打印(期望输出受 accept 闸门守),x1 另有测试钉住;x16 repair +0.028 被目标 0.70 UI 与 PLL 剖面 +3 dB 翻,x64 spare +0.093 不翻。
   0.14.1(0.65 UI 分档 + 受害方直通 cos):x1 +0.091 不翻;x16 模块 +0.066,只有目标 0.70 UI 翻(−0.010);x5 −0.121 不翻(最近:目标 0.60 UI −0.047、介质 24 µm −0.054;0.14.0 时 −0.115 / 介质 −0.052)。
+  0.14.2 起这些数由示例 13 打印(期望输出受 accept 闸门守),x1 另有测试钉住;x16 repair +0.028 被目标 0.70 UI 与 PLL 剖面 +3 dB 翻,x64 spare +0.093 不翻。
   0.13.6(FEXT 改成攻击方导数)后:x16 模块 −0.076,眼宽目标 0.70 也不翻(−0.010),最近的是串扰 −33 dB / 剖面 −3 dB(−0.057);x5 −0.233(介质 24 µm −0.178);x1 不变。

@@ -35,9 +35,10 @@ def test_attribution_switches_each_cause_off_and_its_shares_close_the_gap():
 
 
 def test_x1_sensitivity_numbers_the_docs_quote():
-    """ROADMAP P1 #1 and cairn/spec-sources.md quote the x1 sensitivity:
-    +0.091 nominal, nothing flips, the nearest sides the 0.70 UI target
-    (+0.013) and the PLL profile 3 dB up (+0.029). Example 13 prints the
+    """ROADMAP P1 #1, README and cairn/spec-sources.md quote the x1
+    sensitivity: +0.091 nominal, nothing flips; example 13 prints its
+    nearest sides, the 0.70 UI target (+0.013) and the PLL profile 3 dB up
+    (+0.029). Example 13 prints the
     same for every bundled config (the module ones take minutes); x1 is the
     one cheap enough for the suite (~15 s). Before 0.14.2 no test or
     expected output produced these numbers (fourth health check)."""
