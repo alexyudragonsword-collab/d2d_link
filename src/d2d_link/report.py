@@ -216,6 +216,13 @@ def sensitivity_knobs(cfg) -> list[dict]:
         # the receiver's bandwidth is the design's claim, and with the noise
         # at the input it moves both the pulse and the noise
         knobs.append(dict(label="rx_bw_hz", path="rx.bw_hz", nominal=cfg.rx.bw_hz, source="config", rel=0.2))
+    else:
+        # a flat front end is an idealisation every bundled pass rests on (ROADMAP
+        # P2 #2): one design side, a first-order pole at 2 f_N (the data rate in
+        # GHz), with the noise left at the sampler; the other side is the flat
+        # nominal itself (0.15.2)
+        knobs.append(dict(label="rx_bw_hz (flat)", path="rx.bw_hz", nominal=math.inf, source="model",
+                          sides={"low": 2.0 * cfg.f_nyquist, "high": math.inf}))
     return knobs
 
 
@@ -250,7 +257,14 @@ def sensitivity(cfg, eye_height_mv: float = 10.0, eye_width_ui: float = 0.05, pr
     for k in knobs:
         sides = {}
         for sign, name in ((-1.0, "low"), (1.0, "high")):
-            value = k["nominal"] + sign * k["step"] if "step" in k else k["nominal"] * (1.0 + sign * k["rel"])
+            if "sides" in k:
+                value = k["sides"][name]
+                if value == k["nominal"]:               # a side that is the nominal design: no rerun
+                    tick()
+                    sides[name] = {"value": value, **nominal}
+                    continue
+            else:
+                value = k["nominal"] + sign * k["step"] if "step" in k else k["nominal"] * (1.0 + sign * k["rel"])
             try:
                 c = apply_overrides(cfg, {**k.get("pin", {}), k["path"]: value})
             except ValueError as exc:

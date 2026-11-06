@@ -9,9 +9,10 @@ standard_32g_x1: nominal PASS, worst lane 0 margin +0.091 (smallest eye over the
   clock_path_rj_s         config     2e-13   1.6e-13 -> PASS +0.108    2.4e-13 -> PASS +0.071
   tree_rj_s               config     1e-13     8e-14 -> PASS +0.096    1.2e-13 -> PASS +0.085
   pll_shift_db             model         0        -3 -> PASS +0.126          3 -> PASS +0.029
+  rx_bw_hz (flat)          model       inf   3.2e+10 -> PASS +0.037        inf -> PASS +0.091
   target.eye_height_mv    survey        40        30 -> PASS +0.091         50 -> PASS +0.091
   target.eye_width_ui     survey      0.65       0.6 -> PASS +0.182        0.7 -> PASS +0.013
-  closest to flipping: target.eye_width_ui high 0.7 +0.013, pll_shift_db high 3 +0.029, z0_ohm low 40 +0.054
+  closest to flipping: target.eye_width_ui high 0.7 +0.013, pll_shift_db high 3 +0.029, rx_bw_hz (flat) low 3.2e+10 +0.037
 
 standard_32g_x16_module: nominal PASS, worst lane 4 margin +0.066 (smallest eye over the lanes 226.3 mV / 0.693 UI)
   parameter               source   nominal       low -> verdict           high -> verdict      flips
@@ -27,10 +28,11 @@ standard_32g_x16_module: nominal PASS, worst lane 4 margin +0.066 (smallest eye 
   clock_path_wander_s     config     2e-13   1.6e-13 -> PASS +0.069    2.4e-13 -> PASS +0.062
   pll_shift_db             model         0        -3 -> PASS +0.088          3 -> PASS +0.025
   local_pll_shift_db       model         0        -3 -> PASS +0.071          3 -> PASS +0.055
+  rx_bw_hz (flat)          model       inf   3.2e+10 -> PASS +0.021        inf -> PASS +0.066
   target.eye_height_mv    survey        40        30 -> PASS +0.066         50 -> PASS +0.066
   target.eye_width_ui     survey      0.65       0.6 -> PASS +0.154        0.7 -> FAIL -0.010  yes
   flipped by: target.eye_width_ui high 0.7 -0.010
-  closest to flipping: pll_shift_db high 3 +0.025, z0_ohm low 40 +0.031, xtalk_adjacent_db high -27 +0.034
+  closest to flipping: rx_bw_hz (flat) low 3.2e+10 +0.021, pll_shift_db high 3 +0.025, z0_ohm low 40 +0.031
 
 standard_32g_x16_repair: nominal PASS, worst lane 0 margin +0.028 (smallest eye over the lanes 224.9 mV / 0.668 UI)
   parameter               source   nominal       low -> verdict           high -> verdict      flips
@@ -42,9 +44,10 @@ standard_32g_x16_repair: nominal PASS, worst lane 0 margin +0.028 (smallest eye 
   clock_path_rj_s         config     2e-13   1.6e-13 -> PASS +0.045    2.4e-13 -> PASS +0.009
   tree_rj_s               config     1e-13     8e-14 -> PASS +0.033    1.2e-13 -> PASS +0.022
   pll_shift_db             model         0        -3 -> PASS +0.063          3 -> FAIL -0.034  yes
+  rx_bw_hz (flat)          model       inf   3.2e+10 -> FAIL -0.014        inf -> PASS +0.028  yes
   target.eye_height_mv    survey        40        30 -> PASS +0.028         50 -> PASS +0.028
   target.eye_width_ui     survey      0.65       0.6 -> PASS +0.114        0.7 -> FAIL -0.045  yes
-  flipped by: pll_shift_db high 3 -0.034, target.eye_width_ui high 0.7 -0.045
+  flipped by: rx_bw_hz (flat) low 3.2e+10 -0.014, pll_shift_db high 3 -0.034, target.eye_width_ui high 0.7 -0.045
   closest to flipping: data_path_rj_s high 2.4e-13 +0.005, z0_ohm low 40 +0.006, clock_path_rj_s high 2.4e-13 +0.009
 
 advanced_32g_x64_spare: nominal PASS, worst lane 0 margin +0.093 (smallest eye over the lanes 293.1 mV / 0.710 UI)
@@ -57,6 +60,7 @@ advanced_32g_x64_spare: nominal PASS, worst lane 0 margin +0.093 (smallest eye o
   clock_path_rj_s         config     2e-13   1.6e-13 -> PASS +0.113    2.4e-13 -> PASS +0.070
   tree_rj_s               config     1e-13     8e-14 -> PASS +0.098    1.2e-13 -> PASS +0.086
   pll_shift_db             model         0        -3 -> PASS +0.114          3 -> PASS +0.055
+  rx_bw_hz (flat)          model       inf   3.2e+10 -> PASS +0.075        inf -> PASS +0.093
   target.eye_height_mv    survey        40        30 -> PASS +0.093         50 -> PASS +0.093
   target.eye_width_ui     survey      0.65       0.6 -> PASS +0.184        0.7 -> PASS +0.015
   closest to flipping: target.eye_width_ui high 0.7 +0.015, pll_shift_db high 3 +0.055, data_path_rj_s high 2.4e-13 +0.067
@@ -77,6 +81,7 @@ standard_32g_x5_coupled: nominal FAIL, worst lane 2 margin -0.121 (smallest eye 
   clock_path_wander_s     config     2e-13   1.6e-13 -> FAIL -0.117    2.4e-13 -> FAIL -0.125
   pll_shift_db             model         0        -3 -> FAIL -0.098          3 -> FAIL -0.162
   local_pll_shift_db       model         0        -3 -> FAIL -0.115          3 -> FAIL -0.131
+  rx_bw_hz (flat)          model       inf   3.2e+10 -> FAIL -0.207        inf -> FAIL -0.121
   target.eye_height_mv    survey        40        30 -> FAIL -0.121         50 -> FAIL -0.121
   target.eye_width_ui     survey      0.65       0.6 -> FAIL -0.047        0.7 -> FAIL -0.184
   closest to flipping: target.eye_width_ui low 0.6 -0.047, dielectric_height_um low 24 -0.054, trace_pitch_um high 138 -0.067
@@ -84,6 +89,6 @@ standard_32g_x5_coupled: nominal FAIL, worst lane 2 margin -0.121 (smallest eye 
 summary (+-20 %, dB +-3 dB, targets +-10 mV / +-0.05 UI):
   standard_32g_x1            PASS +0.091  flipped by: nothing
   standard_32g_x16_module    PASS +0.066  flipped by: target.eye_width_ui
-  standard_32g_x16_repair    PASS +0.028  flipped by: pll_shift_db, target.eye_width_ui
+  standard_32g_x16_repair    PASS +0.028  flipped by: pll_shift_db, rx_bw_hz (flat), target.eye_width_ui
   advanced_32g_x64_spare     PASS +0.093  flipped by: nothing
   standard_32g_x5_coupled    FAIL -0.121  flipped by: nothing

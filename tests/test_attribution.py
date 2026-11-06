@@ -51,5 +51,9 @@ def test_x1_sensitivity_numbers_the_docs_quote():
     rows = {r["label"]: r for r in s["rows"]}
     assert rows["target.eye_width_ui"]["high"]["margin"] == pytest.approx(0.013, abs=1e-3)
     assert rows["pll_shift_db"]["high"]["margin"] == pytest.approx(0.029, abs=1e-3)
+    # the flat front end is a knob too (0.15.2): one design side, a 2 f_N pole, the other side the nominal itself
+    fe = rows["rx_bw_hz (flat)"]
+    assert fe["low"]["value"] == 32e9 and fe["low"]["margin"] == pytest.approx(0.037, abs=1e-3) and fe["low"]["passes"]
+    assert fe["high"]["margin"] == s["nominal"]["margin"] and fe["source"] == "model"
     sides = sorted(r[k]["margin"] for r in s["rows"] for k in ("low", "high"))
     assert sides[0] == rows["target.eye_width_ui"]["high"]["margin"]          # the nearest side is the target's

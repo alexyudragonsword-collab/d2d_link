@@ -47,6 +47,7 @@
    x5 在平坦前端就不过,64 GHz 时 0.548 UI(0.14.1)。也就是说 32 GT/s(f_N 16 GHz)标准封装的「过」要求前端 ≳ 1.5–2.5 × f_N,repair 配置几乎没有余地。
    同一个 3 mV 若算在前端输入(Nyquist 带内,采样点 σ = 3 mV·√(π·bw / 2f_N)):x1、x16 模块、x16 repair 在 16–64 GHz 的每个带宽都不过(最好 0.629 / 0.629 / 0.607 UI),
    x64 spare 到 24 GHz 都过 —— 但那是另一个接收机(采样点噪声 3.8–7.5 mV),不是同一个设计换口径。
+   0.15.2 起敏感性把平坦前端当一项(一侧 2 f_N = 32 GHz 一阶极点,`source: model`):示例 13 里只有 x16 repair 被它翻(−0.014)。
    要做:用户给接收机前端带宽与噪声口径(或一个参考设计),写进 bundled 配置,重跑示例 00 / 05 / 07 / 12。
    复现:`examples/09_receiver_front_end.py` 第一张表(x1);模块用 `dataclasses.replace(cfg, rx=dataclasses.replace(cfg.rx, bw_hz=…))` 后 `run_link`。
 
