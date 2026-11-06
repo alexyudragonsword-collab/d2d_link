@@ -55,8 +55,6 @@
    延拓是外推(直通按最后十倍频的斜率,耦合沿直通的衰减):合成文件上剩 0.005 UI 的直通延拓误差;真实文件的带外行为未知,文件带宽低于 4 × Nyquist 时把这一项列进该链路的不确定度。
 
 4. **第六次体检(2026-11-06,0.14.4–0.15.1)的余项**(报告:scratchpad `health_check_2026-11-06.md`;没有判定或文档数字错,文档里的过期处已改):
-   - **CI 的推送运行会被吞掉**(高):`cancel-in-progress` 对推送为 false,但 GitHub 并发组每组只留一个排队中的运行,新推送顶掉排队的旧运行
-     (32f1371 的运行 0 个作业即取消,ac797ed..32f1371 没被检查;693a120 同样)。修:推送时并发组带 `github.sha`。
    - **指纹不走新路径**(中):`tools/fingerprint.py` 的合成用例没有 forwarded_qdr、自由反向相位、按 lane 读的 Touchstone —— 0.14.4 / 0.14.9 / 0.15.x 的数只有 examples-full 看得见,
      而 examples-full 不在分支上跑(只在 main / PR / 每周)。
    - **归因的「抖动关」留着 QDR I/Q 偏差**(中):`report.switched_off` 没把 `qdr_quadrature_ui` 置 0;x1 QDR q = 0.06 时理想眼 0.8278 对应 0.8873,约 0.06 UI 没归到任何原因。

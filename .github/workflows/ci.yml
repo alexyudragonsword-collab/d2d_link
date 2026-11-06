@@ -10,10 +10,14 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
   # pushes are never cancelled: each run's fingerprint job judges the commits
   # its push brought (before..head), and a cancelled run left a range nobody
-  # compared (performance round III, third health check)
+  # compared (performance round III, third health check). cancel-in-progress
+  # false is not enough: a concurrency group keeps one *pending* run and a
+  # newer push replaces it (32f1371's run was dropped that way, sixth health
+  # check), so each push gets a group of its own; pull requests share one per
+  # ref and cancel the superseded run
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
