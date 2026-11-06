@@ -446,3 +446,30 @@ def test_single_ended_file_with_the_modules_lanes_is_read_lane_by_lane(tmp_path)
     g = run_link(group)
     assert g.stat[0].main_cursor_v == g.stat[1].main_cursor_v == pytest.approx(mains[0], rel=1e-12)
     assert not file_per_lane(LinkConfig(lanes=LaneConfig(count=3)))
+
+
+def test_per_lane_file_with_behavioural_fext_keeps_the_cos_factor(tmp_path):
+    """A Touchstone through with behavioural FEXT on top: the per-lane file
+    path and the representative path give the through the same cos factor
+    (0.15.5; until then the per-lane path dropped it -- sixth health check)."""
+    skrf = pytest.importorskip("skrf")
+    from d2d_link.config import LaneConfig
+    from d2d_link.engine import run_link
+
+    cfg = LinkConfig(sim=SimConfig(stat_phase_points=16))
+    ana = ChannelModel.from_config(cfg)
+    f = ana.f[1:]
+    n = 3
+    s = np.zeros((f.size, 2 * n, 2 * n), dtype=complex)
+    for i in range(n):
+        s[:, n + i, i] = s[:, i, n + i] = ana.H[1:]
+    skrf.Network(f=f, s=s, z0=50.0, f_unit="Hz").write_touchstone(str(tmp_path / "flat3"), form="ri")
+    ch = ChannelConfig(kind="touchstone", file=str(tmp_path / "flat3.s6p"), touchstone_mode="single_ended", lane=1,
+                       xtalk="fext", xtalk_adjacent_db=-20.0, coupled_length_mm=25.0)
+    per_lane = run_link(dataclasses.replace(cfg, channel=ch, lanes=LaneConfig(count=3)))
+    # the representative path (a 4-lane module on a 3-lane file reads lane 1 for every lane, and the file's lanes
+    # are identical): lane 0 has one line on each distance in both modules
+    group = run_link(dataclasses.replace(cfg, channel=ch, lanes=LaneConfig(count=4)))
+    assert per_lane.stat[0].main_cursor_v == pytest.approx(group.stat[0].main_cursor_v, rel=1e-9)
+    plain = run_link(dataclasses.replace(cfg, channel=dataclasses.replace(ch, xtalk="none"), lanes=LaneConfig(count=3)))
+    assert per_lane.stat[0].main_cursor_v < plain.stat[0].main_cursor_v          # the cos factor is there

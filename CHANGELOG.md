@@ -4,6 +4,15 @@
 
 ---
 
+## [0.15.5] — 2026-11-06 — 第六次体检中等项:归因与文件直通(bundled 数字不变)
+
+- `report.switched_off`:「抖动关」也把 `qdr_quadrature_ui` 置 0(此前 x1 QDR q = 0.06 时约 0.06 UI 不归任何原因)。
+- `run_link`:按 lane 读 Touchstone 文件时,行为级串扰(`xtalk: fext` / `coupled`)也给直通乘 cos 因子,与代表性线组路径一致
+  (此前合成 3 lane 文件上中间 lane 0.6508 对 0.6330 UI);`xtalk: touchstone` 时线数为 (0, 0),不变。
+- 两个新测试。指纹 3452 值逐位相同。
+
+---
+
 ## [0.15.4] — 2026-11-06 — 指纹覆盖新路径(只加值,不动已有的)
 
 - `tools/fingerprint.py` 的合成用例加三个:`qdr_dcd_skew`(forwarded_qdr + DCD + I/Q 偏差,两个引擎)、`next_free_phase`(3 lane、反向邻居、自由相位取最差)、

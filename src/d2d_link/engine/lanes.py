@@ -251,10 +251,13 @@ def run_link(cfg: LinkConfig, resp: LinkResponse | None = None) -> LinkResult:
     for lane, phys in active:
         lines = coupled_lines(cfg, phys)
         if per_lane:
-            # the file's own lane: its through and its neighbours (the behavioural cos factor does not apply)
+            # the file's own lane: its through and its neighbours; with behavioural
+            # crosstalk on top (xtalk fext / coupled) the through takes the same cos
+            # factor the representative path gives it (0.15.5: it did not, sixth
+            # health check); with xtalk touchstone lines is (0, 0) and nothing changes
             if phys not in file_resp:
                 file_resp[phys] = link_response(dataclasses.replace(cfg, channel=dataclasses.replace(cfg.channel, lane=phys)))
-            lane_resp[phys] = file_resp[phys]
+            lane_resp[phys] = lane_response(cfg, file_resp[phys], lines)
         else:
             if lines not in through:
                 through[lines] = lane_response(cfg, resp, lines)

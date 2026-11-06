@@ -57,3 +57,13 @@ def test_x1_sensitivity_numbers_the_docs_quote():
     assert fe["high"]["margin"] == s["nominal"]["margin"] and fe["source"] == "model"
     sides = sorted(r[k]["margin"] for r in s["rows"] for k in ("low", "high"))
     assert sides[0] == rows["target.eye_width_ui"]["high"]["margin"]          # the nearest side is the target's
+
+
+def test_jitter_off_clears_the_quarter_rate_skew():
+    """The QDR I/Q skew is a clock-phase error: switching jitter off removes
+    it with the duty-cycle error (0.15.5; sixth health check)."""
+    from d2d_link.report import switched_off
+
+    cfg = LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=PROFILE, dcd_ui=0.02, qdr_quadrature_ui=0.06))
+    ck = switched_off(cfg, {"jitter"}).clocking
+    assert ck.qdr_quadrature_ui == 0.0 and ck.dcd_ui == 0.0 and ck.scheme == "forwarded_qdr"

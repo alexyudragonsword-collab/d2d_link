@@ -351,9 +351,10 @@ def attribution_causes(cfg) -> tuple[str, ...]:
 def switched_off(cfg, off):
     """``cfg`` with the named causes removed: crosstalk -> ``xtalk`` and
     ``xtalk_next`` none; jitter -> every clock-path term zero (both PLL
-    profiles and white parts, path white and wander, tree jitter, DCD; the
-    tree's delay and the tracker stay, with nothing to track they cost
-    nothing); PI step -> ``clocking.pi_step_ui`` 0 and an ideal deskew."""
+    profiles and white parts, path white and wander, tree jitter, DCD and the
+    QDR I/Q skew (0.15.5; until then a 0.06 UI skew stayed in the "ideal"
+    eye, sixth health check); the tree's delay and the tracker stay, with
+    nothing to track they cost nothing); PI step -> ``clocking.pi_step_ui`` 0 and an ideal deskew."""
     import dataclasses
 
     R = dataclasses.replace
@@ -363,7 +364,7 @@ def switched_off(cfg, off):
     if "jitter" in off:
         ck = R(ck, pll_profile=None, pll_rj_s=0.0, local_pll_profile=None, local_pll_rj_s=0.0, data_path_rj_s=0.0,
                clock_path_rj_s=0.0, tree_rj_s=0.0, data_path_wander_s=0.0, clock_path_wander_s=0.0, dcd_ui=0.0,
-               tx_dcd_ui=0.0)
+               tx_dcd_ui=0.0, qdr_quadrature_ui=0.0)
     if "PI step" in off:
         ck = R(ck, pi_step_ui=0.0)
         ln = R(ln, deskew_with_tracker="ideal")
