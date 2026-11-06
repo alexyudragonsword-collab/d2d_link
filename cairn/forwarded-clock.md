@@ -76,14 +76,16 @@ t_rx[k]   = (h_tree ⊛ t_pll)[k − τ] + n_t[k]                   树:延时 �
   量化核的两端节点带小数权重,使方差正好是 w²/12(0.12 取整到整数个节点,x5 的 1/64 UI 多 11 % 方差)。
 - **发端 DCD**(段 15,`ForwardedClock.sampling_dcd_ui()`):fs/2 的单音,无本地 PLL 时经 Re E(1 − ρG)(fs/2) 到达采样器(30 ps 树 ≈ 1.7),有本地 PLL 时全额;0.12 当作完全抵消。
 
-## 四分之一速率前向时钟(0.15.0,示例 15;全部 source: model)
+## 四分之一速率前向时钟(0.15.0 / 0.15.1,示例 15;全部 source: model)
 
-- `clocking.scheme: forwarded_qdr`:时钟 fs/4、边沿 2 UI 一个、4 相发生器在边沿间内插。模型两处变化:
-  `ForwardedClock.h_edges` = sinc²(2f/fs)(线性内插在边沿率 fs/2 上的相位传递,fs/4 处 0.405、fs/2 处 0)乘进 `g_clock` 与合成的时钟路径;
-  `sampling_offsets_ui` 给四相偏移 (−dcd − q, −dcd + q, dcd − q, dcd + q)/2(`qdr_quadrature_ui` = q),两个引擎都按 k mod 4 用。DDR 路径逐位不变。
-- 数字:x1(无本地 PLL)泄漏 223.4 → 151.1 fs、残余 365.5 → 292.5 fs、眼宽 0.709 → 0.755 UI —— 30 ps 树在 fs/2 附近把 |1 − G|² 翻到约 3,
-  QDR 下 G → 0,泄漏回到 1 倍底噪;x16 模块(1 MHz 本地 PLL)不变。I/Q 偏差 q 像 PI 箱一样按宽度收费:q = 0.02 UI 费 0.019 UI。
-- **坑**:边沿采样的混叠没建模。fs/4 以上的相噪在 fs/2 的边沿率上会折回带内,真实 QDR 未必有这 0.046 UI 的改善;在混叠项加上之前不要拿它做判定。
+- `clocking.scheme: forwarded_qdr`:时钟 fs/4、边沿 2 UI 一个、4 相发生器在边沿间线性内插。在 UI 网格上就是「隔一个保留、其余取左右均值」:
+  相位音调 f 留下 cos²(πf/fs) 的自己(fs/4 处 1/2、fs/2 处 0),外加同样权重的镜像 fs/2 − f(`JitterBudget.edge_alias_s`)。
+  合成在时钟路径上真做这个抽取与内插,闭式用 cos² 加镜像项;x1 上两者 334.2 对 334.4 fs(`tests/test_engines_m2.py`)。
+  `sampling_offsets_ui` 给四相偏移 (−dcd − q, −dcd + q, dcd − q, dcd + q)/2,两个引擎都按 k mod 4 用。DDR 路径逐位不变。
+- 数字(0.15.1):x1(无本地 PLL)泄漏 223.4 → 156.1 fs、边沿混叠 151.8 fs、残余 365.5 → 334.2 fs、眼宽 0.709 → 0.729 UI;x16 模块(1 MHz 本地 PLL)331.5 → 331.6 fs、眼不变。
+  I/Q 偏差 q 像 PI 箱一样按宽度收费:q = 0.02 UI 费 0.019 UI。
+- **坑(已修)**:0.15.0 用连续时间内插的 sinc² 且没有镜像项,x1 残余读成 292.5 fs、眼宽 0.755 UI —— 把边沿间看不见的噪声当成了「消失」,其实它折回了带内。
+  还没建模:4 相发生器自身的抖动、杂散的镜像(镜像音调)。
   contains: pitfall
 
 ## 决策记录

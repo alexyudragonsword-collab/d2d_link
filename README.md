@@ -95,7 +95,7 @@ Crosstalk、Receiver、Sweeps(tracker 带宽 / 本地 PLL / reach);右栏队列(
 | `12_eye_width_attribution.py` | 眼宽输给了谁 | 每个 bundled 配置最差 lane 的眼宽缺口按 串扰 / 抖动 / PI 步长 拆(Shapley,各份相加正好是缺口;`budget_report.py --attribution`)。**抖动处处最大**:x1 0.178 UI 全是它;x16 模块缺口 0.220 = 抖动 73 % + 串扰 22 % + PI 5 %;x16 repair 与 x64 spare 抖动 77 %、PI 步长 23 %;x5 耦合 0.316 = 串扰 48 % + 抖动 48 %(0.14.1 直通 cos 项把串扰的份额从 45 % 抬到 48 %)。对 0.65 UI(0.14.0)只有 x5 与 x64 + FEXT 不过:x5 单关串扰或单关抖动都能过,x64 + FEXT 单关任一项都过 |
 | `13_sensitivity.py` | 哪些估计决定判定 | 每个 bundled 配置的 `budget_report.py --sensitivity`(±20 %、dB ±3 dB、目标 ±10 mV / ±0.05 UI):x1 +0.091、x64 spare +0.093 什么都不翻;x16 模块 +0.066 只有目标 0.70 UI 翻(−0.010);**x16 repair +0.028 被发端 PLL 剖面 +3 dB(−0.034)和目标 0.70 UI(−0.045)翻**,不翻里最近的是数据路径白抖 +20 %(+0.005)与 Z0 40 Ω(+0.006);x5 −0.121 什么都不翻(最近:目标 0.60 UI −0.047、介质 24 µm −0.054)。约 6 分钟(四核并行) |
 | `14_repair_margin.py` | x16 repair 的薄余量靠什么 | 没有本地 PLL:残余 365.5 fs 里 Tx PLL 经 30 ps 树的泄漏占 37 % 功率,另有 1/16 UI(1.95 ps)PI 步长。bundled 只扛得住 PLL 剖面 **+1.5 dB**;单个杠杆:PI 1/32 UI → +3.4 dB、1/64 UI → +4.1 dB,数据路径白抖 100 fs → +3.0 dB,树 15 ps → +4.1 dB、0 ps → > 12 dB,加 x16 的本地 PLL → +4.9 dB;跟踪器 5 MHz 不动(配置里没有漫游) |
-| `15_quarter_rate_clock.py` | 四分之一速率前向时钟会怎样 | `forwarded_qdr`(0.15.0,source: model):x1 泄漏 223.4 → 151.1 fs、眼宽 0.709 → 0.755 UI(边沿间内插不跟 fs/2 附近的相噪,30 ps 树的翻倍消失);x16 模块不变(本地 PLL 早已截断)。I/Q 偏差 0.02 / 0.06 UI 费 0.019 / 0.059 UI。**混叠未建模**,改善可能偏乐观 |
+| `15_quarter_rate_clock.py` | 四分之一速率前向时钟会怎样 | `forwarded_qdr`(source: model):边沿间内插不再跟 fs/2 附近的相噪,30 ps 树的翻倍消失(x1 泄漏 223.4 → 156.1 fs),但边沿采样把时钟路径在 fs/2 − f 的噪声折回来(151.8 fs,0.15.1):残余 365.5 → 334.2 fs、眼宽 0.709 → 0.729 UI;x16 模块不变。I/Q 偏差 0.02 / 0.06 UI 费 0.019 / 0.059 UI |
 
 ## 规范数字
 

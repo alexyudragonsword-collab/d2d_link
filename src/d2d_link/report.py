@@ -24,6 +24,7 @@ def budget_rows(cfg, clock) -> list[tuple[str, float]]:
             ("clock path wander", b.clock_wander_s),
             ("receive tree jitter", b.tree_s),
             ("profile spurs after the same leaks (sinusoids)", b.spur_s),
+            ("QDR edge sampling: clock noise folded from fs/2 - f", b.edge_alias_s),
             ("phase-interpolator quantisation (uniform)", clock.quantisation_sigma_s())]
     return rows
 

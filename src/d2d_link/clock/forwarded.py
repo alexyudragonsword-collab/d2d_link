@@ -103,13 +103,14 @@ class JitterBudget:
     f_lo_hz: float            # lowest offset in the band (1 / (block UI))
     f_hi_hz: float            # the edge-rate Nyquist
     spur_s: float = 0.0       # the profiles' spurs after the same leaks (RMS of sinusoids: sum A^2/2)
+    edge_alias_s: float = 0.0  # forwarded_qdr: clock-path noise folded from fs/2 - f by the edge sampling (0.15.1)
 
     @property
     def gaussian_s(self) -> float:
         """The Gaussian part of the residual (everything but the spurs)."""
         return math.sqrt(self.common_leak_s ** 2 + self.local_pll_s ** 2 + self.data_path_s ** 2
                          + self.data_wander_s ** 2 + self.clock_path_s ** 2 + self.clock_wander_s ** 2
-                         + self.tree_s ** 2)
+                         + self.tree_s ** 2 + self.edge_alias_s ** 2)
 
     @property
     def total_s(self) -> float:
@@ -251,14 +252,17 @@ class ForwardedClock:
         its edges. ``forwarded_ddr``: both edges sample, one per UI -- the
         clock's phase is seen at the data's own rate (None: nothing to apply).
         ``forwarded_qdr``: the clock runs at fs/4, its edges come every 2 UI,
-        and the 4-phase generator interpolates the phase between them; a
-        linear interpolation at edge rate fs/2 passes sinc^2(2 f / fs) of a
-        phase tone (0.405 at fs/4, 0 at fs/2) -- the Tx PLL's noise there
-        reaches the data but not the sampler. A first-order estimate
-        (source: model): the aliasing of the edge sampling is not modelled."""
+        and the 4-phase generator interpolates the phase linearly between
+        them. On the UI grid the sampler lives on that is: keep every other
+        sample, fill the rest with the mean of their neighbours -- a phase
+        tone at f comes out as cos^2(pi f / fs) of itself (1/2 at fs/4, 0 at
+        fs/2) plus as much of its image at fs/2 - f, which ``edge_alias_s``
+        carries in the closed form and the synthesis gets by doing exactly
+        that (0.15.1; 0.15.0 had sinc^2(2 f / fs), the continuous-time
+        interpolation, and no image). source: model."""
         if self.cfg.clocking.scheme != "forwarded_qdr":
             return None
-        return np.sinc(2.0 * np.asarray(f, dtype=np.float64) / self.fs) ** 2
+        return np.cos(np.pi * np.asarray(f, dtype=np.float64) / self.fs) ** 2
 
     def g_clock(self, f: np.ndarray) -> np.ndarray:
         """Forwarded-clock input to sampler clock: the edges' view of it
@@ -353,7 +357,24 @@ class ForwardedClock:
             clock_wander_s=rms(g2 * self.wander_psd(ck.clock_path_wander_s, f)) if ck.clock_path_wander_s > 0.0 else 0.0,
             tree_s=math.sqrt(e_sum * self.white_psd(ck.tree_rj_s)),
             f_lo_hz=float(f[0]), f_hi_hz=float(f[-1]),
-            spur_s=math.sqrt(sum(0.5 * a * a for _, a in self.spur_terms())))
+            spur_s=math.sqrt(sum(0.5 * a * a for _, a in self.spur_terms())),
+            edge_alias_s=self._edge_alias_s(f, e, df))
+
+    def _edge_alias_s(self, f: np.ndarray, e: np.ndarray, df: float) -> float:
+        """forwarded_qdr: what the edge sampling folds from fs/2 - f onto f --
+        the clock path's whole noise there (its Tx PLL part, common and own,
+        its white and wander terms) through the same |G|^2 the in-band part
+        sees (G carries cos^2) and the tracker. Uncorrelated with the data's
+        noise at f, so it adds in power. 0 for DDR."""
+        if self.cfg.clocking.scheme != "forwarded_qdr":
+            return 0.0
+        ck = self.cfg.clocking
+        fa = np.maximum(0.5 * self.fs - f, f[0])           # the image; at fs/2 itself |G|^2 is 0
+        clock_psd = self.pll_timing_psd(fa) + self.white_psd(ck.clock_path_rj_s)
+        if ck.clock_path_wander_s > 0.0:
+            clock_psd = clock_psd + self.wander_psd(ck.clock_path_wander_s, fa)
+        g2 = np.abs(self.g_clock(f)) ** 2
+        return math.sqrt(float(np.sum(e * g2 * clock_psd) * df))
 
     def residual_sigma_s(self) -> float:
         return self.budget().total_s
@@ -526,10 +547,13 @@ class ForwardedClock:
             return x
         n = x.size
         f = np.fft.rfftfreq(n, d=self.ui)
+        if self.cfg.clocking.scheme == "forwarded_qdr" and n % 2 == 0:
+            # the clock's edges every 2 UI, the phases between them interpolated
+            # (circular, like the block's FFT): cos^2(pi f / fs) and its image
+            x = x.copy()
+            ev = x[0::2]
+            x[1::2] = 0.5 * (ev + np.roll(ev, -1))
         spec = np.fft.rfft(x)
-        he = self.h_edges(f)
-        if he is not None:
-            spec = spec * he
         if local is not None:
             h = self.h_pll(f)
             spec = spec * h + np.fft.rfft(local) * (1.0 - h)

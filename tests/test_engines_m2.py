@@ -102,8 +102,31 @@ def test_quarter_rate_clock_pieces():
     assert q.sampling_offsets_ui() == pytest.approx((-0.05, 0.01, -0.01, 0.05))
     fs = q.fs
     he = q.h_edges(np.array([0.0, fs / 4, fs / 2]))
-    assert he[0] == 1.0 and he[1] == pytest.approx((2 / np.pi) ** 2) and he[2] == pytest.approx(0.0, abs=1e-30)
+    assert he[0] == 1.0 and he[1] == pytest.approx(0.5) and he[2] == pytest.approx(0.0, abs=1e-30)      # cos^2 (0.15.1)
+    assert ddr.budget().edge_alias_s == 0.0
     plain = ForwardedClock(LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=PROFILE)))
     assert plain.sampling_offsets_ui() == (0.0,)
     with pytest.raises(ValueError, match="forwarded_qdr"):
         ClockingConfig(qdr_quadrature_ui=0.01)
+
+
+
+def test_quarter_rate_edge_aliasing_closed_form_matches_the_synthesis():
+    """0.15.1: the edge sampling folds the clock path's noise at fs/2 - f onto
+    f (``JitterBudget.edge_alias_s``); the synthesis does the decimation and
+    linear interpolation itself. The two must give the same residual RMS
+    (0.15.0 had only the in-band sinc^2 and read x1 70 fs low)."""
+    import numpy as np
+    import pytest
+
+    from d2d_link.clock.forwarded import ForwardedClock
+
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0),
+                     clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=PROFILE, data_path_rj_s=200e-15,
+                                             clock_path_rj_s=200e-15, tree_delay_ps=30.0, tree_bw_hz=20e9),
+                     sim=SimConfig(jitter_block=1 << 16))
+    fc = ForwardedClock(cfg)
+    b = fc.budget()
+    assert b.edge_alias_s > 0.3 * b.common_leak_s
+    j = fc.synthesize(1 << 19, np.random.default_rng(7), 1)[0]
+    assert float(np.std(j)) == pytest.approx(b.gaussian_s, rel=0.02)
