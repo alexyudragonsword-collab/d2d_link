@@ -200,7 +200,7 @@ def aggressors_of(cfg: LinkConfig, lm: LaneMap, phys: int, skews_ps: np.ndarray)
 #: the reverse lane's symbol phases a lane is run at when ``lanes.reverse_phase_ui``
 #: is None (the return module's clock has no fixed phase to this one): the
 #: worst by margin is kept. On example 08's x5 edge lanes the eye width moves
-#: <= 0.0008 UI over these (the near-end pulse is ~8.5 UI long and smooth)
+#: <= 0.0011 UI over these (the near-end pulse is ~8.5 UI long and smooth)
 REVERSE_PHASES = tuple(i / 8 for i in range(8))
 
 

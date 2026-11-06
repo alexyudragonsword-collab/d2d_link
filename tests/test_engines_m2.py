@@ -79,7 +79,7 @@ def test_wander_dominated_with_tracker():
 def test_quarter_rate_clock_with_quadrature_skew():
     """0.15.0: ``forwarded_qdr`` samples on four phases; a quadrature skew
     splits them -+q/2 on top of the duty-cycle split, and the edges' view of
-    the clock (sinc^2(2 f / fs), linear interpolation at fs/2 edges) shapes
+    the clock (cos^2(pi f / fs) and its image since 0.15.1) shapes
     the common-mode leak. Both engines see the same four offsets."""
     cfg = LinkConfig(channel=ChannelConfig(length_mm=2.0),
                      clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=PROFILE, data_path_rj_s=1e-12,
@@ -115,7 +115,7 @@ def test_quarter_rate_edge_aliasing_closed_form_matches_the_synthesis():
     """0.15.1: the edge sampling folds the clock path's noise at fs/2 - f onto
     f (``JitterBudget.edge_alias_s``); the synthesis does the decimation and
     linear interpolation itself. The two must give the same residual RMS
-    (0.15.0 had only the in-band sinc^2 and read x1 70 fs low)."""
+    (0.15.0 had only the in-band sinc^2 and read x1 41.7 fs low)."""
     import numpy as np
     import pytest
 

@@ -7,7 +7,7 @@
 
 ---
 
-> 编号不重排:旧编号被代码注释、测试与 LOG 引用(P2 #1 做完已删,P3 #5 仍在 `tools/example_drift.py` 里被引用)。
+> 编号不重排:旧编号被代码注释、测试与 LOG 引用(P2 #1、#4 做完已删,P3 #5 仍在 `tools/example_drift.py` 里被引用)。
 
 ## P1 — 结论的可信度
 
@@ -52,6 +52,17 @@
 
 3. **Touchstone 路径只测过合成文件**(`tests/test_channel.py`:无损 4 端口、有损 + 直流补齐、单端 6 端口、有损 50 GHz 截断 + 直通与耦合项的带外延拓);没有真实封装 S 参数文件。接口留着,数据没有。
    延拓是外推(直通按最后十倍频的斜率,耦合沿直通的衰减):合成文件上剩 0.005 UI 的直通延拓误差;真实文件的带外行为未知,文件带宽低于 4 × Nyquist 时把这一项列进该链路的不确定度。
+
+4. **第六次体检(2026-11-06,0.14.4–0.15.1)的余项**(报告:scratchpad `health_check_2026-11-06.md`;没有判定或文档数字错,文档里的过期处已改):
+   - **CI 的推送运行会被吞掉**(高):`cancel-in-progress` 对推送为 false,但 GitHub 并发组每组只留一个排队中的运行,新推送顶掉排队的旧运行
+     (32f1371 的运行 0 个作业即取消,ac797ed..32f1371 没被检查;693a120 同样)。修:推送时并发组带 `github.sha`。
+   - **指纹不走新路径**(中):`tools/fingerprint.py` 的合成用例没有 forwarded_qdr、自由反向相位、按 lane 读的 Touchstone —— 0.14.4 / 0.14.9 / 0.15.x 的数只有 examples-full 看得见,
+     而 examples-full 不在分支上跑(只在 main / PR / 每周)。
+   - **归因的「抖动关」留着 QDR I/Q 偏差**(中):`report.switched_off` 没把 `qdr_quadrature_ui` 置 0;x1 QDR q = 0.06 时理想眼 0.8278 对应 0.8873,约 0.06 UI 没归到任何原因。
+   - **按 lane 读文件时丢了行为级 cos**(中):`touchstone` 信道 + `xtalk: fext` 时,文件 lane 数等于模块线数走 `file_per_lane`、不乘 `through_factor`,不等时乘;
+     合成 3 lane 文件 count = 3 中间 lane 0.6508 UI、count = 4 时 0.6330 UI。要么两条路都乘,要么都不乘并写明。
+   - 低:`reverse_adjacent` 不限边缘 lane(非边缘 lane 会算出一位 3 条线);QDR 在 q = 0 时偏移退回 DDR 两相(时域符号顺序跳变);`_edge_alias_s` 不含杂散镜像
+     (−50 dBc @ 3 GHz 时约 8 fs);表外速率告警每进程一次、GUI 看不到;按 lane 读文件的测试没覆盖邻线与 spare;`@20` 回退与区间重叠只在查询时才报;冒烟子集无单测。
 
 ## P3 — 能力扩展
 
