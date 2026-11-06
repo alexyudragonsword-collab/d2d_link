@@ -4,6 +4,15 @@
 
 ---
 
+## [0.15.7] — 2026-11-06 — 训练眼监视器的统计误差(新能力;bundled 数字不变)
+
+- `rx.training_dwell_symbols`(眼监视器每相位数的符号数)与 `rx.training_sigmas`(默认 3):边沿交点的误差 1/(√(Np)·ln10·|d log10 BER/dx|),
+  中心取两边平方和根的一半(`StatisticalEngine.centring_sigma_ui`);lane 在 k σ 处向较近的边判。`extras["training_sigma_ui"]`。GUI 表单加两格。
+- 示例 09:x1 在 1e-6 时 N = 1e7 → σ 0.00061 UI、眼宽 0.7028(精确边沿 0.7064);N = 1e9 → σ 0.00006 UI。新测试:σ ∝ 1/√N、移位 = 3σ、校验。
+- ROADMAP P3 #3 改写。指纹逐位相同(默认不驻留)。
+
+---
+
 ## [0.15.6] — 2026-11-06 — 第六次体检低项(bundled 数字不变)
 
 - `lanes.reverse_adjacent` 只收边缘 lane(0 或 count + spare − 1):中间 lane 会算出一位外三条线。

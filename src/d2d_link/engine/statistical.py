@@ -806,6 +806,21 @@ class StatisticalEngine:
             i = j + 1
         return (best[1], best[2]) if best else None
 
+    @staticmethod
+    def centring_sigma_ui(phases: np.ndarray, log10_ber: np.ndarray, edges: tuple[float, float], p: float,
+                          n_symbols: int) -> float:
+        """The RMS error [UI] of an eye centre found by counting ``n_symbols``
+        at each phase and taking the crossings of BER ``p``: at an edge the
+        count is Poisson(N p), so the crossing moves by
+        1 / (sqrt(N p) ln 10 |d log10 BER / dx|); the centre, half the sum of
+        two independent edges, by half their quadrature sum."""
+        slope = np.gradient(np.asarray(log10_ber, dtype=np.float64), np.asarray(phases, dtype=np.float64))
+        sig = []
+        for x in edges:
+            s = abs(float(np.interp(x, phases, slope)))
+            sig.append(1.0 / (math.sqrt(n_symbols * p) * math.log(10.0) * s) if s > 0.0 else float("inf"))
+        return 0.5 * math.sqrt(sig[0] ** 2 + sig[1] ** 2)
+
     # ------------------------------------------------------------ run
     def run(self, lane: int = 0, skew_residual_ui: float = 0.0) -> StatResult:
         cfg = self.cfg
@@ -828,6 +843,7 @@ class StatisticalEngine:
         else:
             center = float(phases[i_min])
         target_centre = center
+        training_sigma = 0.0
         if cfg.rx.training_ber is not None and ew > 0.0:
             # link training centres the sampler between the edges it can see
             # at its own BER (phase 7): an asymmetric bathtub puts that
@@ -836,6 +852,15 @@ class StatisticalEngine:
             training = self.eye_region(phases, ber, cfg.rx.training_ber, refine=self.eye_edge)
             if training is not None:
                 center = 0.5 * (training[0] + training[1])
+                if cfg.rx.training_dwell_symbols is not None:
+                    # the eye monitor counts N symbols per phase: each edge it finds is off by
+                    # sqrt(N p) errors' worth, sigma = 1 / (sqrt(N p) ln10 |d log10 BER / dx|),
+                    # and the centre by half their quadrature sum; the lane is judged
+                    # training_sigmas of that toward its nearer edge (0.15.7)
+                    training_sigma = self.centring_sigma_ui(phases, ber, training, cfg.rx.training_ber,
+                                                            cfg.rx.training_dwell_symbols)
+                    shift = cfg.rx.training_sigmas * training_sigma
+                    center = center - shift if (center - left) <= (right - center) else center + shift
         if cfg.rx.sampling_phase_ui is not None:
             center = target_centre = cfg.rx.sampling_phase_ui
         phase = center + skew_residual_ui
@@ -864,6 +889,7 @@ class StatisticalEngine:
                     "spur_rms_s": self.budget.spur_s, "n_spurs": len(self.spurs_ui),
                     "phase_min_ui": float(phases[i_min]),
                     "training_centre_ui": float(center), "centre_offset_ui": float(center - target_centre),
+                    "training_sigma_ui": float(training_sigma),
                     "noise_gain": float(self.noise_gain), "sigma_noise_input_v": float(cfg.rx.noise_rms_v),
                     "eye_width_raw_ui": float(ew_raw), "eye_width_clipped": bool(clipped),
                     "insertion_loss_nyquist_db": self.resp.channel.insertion_loss_db(cfg.f_nyquist),

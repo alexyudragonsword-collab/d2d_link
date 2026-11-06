@@ -102,6 +102,12 @@ for tb in (None, 1e-3, 1e-6, 1e-9):
     r = ideal if tb is None else run_statistical(with_rx(x1, training_ber=tb))
     print(f"{'x1':>22s} {('target ' + f'{r.target_ber:.0e}') if tb is None else f'{tb:.0e}':>13s} {r.phase_ui:+12.5f} "
           f"{r.extras['centre_offset_ui']:+12.5f} {r.eye_width_ui:9.4f} {1e3 * r.eye_height_v:9.1f}")
+for dwell in (10_000_000, 1_000_000_000):
+    # the eye monitor counts a finite dwell at each phase (0.15.7): its centre is off by
+    # sigma ~ 1 / sqrt(N p); the lane is judged 3 sigma toward its nearer edge
+    r = run_statistical(with_rx(x1, training_ber=1e-6, training_dwell_symbols=dwell))
+    print(f"{'x1, dwell ' + format(dwell, '.0e'):>22s} {'1e-06':>13s} {r.phase_ui:+12.5f} {r.extras['centre_offset_ui']:+12.5f} "
+          f"{r.eye_width_ui:9.4f} {1e3 * r.eye_height_v:9.1f}   (centring sigma {r.extras['training_sigma_ui']:.5f} UI)")
 x5 = load_config(CONFIGS / "standard_32g_x5_coupled.yaml")
 res_t = run_link(x5)
 res_e = run_link(with_rx(x5, training_ber=1e-3))

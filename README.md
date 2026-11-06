@@ -70,7 +70,7 @@ Markulic 2016 SSPLL 剖面(100 Hz..f0/2 186 fs,由 pll_simulator 算到 16 GHz 2
 ## 段 7:收端机制(0.9.0)
 
 `rx.bw_hz`(收端前端一阶极点,数据边沿的"树带宽")、`rx.noise_at: sampler | input`(噪声在采样点还是在前端输入 —— CTLE 的噪声代价由此而来)、
-`rx.training_ber`(训练在哪个 BER 上居中);默认值全部保持旧行为,bundled 配置指纹逐位相同。机制与数字见 `cairn/receiver.md`。
+`rx.training_ber`(训练在哪个 BER 上居中)与 `rx.training_dwell_symbols`(眼监视器每相位数多少符号,0.15.7:居中误差按 3σ 计);默认值全部保持旧行为,bundled 配置指纹逐位相同。机制与数字见 `cairn/receiver.md`。
 
 | 示例 | 问题 | 答案(当前版本) |
 |---|---|---|

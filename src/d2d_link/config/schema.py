@@ -448,6 +448,9 @@ class RxConfig:
     sampling_phase_ui: Optional[float] = None   # None = the bathtub minimum (eye-centred tracker)
     vref_offset_v: float = 0.0             # decision threshold offset from mid-swing
     training_ber: Optional[float] = None   # eye-centring BER of link training; None = the target BER
+    training_dwell_symbols: Optional[int] = None   # symbols the eye monitor counts per phase (0.15.7); None = exact edges
+    training_sigmas: float = 3.0           # with a dwell: the lane is judged that many sigma of the centring error
+                                           # toward its nearer edge (3 = 99.7 % of trainings), source: model
 
     def __post_init__(self):
         _finite_nonneg(self.noise_rms_v, "rx.noise_rms_v")
@@ -462,6 +465,10 @@ class RxConfig:
         if self.training_ber is not None:
             _require(0.0 < self.training_ber < 0.5,
                      f"rx.training_ber must be in (0, 0.5), got {self.training_ber!r}")
+        if self.training_dwell_symbols is not None:
+            _require(self.training_ber is not None, "rx.training_dwell_symbols needs rx.training_ber (the BER it counts at)")
+            _require(self.training_dwell_symbols >= 1, f"rx.training_dwell_symbols must be >= 1, got {self.training_dwell_symbols}")
+        _finite_nonneg(self.training_sigmas, "rx.training_sigmas")
 
 
 # ---------------------------------------------------------------------------

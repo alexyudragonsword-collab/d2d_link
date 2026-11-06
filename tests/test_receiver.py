@@ -148,3 +148,24 @@ def test_training_window_follows_the_training_opening():
     assert r.bathtub_phase_ui[0] < -0.5 or r.bathtub_phase_ui[-1] > 0.5
     narrow = eng.eye_region(*eng.bathtub(-0.5, 0.5), 1e-3, refine=eng.eye_edge)
     assert abs(0.5 * (narrow[0] + narrow[1]) - r.extras["training_centre_ui"]) > 0.005
+
+
+def test_eye_monitor_dwell_puts_a_statistical_error_on_the_centre():
+    """0.15.7: training counts rx.training_dwell_symbols at each phase; the
+    centre it finds is off by sigma ~ 1/sqrt(N p) (Poisson at the edges),
+    and the lane is judged training_sigmas of it toward its nearer edge.
+    100x the dwell is 10x less sigma; no dwell = exact edges, as before."""
+    from d2d_link.config import LinkConfig, RxConfig, SimConfig
+    from d2d_link.engine import run_statistical
+
+    base = LinkConfig(rx=RxConfig(noise_rms_v=0.008, training_ber=1e-6), sim=SimConfig(stat_phase_points=16))
+    exact = run_statistical(base)
+    r7 = run_statistical(dataclasses.replace(base, rx=dataclasses.replace(base.rx, training_dwell_symbols=10_000_000)))
+    r9 = run_statistical(dataclasses.replace(base, rx=dataclasses.replace(base.rx, training_dwell_symbols=1_000_000_000)))
+    assert exact.extras["training_sigma_ui"] == 0.0
+    assert r7.extras["training_sigma_ui"] == pytest.approx(10.0 * r9.extras["training_sigma_ui"], rel=1e-9)
+    shift = r7.extras["training_centre_ui"] - exact.extras["training_centre_ui"]
+    assert abs(shift) == pytest.approx(3.0 * r7.extras["training_sigma_ui"], rel=1e-9)
+    assert r7.eye_width_ui <= exact.eye_width_ui
+    with pytest.raises(ValueError, match="training_ber"):
+        RxConfig(training_dwell_symbols=1000)

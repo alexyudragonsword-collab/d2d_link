@@ -123,6 +123,8 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
         _f("rx.sampling_phase_ui", "Sampling phase [UI] (empty = eye centre)", "opt_float"),
         _f("rx.vref_offset_v", "Vref offset [mV]", "float", scale=1e-3),
         _f("rx.training_ber", "Training BER for eye centring (empty = target BER)", "opt_float"),
+        _f("rx.training_dwell_symbols", "Eye-monitor dwell [symbols per phase] (empty = exact edges)", "opt_int"),
+        _f("rx.training_sigmas", "Centring error judged at [sigma]", "float"),
     ]),
     ("sim", "Simulation", [
         _f("sim.osr", "Samples per UI", "int"),

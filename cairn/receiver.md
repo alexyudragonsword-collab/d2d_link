@@ -5,7 +5,7 @@ summary: "收端自己的机制怎么建:前端带宽对数据边沿、噪声在
 tags: [receiver, front-end, noise, ctle, training]
 contains: [decision, lesson]
 created: "2026-10-13"
-updated: "2026-11-05"
+updated: "2026-11-06"
 related: [engines.md, forwarded-clock.md, architecture-invariants.md]
 authoring_mode: ai_generated
 ---
@@ -31,6 +31,10 @@ CTLE 白拿增益,噪声不随它变。段 7 加了三件事,默认值全部保�
 - **训练 BER** `rx.training_ber`:链路训练在它的眼监视器能看见的 BER(驻留几千到几百万符号:1e-3…1e-6)上找眼边、把采样点放在中点,
   而不是在链路被判定的 1e-27 上。浴盆不对称时两个中点不同,lane 像付 skew 残余一样付这个偏移(眼宽 = 围绕实际采样点的对称开口)。
   `extras["training_centre_ui"]`、`extras["centre_offset_ui"]`。留空 = 目标 BER 的中点(旧的理想化)。
+- **眼监视器的驻留** `rx.training_dwell_symbols`(0.15.7,source: model):每个相位只数 N 个符号,边沿处的误码数是 Poisson(N p),
+  找到的交点偏 1/(√(Np)·ln10·|d log10 BER/dx|),中心偏两边的一半平方和根(`StatisticalEngine.centring_sigma_ui`,一阶式,未用蒙特卡洛核对);
+  lane 按 `rx.training_sigmas`(默认 3,99.7 % 的训练)倍 σ 向较近的边判。x1 在 1e-6 时:N = 1e7 σ 0.00061 UI、眼宽 0.7064 → 0.7028;N = 1e9 σ 0.00006 UI。
+  x5 最差 lane 在 1e-3 / 1e5 时 σ 0.0004 UI、眼宽 −0.0025。结论:有限驻留的代价是千分之几 UI,比训练 BER 本身的偏移(x5 0.008–0.02 UI)小一个量级。
 
 ## 数字(2026-10-13,0.9.0;x1 标准 25 mm,噪声 3 mV —— 0.11 的非因果走线上;0.12.0 的同一张表见 README 示例 09 行与 `examples/expected/09_receiver_front_end.txt`,平坦前端 209.7 mV / 0.761 UI)
 
