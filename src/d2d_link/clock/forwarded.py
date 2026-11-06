@@ -314,6 +314,16 @@ class ForwardedClock:
                     out.append((fs_hz, amp_s * e * abs(1.0 - self.rho * g)))
                     if self.rho < 1.0:
                         out.append((fs_hz, amp_s * e * math.sqrt(1.0 - self.rho ** 2) * abs(g)))
+                    if self.cfg.clocking.scheme == "forwarded_qdr":
+                        # the edge sampling's image of the clock path's copy at fs/2 - f
+                        # (sin^2(pi f / fs) of it), through the tree, local PLL and
+                        # tracker there; the data has no image (0.15.6)
+                        fi = np.array([0.5 * self.fs - fs_hz])
+                        w = math.sin(math.pi * fs_hz / self.fs) ** 2
+                        gi = abs(complex((self.h_tree(fi) * self.h_pll(fi))[0])) * abs(complex(self.e_track(fi)[0]))
+                        out.append((float(fi[0]), amp_s * w * gi * self.rho))
+                        if self.rho < 1.0:
+                            out.append((float(fi[0]), amp_s * w * gi * math.sqrt(1.0 - self.rho ** 2)))
                 else:
                     h = complex((self.h_tree(fa) * (1.0 - self.h_pll(fa)))[0])
                     out.append((fs_hz, amp_s * e * abs(h)))
@@ -414,7 +424,9 @@ class ForwardedClock:
         (0,) when there is no offset at all."""
         dcd = self.sampling_dcd_ui()
         ck = self.cfg.clocking
-        if ck.scheme == "forwarded_qdr" and ck.qdr_quadrature_ui > 0.0:
+        if ck.scheme == "forwarded_qdr" and (ck.qdr_quadrature_ui > 0.0 or dcd > 0.0):
+            # the four phases even with q = 0: the symbol order is the clock's
+            # (rising, rising + 90, falling, falling + 90), not DDR's alternation
             q = ck.qdr_quadrature_ui
             return (0.5 * (-dcd - q), 0.5 * (-dcd + q), 0.5 * (dcd - q), 0.5 * (dcd + q))
         return (-0.5 * dcd, 0.5 * dcd) if dcd > 0.0 else (0.0,)

@@ -130,3 +130,20 @@ def test_quarter_rate_edge_aliasing_closed_form_matches_the_synthesis():
     assert b.edge_alias_s > 0.3 * b.common_leak_s
     j = fc.synthesize(1 << 19, np.random.default_rng(7), 1)[0]
     assert float(np.std(j)) == pytest.approx(b.gaussian_s, rel=0.02)
+
+
+def test_quarter_rate_offsets_and_spur_images():
+    """0.15.6: a QDR clock samples on four phases whenever there is an offset
+    at all (with q = 0 the order is still the clock's, not DDR's
+    alternation); a Tx spur gets its edge-sampling image at fs/2 - f."""
+    import pytest
+
+    from d2d_link.clock.forwarded import ForwardedClock
+
+    q0 = ForwardedClock(LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=PROFILE, dcd_ui=0.04)))
+    assert q0.sampling_offsets_ui() == pytest.approx((-0.02, -0.02, 0.02, 0.02))
+    wu = "data/clock_profiles/bench_wu19_spll_frac_52m_6p253g.yaml"
+    ddr = ForwardedClock(LinkConfig(clocking=ClockingConfig(pll_profile=wu, tree_delay_ps=30.0)))
+    qdr = ForwardedClock(LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=wu, tree_delay_ps=30.0)))
+    images = [f for f, _ in qdr.spur_terms() if f > 0.25 * qdr.fs]
+    assert len(qdr.spur_terms()) == 2 * len(ddr.spur_terms()) and len(images) == len(ddr.spur_terms())

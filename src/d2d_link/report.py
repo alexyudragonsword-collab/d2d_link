@@ -49,7 +49,7 @@ def report(cfg, res, clock) -> dict:
     ui = cfg.ui
     rows = budget_rows(cfg, clock)
     total = math.sqrt(sum(v ** 2 for _, v in rows))
-    from d2d_link.engine.statistical import target_keys
+    from d2d_link.engine.statistical import off_table_rate, target_keys
 
     lm = res.lanes
     t = res.targets
@@ -70,7 +70,8 @@ def report(cfg, res, clock) -> dict:
                  "verdict": "PASS" if res.passes else "FAIL"},
         "jitter_budget": [{"term": name, "fs": 1e15 * v, "ui": v / ui} for name, v in rows]
                          + [{"term": "total (power sum)", "fs": 1e15 * total, "ui": total / ui}],
-        "targets": {k: {"value": v, "source": src, "key": keys[k]} for k, (v, src) in t.items()},
+        "targets": {k: {"value": v, "source": src, "key": keys[k],
+                        **({"off_table": off_table_rate(cfg)} if k == "eye_width_ui" else {})} for k, (v, src) in t.items()},
         "crosstalk": ({"mode": cfg.channel.xtalk, **describe(cfg)} if cfg.channel.xtalk == "coupled"
                       else {"mode": cfg.channel.xtalk, **_xtalk_level(cfg, res)}),
         "channel_model": ({"rlgc_source": "model", **{k: v for k, v in cfg.rlgc().items()}}
@@ -107,7 +108,8 @@ def to_markdown(rep: dict) -> str:
         lines.append(f"| {row['term']} | {row['fs']:.1f} | {row['ui']:.4f} |")
     lines += ["", "## Targets", "", "| quantity | value | source | table key |", "|---|---:|---|---|"]
     for k, v in rep["targets"].items():
-        lines.append(f"| {k} | {v['value']:g} | {v['source']} | {v.get('key', '')} |")
+        note = " (rate in no tier: fallback, unstated for this rate)" if v.get("off_table") else ""
+        lines.append(f"| {k} | {v['value']:g} | {v['source']} | {v.get('key', '')}{note} |")
     x = rep["crosstalk"]
     lines += ["", "## Crosstalk", ""]
     if x["mode"] == "coupled":

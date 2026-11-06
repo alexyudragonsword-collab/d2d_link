@@ -239,6 +239,8 @@ class LaneConfig:
         n_phys = self.count + self.spare_count
         for i in self.reverse_adjacent:
             _require(0 <= i < n_phys, f"lanes.reverse_adjacent names lane {i}, module has {n_phys} physical lanes")
+            _require(i in (0, n_phys - 1), f"lanes.reverse_adjacent names lane {i}: only an edge lane (0 or {n_phys - 1}) "
+                     "has the return module beside it")
         _require(self.reverse_phase_ui is None or math.isfinite(self.reverse_phase_ui),
                  "lanes.reverse_phase_ui must be finite or null")
         _require(len(self.skew_ps) <= n_phys,

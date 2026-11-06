@@ -171,3 +171,12 @@ def test_dedup_key_separates_lanes_with_the_same_aggressors_but_other_lines():
         direct = run_statistical(cfg, lane_response(cfg, resp, coupled_lines(cfg, phys)), r.lane, r.skew_residual_ui,
                                  aggressors=a2)
         assert direct.eye_width_ui == r.eye_width_ui
+
+
+def test_reverse_neighbour_only_on_an_edge_lane():
+    """The return module sits beside the module's edge: a middle lane in
+    lanes.reverse_adjacent would count three lines one place away (0.15.6)."""
+    with pytest.raises(ValueError, match="only an edge lane"):
+        LaneConfig(count=5, reverse_adjacent=(2,))
+    assert LaneConfig(count=5, reverse_adjacent=(0, 4)).reverse_adjacent == (0, 4)
+    assert LaneConfig(count=4, spare_count=1, repair="spare", reverse_adjacent=(4,)).reverse_adjacent == (4,)

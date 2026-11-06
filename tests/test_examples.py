@@ -38,3 +38,25 @@ def test_only_a_missing_optional_package_is_a_skip():
     assert mod._missing_optional("ModuleNotFoundError: No module named 'skrf.io'") == "skrf"
     assert mod._missing_optional("ImportError: cannot import name 'x' from 'matplotlib' (/x)") is None
     assert mod._missing_optional("ModuleNotFoundError: No module named 'scipy'") is None
+
+
+def test_smoke_flag_reaches_the_examples(tmp_path, monkeypatch):
+    """--smoke sets D2D_LINK_SMOKE=1 for the child (examples 08 / 13 / 14 read
+    it through _common.SMOKE and run a subset); a full-size run sets 0
+    (0.14.8; sixth health check: untested)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("run_examples", REPO / "tools" / "run_examples.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    seen = []
+    monkeypatch.setattr(mod, "_one", lambda p, cap, timeout, env, save: (seen.append(env["D2D_LINK_SMOKE"]), (0, "", 0.0))[1])
+    mod.run([REPO / "examples" / "00_single_lane_eye.py"], 20_000, 10.0)
+    mod.run([REPO / "examples" / "00_single_lane_eye.py"], 0, 10.0)
+    assert seen == ["1", "0"]
+    import subprocess
+    import sys
+
+    out = subprocess.run([sys.executable, "-c", "import _common; print(_common.SMOKE)"], cwd=REPO / "examples",
+                         env={**__import__("os").environ, "D2D_LINK_SMOKE": "1"}, capture_output=True, text=True)
+    assert out.stdout.strip() == "True"

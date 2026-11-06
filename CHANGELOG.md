@@ -4,6 +4,17 @@
 
 ---
 
+## [0.15.6] — 2026-11-06 — 第六次体检低项(bundled 数字不变)
+
+- `lanes.reverse_adjacent` 只收边缘 lane(0 或 count + spare − 1):中间 lane 会算出一位外三条线。
+- QDR 只要有偏移(DCD 或 I/Q 偏差)就用四相顺序;q = 0 时不再退回 DDR 的奇偶交替(只影响时域的符号顺序)。
+- `spur_terms`:QDR 下每条 Tx 杂散的边沿采样镜像(fs/2 − f 处、sin²(πf/fs) 倍,经树、本地 PLL 与跟踪器);Wu19 剖面 +20 dB 时闭式 1057.3 对合成 1055.8–1058.5 fs。
+- `statistical.off_table_rate`:报表的 `targets.eye_width_ui.off_table` 与 Markdown 注记(GUI 用同一份报表);包级条目不算表外。
+- 综述表读入时就拒绝重叠区间(`spec.check_ranges`)。新测试:20 GT/s 回退告警与报表标记、重叠区间、边缘 lane、QDR 四相与杂散镜像、冒烟标志进子进程。
+- ROADMAP P2 #4 清空删除。指纹 3452 值逐位相同,示例 08 / 15 不变。
+
+---
+
 ## [0.15.5] — 2026-11-06 — 第六次体检中等项:归因与文件直通(bundled 数字不变)
 
 - `report.switched_off`:「抖动关」也把 `qdr_quadrature_ui` 置 0(此前 x1 QDR q = 0.06 时约 0.06 UI 不归任何原因)。

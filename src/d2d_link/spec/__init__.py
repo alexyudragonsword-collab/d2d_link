@@ -87,7 +87,23 @@ def load_survey(path: Path | str = SURVEY_FILE, allowed: tuple[str, ...] = ("sur
         if out[key].source not in allowed:
             raise ValueError(f"spec entry {key!r} in {Path(path).name}: source {out[key].source!r} "
                              f"does not belong in this table (allowed {allowed})")
+    check_ranges(out)
     return out
+
+
+def check_ranges(table: dict) -> None:
+    """Refuse overlapping rate ranges for one key when the table is read, not
+    only when a rate in the overlap is asked for (0.15.6; sixth health check)."""
+    spans: dict[str, list[tuple[float, float, str]]] = {}
+    for k in table:
+        m = re.fullmatch(r"(.+)@([0-9.]+)-([0-9.]+)", k)
+        if m:
+            spans.setdefault(m.group(1), []).append((float(m.group(2)), float(m.group(3)), k))
+    for base, items in spans.items():
+        items.sort()
+        for (a0, a1, ka), (b0, b1, kb) in zip(items, items[1:]):
+            if b0 <= a1:
+                raise ValueError(f"overlapping rate ranges for {base!r}: {ka} and {kb}")
 
 
 @lru_cache(maxsize=1)

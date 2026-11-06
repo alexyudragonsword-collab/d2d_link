@@ -227,3 +227,25 @@ def test_the_eye_width_tier_is_a_rate_range():
     table["rx_eye_width_ui@30-40"] = dataclasses.replace(base, key="rx_eye_width_ui@30-40", value=0.55)
     with pytest.raises(ValueError, match="overlapping"):
         spec.survey_tiered("rx_eye_width_ui", "standard", 31.0, table=table)
+
+
+def test_tier_fallback_and_overlap_are_caught(tmp_path, monkeypatch):
+    """Sixth health check leftovers (0.15.6): a rate in no tier (20 GT/s)
+    falls back with a warning and the report flags it; overlapping ranges
+    are refused when the table is read, not only when a rate in the overlap
+    is asked for."""
+    from d2d_link.config import LinkConfig, with_data_rate
+    from d2d_link.engine import statistical as st
+    from d2d_link.report import build
+
+    st._OFF_TABLE_WARNED.clear()
+    c20 = with_data_rate(LinkConfig(), 20)
+    with pytest.warns(UserWarning, match="neither in the survey's rate list"):
+        assert st.resolved_targets(c20)["eye_width_ui"][0] == 0.75
+    assert st.off_table_rate(c20) and not st.off_table_rate(with_data_rate(LinkConfig(), 28))
+    assert build(LinkConfig())["targets"]["eye_width_ui"]["off_table"] is False
+    bad = tmp_path / "t.yaml"
+    entry = 'value: 0.6\n    unit: UI\n    source: survey\n    cite: "x"\n    note: "未核实"'
+    bad.write_text(f"entries:\n  w@10-20:\n    {entry}\n  w@15-30:\n    {entry}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="overlapping rate ranges"):
+        spec.load_survey(bad)

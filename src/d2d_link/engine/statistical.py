@@ -97,17 +97,29 @@ def target_keys(cfg: LinkConfig) -> dict:
 _OFF_TABLE_WARNED: set = set()
 
 
-def _warn_off_table_rate(cfg: LinkConfig) -> None:
-    """A data rate outside the survey's rate list that no rate tier covers
-    falls to the plain eye-width entry: say so once per rate, since that
-    value's source states it for 4-16 GT/s only (0.14.5). A rate inside a
-    range tier (28 GT/s in ``@24-32``) is covered by that tier's source."""
+def off_table_rate(cfg: LinkConfig) -> bool:
+    """True when the eye-width target comes from the plain fallback entry at
+    a data rate that is neither in the survey's rate list nor in a rate tier
+    (the fallback's source states it for 4-16 GT/s only). A rate inside a
+    range tier (28 GT/s in ``@24-32``) or a package's own entry is covered by
+    that entry's source; a configured target is the config's claim. The
+    report carries this flag (``targets.eye_width_ui.off_table``, 0.15.6)."""
+    if cfg.target.eye_width_ui is not None:
+        return False
     rate = float(cfg.data_rate_gtps)
-    if rate in _OFF_TABLE_WARNED or cfg.target.eye_width_ui is not None:
-        return
     rates = [float(r) for r in survey_tiered("data_rates_gtps").value]
     key = survey_tiered("rx_eye_width_ui", cfg.package.kind, rate).key
-    if "@" not in key and not any(abs(rate - r) < 1e-9 for r in rates):
+    return "@" not in key and "." not in key and not any(abs(rate - r) < 1e-9 for r in rates)
+
+
+def _warn_off_table_rate(cfg: LinkConfig) -> None:
+    """Warn once per rate per process when ``off_table_rate`` holds (0.14.5)."""
+    rate = float(cfg.data_rate_gtps)
+    if rate in _OFF_TABLE_WARNED:
+        return
+    if off_table_rate(cfg):
+        key = survey_tiered("rx_eye_width_ui", cfg.package.kind, rate).key
+        rates = [float(r) for r in survey_tiered("data_rates_gtps").value]
         _OFF_TABLE_WARNED.add(rate)
         import warnings
 
