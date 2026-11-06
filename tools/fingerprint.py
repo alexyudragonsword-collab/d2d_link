@@ -103,6 +103,37 @@ def record_configs() -> dict:
     return out
 
 
+def _touchstone_case(sim):
+    """A 3-lane single-ended file (written to a temporary directory) whose
+    lanes differ in loss and couple at -20 dB, read lane by lane by a
+    3-lane module; None without scikit-rf."""
+    import tempfile
+
+    try:
+        import skrf
+    except ImportError:
+        return None
+    from d2d_link.channel.model import ChannelModel
+    from d2d_link.config import ChannelConfig, LaneConfig, LinkConfig
+
+    base = LinkConfig(channel=ChannelConfig(length_mm=20.0), sim=sim)
+    ana = ChannelModel.from_config(base)
+    f, h = ana.f[1:], ana.H[1:]
+    kx = 0.1 * np.sqrt(2.0) * (1j * f / base.f_nyquist) / (1.0 + 1j * f / base.f_nyquist)
+    n = 3
+    sp = np.zeros((f.size, 2 * n, 2 * n), dtype=complex)
+    for i, loss in enumerate((1.0, 0.95, 0.9)):
+        sp[:, n + i, i] = sp[:, i, n + i] = loss * h
+        for j in range(n):
+            if abs(i - j) == 1:
+                sp[:, n + i, j] = sp[:, j, n + i] = kx * h
+    path = Path(tempfile.mkdtemp(prefix="d2d_fp_")) / "three"
+    skrf.Network(f=f, s=sp, z0=50.0, f_unit="Hz").write_touchstone(str(path), form="ri")
+    return LinkConfig(channel=ChannelConfig(kind="touchstone", file=str(path) + ".s6p", touchstone_mode="single_ended",
+                                            xtalk="touchstone", coupled_length_mm=20.0),
+                      lanes=LaneConfig(count=3), sim=dataclasses.replace(sim, engine="statistical"))
+
+
 def record_synthetic() -> dict:
     from d2d_link.clock.forwarded import ForwardedClock
     from d2d_link.config import (ChannelConfig, ClockingConfig, CtleConfig, LaneConfig, LinkConfig,
@@ -129,6 +160,17 @@ def record_synthetic() -> dict:
                                       clocking=ClockingConfig(pll_profile=prof, data_path_rj_s=300e-15),
                                       sim=dataclasses.replace(sim, engine="statistical")),
     }
+    # 0.15.3: the paths 0.14.4-0.15.1 added, which no bundled config takes (sixth health check)
+    cases["qdr_dcd_skew"] = LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=prof, data_path_rj_s=200e-15,
+                                                               clock_path_rj_s=200e-15, tree_delay_ps=30.0, tree_bw_hz=20e9,
+                                                               dcd_ui=0.03, qdr_quadrature_ui=0.04), sim=sim)
+    cases["next_free_phase"] = LinkConfig(channel=ChannelConfig(xtalk="fext", xtalk_next="fixed", next_db=-16.0),
+                                          lanes=LaneConfig(count=3, reverse_adjacent=(0,)),
+                                          clocking=ClockingConfig(pll_profile=prof, data_path_rj_s=300e-15),
+                                          sim=dataclasses.replace(sim, engine="statistical"))
+    ts = _touchstone_case(sim)
+    if ts is not None:
+        cases["touchstone_per_lane"] = ts
     out = {}
     for name, cfg in cases.items():
         def one(cfg=cfg):

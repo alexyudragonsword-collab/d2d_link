@@ -55,8 +55,6 @@
    延拓是外推(直通按最后十倍频的斜率,耦合沿直通的衰减):合成文件上剩 0.005 UI 的直通延拓误差;真实文件的带外行为未知,文件带宽低于 4 × Nyquist 时把这一项列进该链路的不确定度。
 
 4. **第六次体检(2026-11-06,0.14.4–0.15.1)的余项**(报告:scratchpad `health_check_2026-11-06.md`;没有判定或文档数字错,文档里的过期处已改):
-   - **指纹不走新路径**(中):`tools/fingerprint.py` 的合成用例没有 forwarded_qdr、自由反向相位、按 lane 读的 Touchstone —— 0.14.4 / 0.14.9 / 0.15.x 的数只有 examples-full 看得见,
-     而 examples-full 不在分支上跑(只在 main / PR / 每周)。
    - **归因的「抖动关」留着 QDR I/Q 偏差**(中):`report.switched_off` 没把 `qdr_quadrature_ui` 置 0;x1 QDR q = 0.06 时理想眼 0.8278 对应 0.8873,约 0.06 UI 没归到任何原因。
    - **按 lane 读文件时丢了行为级 cos**(中):`touchstone` 信道 + `xtalk: fext` 时,文件 lane 数等于模块线数走 `file_per_lane`、不乘 `through_factor`,不等时乘;
      合成 3 lane 文件 count = 3 中间 lane 0.6508 UI、count = 4 时 0.6330 UI。要么两条路都乘,要么都不乘并写明。
