@@ -4,6 +4,15 @@
 
 ---
 
+## [0.15.8] — 2026-11-06 — QDR 4 相发生器自身的抖动(新能力;bundled 数字不变)
+
+- `clocking.qdr_phase_rj_s`(source: model,需 forwarded_qdr):每个采样边沿的白抖动,加在内插之后、经跟踪器(与树抖动同口径);
+  `JitterBudget.phase_gen_s`,报表抖动表一行,敏感性旋钮与归因的「抖动关」都含它,GUI 表单一格。
+- 示例 15:x1 QDR 加 100 / 200 fs → 残余 334.2 → 348.8 / 389.4 fs、眼宽 0.729 → 0.720 / 0.694 UI。闭式与合成 235.7 / 235.5 fs(新测试)。
+- 指纹新增合成用例 `qdr_phase_rj`;已有值逐位相同。
+
+---
+
 ## [0.15.7] — 2026-11-06 — 训练眼监视器的统计误差(新能力;bundled 数字不变)
 
 - `rx.training_dwell_symbols`(眼监视器每相位数的符号数)与 `rx.training_sigmas`(默认 3):边沿交点的误差 1/(√(Np)·ln10·|d log10 BER/dx|),

@@ -13,3 +13,10 @@ quadrature skew of the 4-phase generator (x1, forwarded_qdr):
    0.04   -0.020, +0.020, -0.020, +0.020    0.6906     0.0385  PASS
    0.06   -0.030, +0.030, -0.030, +0.030    0.6706     0.0585  PASS
   a box of total width q costs about q of eye width at the target BER (the phases are bounded, not Gaussian)
+
+the 4-phase generator's own white jitter (x1, forwarded_qdr, q = 0; 0.15.8):
+ RJ [fs] residual [fs]  eye [UI]  link
+       0         334.2    0.7291  PASS
+     100         348.8    0.7198  PASS
+     200         389.4    0.6937  PASS
+  white per edge like the receive tree's jitter: it adds in power to the residual

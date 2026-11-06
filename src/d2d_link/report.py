@@ -25,6 +25,7 @@ def budget_rows(cfg, clock) -> list[tuple[str, float]]:
             ("receive tree jitter", b.tree_s),
             ("profile spurs after the same leaks (sinusoids)", b.spur_s),
             ("QDR edge sampling: clock noise folded from fs/2 - f", b.edge_alias_s),
+            ("QDR 4-phase generator jitter", b.phase_gen_s),
             ("phase-interpolator quantisation (uniform)", clock.quantisation_sigma_s())]
     return rows
 
@@ -196,7 +197,7 @@ def sensitivity_knobs(cfg) -> list[dict]:
     from d2d_link.clock.forwarded import ForwardedClock
 
     total = ForwardedClock(cfg).budget().total_s
-    for name in ("data_path_rj_s", "clock_path_rj_s", "tree_rj_s", "data_path_wander_s", "clock_path_wander_s", "pll_rj_s",
+    for name in ("data_path_rj_s", "clock_path_rj_s", "tree_rj_s", "qdr_phase_rj_s", "data_path_wander_s", "clock_path_wander_s", "pll_rj_s",
                  "local_pll_rj_s"):
         v = getattr(ck, name, 0.0)
         if not v:
@@ -366,7 +367,7 @@ def switched_off(cfg, off):
     if "jitter" in off:
         ck = R(ck, pll_profile=None, pll_rj_s=0.0, local_pll_profile=None, local_pll_rj_s=0.0, data_path_rj_s=0.0,
                clock_path_rj_s=0.0, tree_rj_s=0.0, data_path_wander_s=0.0, clock_path_wander_s=0.0, dcd_ui=0.0,
-               tx_dcd_ui=0.0, qdr_quadrature_ui=0.0)
+               tx_dcd_ui=0.0, qdr_quadrature_ui=0.0, qdr_phase_rj_s=0.0)
     if "PI step" in off:
         ck = R(ck, pi_step_ui=0.0)
         ln = R(ln, deskew_with_tracker="ideal")

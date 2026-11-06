@@ -16,6 +16,8 @@ this model, both ``source: model`` (no spec text is available):
   of its image at fs/2 - f, clock-path noise the data does not share
   (``JitterBudget.edge_alias_s``, 0.15.1; 0.15.0 had the continuous-time
   sinc^2 and no image, and read x1's residual 292.5 fs instead of 334).
+- **the generator's own jitter** (``clocking.qdr_phase_rj_s``, 0.15.8): white per
+  sampling edge, after the interpolation, filtered by the tracker like the tree's.
 - **four sampling phases, not two.** The duty-cycle error still splits
   rising from falling edges; a quadrature skew q of the 4-phase generator
   (``clocking.qdr_quadrature_ui``) splits the 0/180 pair from the 90/270
@@ -65,4 +67,12 @@ for q in (0.0, 0.01, 0.02, 0.04, 0.06):
     base = r.worst.eye_width_ui if base is None else base
     offs = ", ".join(f"{o:+.3f}" for o in ForwardedClock(c).sampling_offsets_ui())
     print(f"{q:7.2f} {offs:>32s} {r.worst.eye_width_ui:9.4f} {base - r.worst.eye_width_ui:10.4f} {'PASS' if r.passes else 'FAIL':>5s}")
-print("  a box of total width q costs about q of eye width at the target BER (the phases are bounded, not Gaussian)")
+print("  a box of total width q costs about q of eye width at the target BER (the phases are bounded, not Gaussian)\n")
+
+print("the 4-phase generator's own white jitter (x1, forwarded_qdr, q = 0; 0.15.8):")
+print(f"{'RJ [fs]':>8s} {'residual [fs]':>13s} {'eye [UI]':>9s} {'link':>5s}")
+for rj in (0.0, 100e-15, 200e-15):
+    c = R(x1, clocking=R(x1.clocking, scheme="forwarded_qdr", qdr_phase_rj_s=rj))
+    r = run_link(c)
+    print(f"{1e15 * rj:8.0f} {1e15 * ForwardedClock(c).budget().total_s:13.1f} {r.worst.eye_width_ui:9.4f} {'PASS' if r.passes else 'FAIL':>5s}")
+print("  white per edge like the receive tree's jitter: it adds in power to the residual")

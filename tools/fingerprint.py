@@ -164,6 +164,8 @@ def record_synthetic() -> dict:
     cases["qdr_dcd_skew"] = LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=prof, data_path_rj_s=200e-15,
                                                                clock_path_rj_s=200e-15, tree_delay_ps=30.0, tree_bw_hz=20e9,
                                                                dcd_ui=0.03, qdr_quadrature_ui=0.04), sim=sim)
+    cases["qdr_phase_rj"] = LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=prof, data_path_rj_s=200e-15,
+                                                               qdr_phase_rj_s=150e-15, track_bw_hz=5e6), sim=sim)
     cases["next_free_phase"] = LinkConfig(channel=ChannelConfig(xtalk="fext", xtalk_next="fixed", next_db=-16.0),
                                           lanes=LaneConfig(count=3, reverse_adjacent=(0,)),
                                           clocking=ClockingConfig(pll_profile=prof, data_path_rj_s=300e-15),

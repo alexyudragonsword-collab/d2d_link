@@ -104,13 +104,14 @@ class JitterBudget:
     f_hi_hz: float            # the edge-rate Nyquist
     spur_s: float = 0.0       # the profiles' spurs after the same leaks (RMS of sinusoids: sum A^2/2)
     edge_alias_s: float = 0.0  # forwarded_qdr: clock-path noise folded from fs/2 - f by the edge sampling (0.15.1)
+    phase_gen_s: float = 0.0   # forwarded_qdr: the 4-phase generator's own white jitter after the tracker (0.15.8)
 
     @property
     def gaussian_s(self) -> float:
         """The Gaussian part of the residual (everything but the spurs)."""
         return math.sqrt(self.common_leak_s ** 2 + self.local_pll_s ** 2 + self.data_path_s ** 2
                          + self.data_wander_s ** 2 + self.clock_path_s ** 2 + self.clock_wander_s ** 2
-                         + self.tree_s ** 2 + self.edge_alias_s ** 2)
+                         + self.tree_s ** 2 + self.edge_alias_s ** 2 + self.phase_gen_s ** 2)
 
     @property
     def total_s(self) -> float:
@@ -368,7 +369,8 @@ class ForwardedClock:
             tree_s=math.sqrt(e_sum * self.white_psd(ck.tree_rj_s)),
             f_lo_hz=float(f[0]), f_hi_hz=float(f[-1]),
             spur_s=math.sqrt(sum(0.5 * a * a for _, a in self.spur_terms())),
-            edge_alias_s=self._edge_alias_s(f, e, df))
+            edge_alias_s=self._edge_alias_s(f, e, df),
+            phase_gen_s=math.sqrt(e_sum * self.white_psd(ck.qdr_phase_rj_s)) if ck.qdr_phase_rj_s > 0.0 else 0.0)
 
     def _edge_alias_s(self, f: np.ndarray, e: np.ndarray, df: float) -> float:
         """forwarded_qdr: what the edge sampling folds from fs/2 - f onto f --
@@ -499,6 +501,8 @@ class ForwardedClock:
             clk = self._through_clock_path(clk, local)
             if ck.tree_rj_s > 0.0:
                 clk = clk + rng.normal(0.0, ck.tree_rj_s, n_fft)
+            if ck.qdr_phase_rj_s > 0.0:
+                clk = clk + rng.normal(0.0, ck.qdr_phase_rj_s, n_fft)
             for lane in range(n_lanes):
                 data = c
                 if ck.data_path_rj_s > 0.0:

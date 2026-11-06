@@ -96,6 +96,7 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
         _f("clocking.profile_above", "PLL profile above its last point", "enum", options=["floor", "zero"]),
         _f("clocking.dcd_ui", "Rx DDR duty-cycle error [UI]", "float"),
         _f("clocking.qdr_quadrature_ui", "QDR I/Q skew [UI] (forwarded_qdr)", "float"),
+        _f("clocking.qdr_phase_rj_s", "QDR 4-phase generator RJ [fs] (forwarded_qdr)", "float", scale=1e-15),
         _f("clocking.tx_dcd_ui", "Tx PLL duty-cycle error [UI] (common mode; shows with a local PLL)", "float"),
         _f("clocking.local_pll_profile", "Rx local PLL profile (locked to forwarded clock)", "opt_str"),
         _f("clocking.local_pll_f0_hz", "Local PLL carrier override [GHz]", "opt_float", scale=1e9),

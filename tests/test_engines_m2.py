@@ -147,3 +147,24 @@ def test_quarter_rate_offsets_and_spur_images():
     qdr = ForwardedClock(LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=wu, tree_delay_ps=30.0)))
     images = [f for f, _ in qdr.spur_terms() if f > 0.25 * qdr.fs]
     assert len(qdr.spur_terms()) == 2 * len(ddr.spur_terms()) and len(images) == len(ddr.spur_terms())
+
+
+def test_quarter_rate_phase_generator_jitter():
+    """0.15.8: the 4-phase generator's own white jitter enters after the
+    edges' interpolation, through the tracker like the tree's; closed form
+    and synthesis agree, and it needs the QDR scheme."""
+    import numpy as np
+    import pytest
+
+    from d2d_link.clock.forwarded import ForwardedClock
+
+    cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0),
+                     clocking=ClockingConfig(scheme="forwarded_qdr", pll_profile=PROFILE, tree_delay_ps=30.0, tree_bw_hz=20e9,
+                                             qdr_phase_rj_s=150e-15, track_bw_hz=5e6),
+                     sim=SimConfig(jitter_block=1 << 16))
+    fc = ForwardedClock(cfg)
+    b = fc.budget()
+    assert b.phase_gen_s == pytest.approx(150e-15, rel=0.01)                 # white, barely touched by a 5 MHz tracker
+    assert float(np.std(fc.synthesize(1 << 19, np.random.default_rng(2), 1)[0])) == pytest.approx(b.gaussian_s, rel=0.02)
+    with pytest.raises(ValueError, match="forwarded_qdr"):
+        ClockingConfig(qdr_phase_rj_s=1e-13)

@@ -307,6 +307,8 @@ class ClockingConfig:
     profile_above: Literal["floor", "zero"] = "floor"   # PLL profile above its last point: the last level held
                                                          # flat to fs/2 ("floor", phase 15) or zero ("zero", 0.12)
     dcd_ui: float = 0.0                   # receiver-side DDR duty-cycle error: odd/even sampling offset [UI]
+    qdr_phase_rj_s: float = 0.0           # forwarded_qdr: the 4-phase generator's own white jitter per sampling edge
+                                          # [s RMS], after the interpolation (0.15.8; source: model)
     qdr_quadrature_ui: float = 0.0        # forwarded_qdr: I/Q skew of the 4-phase generator, the 90 / 270 degree
                                           # phases' offset from the 0 / 180 ones [UI] (source: model; no spec text)
     tx_dcd_ui: float = 0.0                # Tx PLL duty-cycle error, common to data and forwarded clock [UI]:
@@ -341,6 +343,9 @@ class ClockingConfig:
         _require(self.qdr_quadrature_ui < 0.5, f"clocking.qdr_quadrature_ui must be < 0.5 UI, got {self.qdr_quadrature_ui}")
         _require(self.qdr_quadrature_ui == 0.0 or self.scheme == "forwarded_qdr",
                  "clocking.qdr_quadrature_ui needs clocking.scheme: forwarded_qdr")
+        _finite_nonneg(self.qdr_phase_rj_s, "clocking.qdr_phase_rj_s")
+        _require(self.qdr_phase_rj_s == 0.0 or self.scheme == "forwarded_qdr",
+                 "clocking.qdr_phase_rj_s needs clocking.scheme: forwarded_qdr")
         _require(self.track_delay_ui >= 0, f"clocking.track_delay_ui must be >= 0, got {self.track_delay_ui}")
         _finite_nonneg(self.pi_step_ui, "clocking.pi_step_ui")
         _require(self.pi_step_ui < 0.5, f"clocking.pi_step_ui must be < 0.5 UI, got {self.pi_step_ui}")
