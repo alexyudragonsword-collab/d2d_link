@@ -48,7 +48,8 @@ def test_no_drift():
 
 def test_every_file_has_a_full_sha_header():
     bad = []
-    for f in sorted((REPO / "src/d2d_link/vendor").rglob("*.py")):
+    vendor = REPO / "src/d2d_link/vendor"
+    for f in sorted([*vendor.rglob("*.py"), *vendor.rglob("*.yaml")]):     # spec_sources' tables too (0.16.0)
         if f.name == "__init__.py":
             continue
         first = f.read_text().splitlines()[0]
@@ -76,3 +77,15 @@ def test_detects_injected_drift():
         assert any(r.status == "DRIFT" and "jitter.py" in r.rel for r in results)
     finally:
         target.write_text(original)
+
+
+def test_strip_header_drops_only_the_two_attribution_lines():
+    """A vendored YAML table's body opens with its own comment: only the
+    ``Vendored from`` line and the policy line after it are the header
+    (0.16.0; until then every leading ``# `` line went and the spec_sources
+    table read as DRIFT -- issue #1)."""
+    lines = ["# Vendored from spec_sources@" + "a" * 40 + ": src/spec_sources/data/ucie.yaml",
+             "# Adapted-copy policy: see src/d2d_link/vendor/__init__.py",
+             "# ucie -- the table's own comment", "entries: {}"]
+    assert vc._strip_header(lines) == "# ucie -- the table's own comment\nentries: {}"
+    assert vc._strip_header(["# not a header", "x = 1"]) == "# not a header\nx = 1"

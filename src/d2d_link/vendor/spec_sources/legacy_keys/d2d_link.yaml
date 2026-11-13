@@ -1,0 +1,25 @@
+# Vendored from spec_sources@d7b4d1eb510617d69784622c593c8ed31ab32b8b: src/spec_sources/legacy_keys/d2d_link.yaml
+# Adapted-copy policy: see src/d2d_link/vendor/__init__.py
+# d2d_link 的裸键名 → spec_sources 的键名（给 d2d_link/spec 的垫片用：它在自己的命名空间里继续用旧名，
+# 数从这里读）。源表：d2d_link@6789810ccb6328324673222b2f64cc21f748451e src/d2d_link/data/spec/ucie_survey.yaml。
+# 这不是读取器层面的弃用别名：旧名从来没有在本库里发布过，本库按旧名读会报 KeyError。
+# tests/test_extraction.py 核对：一对一、目标都是活键、与源表逐条对应。
+repo: d2d_link
+from: 6789810ccb6328324673222b2f64cc21f748451e
+keys:
+  data_rates_gtps: "ucie.data_rates_gtps"
+  forwarded_clock: "ucie.forwarded_clock"
+  raw_ber_target: "ucie.raw_ber_target"
+  raw_ber_with_retry: "ucie.raw_ber_with_retry"
+  rx_eye_height_mv: "ucie.rx_eye_height_mv"
+  rx_eye_width_ui: "ucie.rx_eye_width_ui"
+  "rx_eye_width_ui@24-32": "ucie.rx_eye_width_ui@24-32"
+  tx_swing_vpp: "ucie.tx_swing_vpp"
+  standard.bump_pitch_um: "ucie.standard.bump_pitch_um"
+  standard.reach_mm: "ucie.standard.reach_mm"
+  standard.module_width_lanes: "ucie.standard.module_width_lanes"
+  standard.lane_repair: "ucie.standard.lane_repair"
+  advanced.bump_pitch_um: "ucie.advanced.bump_pitch_um"
+  advanced.reach_mm: "ucie.advanced.reach_mm"
+  advanced.module_width_lanes: "ucie.advanced.module_width_lanes"
+  advanced.lane_repair: "ucie.advanced.lane_repair"

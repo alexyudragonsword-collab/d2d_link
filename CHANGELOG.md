@@ -4,6 +4,21 @@
 
 ---
 
+## [0.16.0] — 2026-11-13 — UCIe 表迁到共享库 spec_sources(只搬家,指纹逐位不变;issue #1)
+
+- `src/d2d_link/data/spec/ucie_survey.yaml` 删除;16 条改从共享库 spec_sources 读:`reader.py`、`data/ucie.yaml`(键 `ucie.*`)、`legacy_keys/d2d_link.yaml`
+  原样 vendor 到 `src/d2d_link/vendor/spec_sources/`,pin `d7b4d1eb510617d69784622c593c8ed31ab32b8b`(spec_sources main,PR #1 的合并提交);`__init__.py` 是本库自己的。
+- `d2d_link.spec` 是垫片:`SURVEY_FILE` 指向 vendored 的 `ucie.yaml`,`_table()` 按 `legacy_keys("d2d_link")` 把共享条目挂回旧的裸键名(原表顺序),
+  构造本库自己的 `SpecNumber`(spec_sources 的 `quote` / `section` 缺省 None,这里转成 "")。`survey`、`survey_tiered`(含 `@24-32` 区间档)、报告里的键名照旧。
+  `model_presets.yaml`(30 条 `source: model`)不动。
+- 唯一字段变化:`rx_eye_width_ui@24-32` 的 note 里「改 source: spec 或删去」改为「改成 spec 标签或删去」(spec_sources 的铁律 5:说明里不写「标签词 + 冒号」);代码不打印 note。
+- 工具:`vendor_check` 也扫 `*.yaml`,`_strip_header` 只去两行归属头(此前去掉所有开头的 `# ` 行,YAML 正文第一行的注释被一起去掉、报 DRIFT);
+  `example_drift.spec_values` 读 vendored 的表。CI vendor-drift 加 spec_sources@d7b4d1e 的检出;package-data 加 vendor 的两个 glob。
+- 测试:垫片的键就是旧键名且逐条与共享表相同、`audit_tags` 为空、`_strip_header` 只去两行、头部测试也扫 YAML。文档里的旧路径全部改到 vendored 的表。
+- 验收:指纹 3597 / 3597 逐位相同;`vendor_check --strict --fail-on-skip` 9 个文件 8 verbatim + 1 adapted(halo/response.py,迁移前就是)、无漂移。
+
+---
+
 ## [0.15.8] — 2026-11-06 — QDR 4 相发生器自身的抖动(新能力;bundled 数字不变)
 
 - `clocking.qdr_phase_rj_s`(source: model,需 forwarded_qdr):每个采样边沿的白抖动,加在内插之后、经跟踪器(与树抖动同口径);

@@ -129,7 +129,8 @@ def test_data_ships_inside_the_package(tmp_path, monkeypatch):
     from d2d_link.clock.forwarded import PACKAGE_DIR, resolve_data_file
 
     assert spec.SURVEY_FILE.is_file() and spec.PRESETS_FILE.is_file()
-    assert spec.SURVEY_FILE.is_relative_to(PACKAGE_DIR / "data")
+    assert spec.SURVEY_FILE.is_relative_to(PACKAGE_DIR / "vendor" / "spec_sources" / "data")     # spec_sources, vendored (0.16.0)
+    assert spec.PRESETS_FILE.is_relative_to(PACKAGE_DIR / "data")
     monkeypatch.chdir(tmp_path)                       # no data/ in the working directory
     p = resolve_data_file("data/clock_profiles/bench_markulic16_sspll_40m_10p24g.yaml")
     assert p.is_file() and p.is_relative_to(PACKAGE_DIR)
@@ -137,6 +138,8 @@ def test_data_ships_inside_the_package(tmp_path, monkeypatch):
     # tomllib is 3.11+; the declaration is one line of text
     pyproject = (PACKAGE_DIR.parents[1] / "pyproject.toml").read_text(encoding="utf-8")
     assert re.search(r'^d2d_link = \[.*"data/clock_profiles/\*\.yaml".*\]', pyproject, re.M), "package-data declaration"
+    for glob in ("vendor/spec_sources/data/*.yaml", "vendor/spec_sources/legacy_keys/*.yaml"):
+        assert re.search(r'^d2d_link = \[.*"' + re.escape(glob) + r'".*\]', pyproject, re.M), glob
 
 
 def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
@@ -249,3 +252,22 @@ def test_tier_fallback_and_overlap_are_caught(tmp_path, monkeypatch):
     bad.write_text(f"entries:\n  w@10-20:\n    {entry}\n  w@15-30:\n    {entry}\n", encoding="utf-8")
     with pytest.raises(ValueError, match="overlapping rate ranges"):
         spec.load_survey(bad)
+
+
+def test_shim_keys_are_the_old_keys():
+    """0.16.0: the UCIe numbers are spec_sources' ``ucie.*`` entries, vendored
+    and pinned; the shim hangs them on this library's old bare keys in the
+    old table's order, value for value, and the vendored table passes
+    spec_sources' own tag guard (each of its four tags' grep count equals its
+    entries) -- issue #1."""
+    from d2d_link.vendor.spec_sources import reader as ss
+
+    legacy = ss.legacy_keys("d2d_link")
+    assert list(spec.all_entries()) == list(legacy)
+    shared = ss.load_table(spec.SURVEY_FILE)
+    for old, new in legacy.items():
+        e, s = spec.survey(old), shared[new]
+        assert e.key == old and e.value == s.value and e.unit == s.unit and e.source == s.source and e.cite == s.cite
+        assert e.quote == (s.quote or "") and e.section == (s.section or "")
+    assert ss.audit_tags(spec.SURVEY_FILE) == []
+    assert spec.survey_tiered("rx_eye_width_ui", "standard", 28.0).key == "rx_eye_width_ui@24-32"

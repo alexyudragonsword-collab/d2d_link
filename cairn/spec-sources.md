@@ -5,7 +5,7 @@ summary: "规范数字的来源状态:哪些是综述、各自待核实什么、
 tags: [spec, ucie, sources]
 contains: [decision]
 created: "2026-10-12"
-updated: "2026-11-05"
+updated: "2026-11-13"
 related: [architecture-invariants.md]
 authoring_mode: ai_generated
 ---
@@ -13,7 +13,7 @@ authoring_mode: ai_generated
 
 ## 当前结论
 
-- 全部 16 条都是 `source: survey`(0.14.0 起含眼宽 24–32 GT/s 分档;0.14.5 起是一条区间 `@24-32`,此前 `@24`、`@32` 两条),见 `src/d2d_link/data/spec/ucie_survey.yaml`;没有一条读过规范原文。`grep -c "source: survey" src/d2d_link/data/spec/ucie_survey.yaml` = 16
+- 全部 16 条都是 `source: survey`(0.14.0 起含眼宽 24–32 GT/s 分档;0.14.5 起是一条区间 `@24-32`,此前 `@24`、`@32` 两条),见共享库 spec_sources 的 `ucie.yaml`(0.16.0 起 vendored 在 `src/d2d_link/vendor/spec_sources/data/ucie.yaml`,pin d7b4d1e;issue #1;`d2d_link.spec` 用 `legacy_keys/d2d_link.yaml` 按旧键名接住);没有一条读过规范原文。`grep -c "source: survey" src/d2d_link/vendor/spec_sources/data/ucie.yaml` = 16
   (文件头注释不再含该字串,测试断言这条命令的计数)。
 - 综述来源是公开材料的记忆与转述(Das Sharma 2022 的 UCIe 综述、Consortium 白皮书、Hot Chips 34 概览),**数值本身未经核对**,
   每条 note 都写了"未核实"。最不可靠的三条:收端眼宽(0.14.0 起 24 / 32 GT/s 用 0.65 UI 分档,出自二手转述;判定悬在它上面)、眼高 40 mV(眼罩表的速率档与封装归属不明)、1e-15 的 retry 口径。
@@ -34,6 +34,11 @@ authoring_mode: ai_generated
 - `data_rates_gtps` 是示例 07 的扫描轴。
 
 ## 决策记录
+
+- **2026-11-13(0.16.0,issue #1)UCIe 表迁到共享库 spec_sources**:16 条从本库 `data/spec/ucie_survey.yaml` 迁进 spec_sources 的 `data/ucie.yaml`(键 `ucie.*`),
+  本库 vendor + pin(d7b4d1e),`d2d_link.spec` 用 `legacy_keys/d2d_link.yaml` 按旧键名接住。理由:同一批外部数字被多个库(mmw60_trx、fmcw_radar…)引用,
+  一处核实、各库重新 pin。代价:改数要先改 spec_sources 再重新 vendor;本库的守卫只数 survey,spec_sources 的 `audit_tags` 四个标签都数(已加进测试)。
+  `model_presets.yaml` 是本库自己的取舍(`source: model`),不迁。
 
 - 规范数字不进代码:`TargetConfig` 字段默认 None,运行时按 package 与速率分档解析成 `(value, source)`(0.13.5 起 `target_keys` 给出答话的表 key),结果行打印 `source: xxx`。
   配置里显式写的值标 `source: config`,是配置自己的主张。

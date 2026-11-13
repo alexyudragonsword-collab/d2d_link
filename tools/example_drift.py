@@ -396,19 +396,19 @@ class DocIndex:
 
 @functools.lru_cache(maxsize=None)
 def spec_values(repo: Path = REPO) -> frozenset:
-    """Every number in the spec table (``ucie_survey.yaml``): targets, reach,
-    module widths, pitches, rates. A doc quoting one quotes the table."""
+    """Every number in the spec tables (the vendored spec_sources
+    ``data/*.yaml``, 0.16.0; until then ``data/spec/ucie_survey.yaml``):
+    targets, reach, module widths, pitches, rates. A doc quoting one quotes
+    the table."""
     import yaml
 
-    f = repo / "src" / "d2d_link" / "data" / "spec" / "ucie_survey.yaml"
-    if not f.exists():
-        return frozenset()
     out = set()
-    for e in (yaml.safe_load(f.read_text(encoding="utf-8")).get("entries") or {}).values():
-        v = e.get("value") if isinstance(e, dict) else None
-        for x in (v if isinstance(v, list) else [v]):
-            if isinstance(x, (int, float)) and not isinstance(x, bool):
-                out.add(float(x))
+    for f in sorted((repo / "src" / "d2d_link" / "vendor" / "spec_sources" / "data").glob("*.yaml")):
+        for e in (yaml.safe_load(f.read_text(encoding="utf-8")).get("entries") or {}).values():
+            v = e.get("value") if isinstance(e, dict) else None
+            for x in (v if isinstance(v, list) else [v]):
+                if isinstance(x, (int, float)) and not isinstance(x, bool):
+                    out.add(float(x))
     return frozenset(out)
 
 

@@ -3,7 +3,7 @@
 #   model   估计值:来自教科书量级、公开论文的典型值或本库自己的推导;note 写依据与不确定度。
 #           用 grep 数这个标签(见 README)恰好得到估计条目数:文件头不含标签字串。
 #
-# 规范数字(速率、BER、bump 间距、reach、模块宽度、眼罩)在 ucie_survey.yaml;这里只放"没有规范、
+# 规范数字(速率、BER、bump 间距、reach、模块宽度、眼罩)在共享库 spec_sources 的 ucie.yaml(vendored 在 src/d2d_link/vendor/spec_sources/);这里只放"没有规范、
 # 只能估"的几何与材料参数。L、C 不在表里:它们由 z0_ohm 与叠层几何推出(config/schema.py::LinkConfig.rlgc),
 # 让信道延时与串扰估计用同一个介电常数。tools/budget_report.py --sensitivity 把每条 ±20%(dB 值 ±3 dB)看结论翻不翻。
 

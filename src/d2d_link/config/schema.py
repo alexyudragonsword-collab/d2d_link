@@ -8,7 +8,7 @@ value fails here with its name, not deep inside an engine as a NaN.
 
 Numbers that come from the UCIe specification are *not* hard-coded here: the
 ``TargetConfig`` fields default to ``None``, which means "the value in
-``src/d2d_link/data/spec/ucie_survey.yaml`` for this package and rate" (invariant #5: every
+``src/d2d_link/vendor/spec_sources/data/ucie.yaml`` (spec_sources, vendored; read through ``d2d_link.spec``) for this package and rate" (invariant #5: every
 such number carries its ``source``). Setting a field overrides it.
 """
 
@@ -51,7 +51,7 @@ def _finite_pos(value: float, name: str) -> None:
 #: the coupled-line crosstalk estimate travel at one speed. Earlier versions
 #: carried L and C as separate numbers whose implied eps_eff (3.94 / 5.75)
 #: contradicted the stack-up's eps_r (3.5 / 3.3). The reach and pitch figures
-#: the packages are known by live in ucie_survey.yaml with their own source.
+#: the packages are known by live in the vendored spec_sources ucie.yaml with their own source.
 C0 = 299_792_458.0
 RLGC_PRESET_KEYS = ("rdc_ohm_m", "r_skin", "loss_tangent", "g_s_m", "z0_ohm")
 STACKUP_KEYS = ("trace_width_um", "dielectric_height_um", "eps_r")

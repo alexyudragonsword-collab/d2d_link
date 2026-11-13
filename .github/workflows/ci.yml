@@ -218,6 +218,12 @@ jobs:
           repository: alexyudragonsword-collab/pll_simulator
           ref: 00e48a2f6f7c11c0b6f106234f1490493d43e082
           path: _siblings/pll_simulator
+      - name: Checkout spec_sources (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: alexyudragonsword-collab/spec_sources
+          ref: d7b4d1eb510617d69784622c593c8ed31ab32b8b
+          path: _siblings/spec_sources
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -227,6 +233,7 @@ jobs:
           python tools/vendor_check.py --strict --fail-on-skip
           --siblings Halo_Serdes=${{ github.workspace }}/_siblings/Halo_Serdes
           pll_simulator=${{ github.workspace }}/_siblings/pll_simulator
+          spec_sources=${{ github.workspace }}/_siblings/spec_sources
       # the _to16g clock profiles name pll_simulator@00e48a2f as their source:
       # regenerate them from that checkout and compare (fourth health check)
       - name: 16 GHz profiles match the pinned pll_simulator

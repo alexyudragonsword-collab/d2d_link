@@ -1,12 +1,18 @@
 """Specification numbers with their provenance (invariant #5).
 
 Every number the UCIe specification owns -- rates, BER target, bump pitch,
-reach, module width, eye mask -- lives in ``src/d2d_link/data/spec/ucie_survey.yaml``, one
-entry each, with ``source: survey`` (from public summaries; unverified) or
-``source: spec`` (from the specification text, with a quote). Code takes
-them through :func:`survey` by key and carries the source along; nothing
-hard-codes them. ``grep "source: survey"`` on the data file lists every
-unverified number at once.
+reach, module width, eye mask -- lives in the shared library spec_sources
+(``data/ucie.yaml``, keys prefixed ``ucie.``), vendored and pinned under
+``src/d2d_link/vendor/spec_sources/`` (0.16.0; until then this repository's
+own ``data/spec/ucie_survey.yaml``). One entry each, with ``source: survey``
+(from public summaries; unverified) or ``source: spec`` (from the
+specification text, with a quote). This module is the shim: it hangs the
+shared entries back on this library's old bare keys
+(``legacy_keys/d2d_link.yaml``, in the old table's order), so code keeps
+taking them through :func:`survey` / :func:`survey_tiered` by the same keys
+and carries the source along; nothing hard-codes them. ``grep "source:
+survey"`` on the vendored ``ucie.yaml`` lists every unverified number at
+once. A change to a number is made in spec_sources and re-pinned here.
 
 The numbers the specification does *not* own but a simulation still needs --
 the package trace's resistance and loss tangent, the stack-up geometry, the
@@ -26,10 +32,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-# the tables ship inside the package (src/d2d_link/data/spec, package data):
-# an installed d2d_link finds them without the checkout
+# the tables ship inside the package (package data): an installed d2d_link
+# finds them without the checkout. The UCIe table is spec_sources', vendored.
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
-SURVEY_FILE = DATA_DIR / "spec" / "ucie_survey.yaml"
+VENDOR_DIR = Path(__file__).resolve().parents[1] / "vendor" / "spec_sources"
+SURVEY_FILE = VENDOR_DIR / "data" / "ucie.yaml"
 PRESETS_FILE = DATA_DIR / "spec" / "model_presets.yaml"
 SOURCES = ("survey", "spec", "model")
 
@@ -108,7 +115,20 @@ def check_ranges(table: dict) -> None:
 
 @lru_cache(maxsize=1)
 def _table() -> dict[str, SpecNumber]:
-    return load_survey()
+    """spec_sources' ``ucie.*`` entries under this library's old bare keys
+    (``legacy_keys/d2d_link.yaml``, the old table's order), as this
+    library's own :class:`SpecNumber`; spec_sources leaves ``quote`` /
+    ``section`` as None where this library had ``""``."""
+    from ..vendor.spec_sources import reader as ss
+
+    shared = ss.load_table(SURVEY_FILE)
+    out = {}
+    for old, new in ss.legacy_keys("d2d_link").items():
+        e = shared[new]
+        out[old] = SpecNumber(key=old, value=e.value, unit=e.unit, source=e.source, cite=e.cite,
+                              note=e.note, quote=e.quote or "", section=e.section or "")
+    check_ranges(out)
+    return out
 
 
 @lru_cache(maxsize=1)
@@ -117,7 +137,7 @@ def _presets() -> dict[str, SpecNumber]:
 
 
 def preset(key: str, package: str) -> SpecNumber:
-    """The model estimate ``<package>.<key>`` (``src/d2d_link/data/spec/model_presets.yaml``)."""
+    """The model estimate ``<package>.<key>`` (``src/d2d_link/data/spec/model_presets.yaml``, this library's own)."""
     table = _presets()
     full = f"{package}.{key}"
     if full not in table:

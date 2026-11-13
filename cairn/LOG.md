@@ -3,6 +3,14 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短(数字原值、被推翻的判断、下一步),
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-11-13 · UCIe 表迁到 spec_sources(ccr-a2094794-9qa40v,0.16.0,issue #1)
+
+- 照 spec_sources 的迁移说明(bef20fb)做:vendor 三个文件(pin d7b4d1e)、删 ucie_survey.yaml、垫片按旧键名接住;核对 16 条只有 `@24-32` 的 note 变了一处。
+- 指纹:迁移前在 HEAD(2fe81fa)的干净 worktree 上重记(容器重建后旧的没了),前后 3597 值逐位相同。
+- vendor_check:Halo / pllsim / spec_sources 都检出在 pin 上时 `--strict --fail-on-skip` 绿(8 verbatim + 1 adapted,adapted 迁移前就是);
+  检出在各自 HEAD 时 Halo 报「stale pin」—— 与本迁移无关,CI 本来就检出在 pin 上。
+- 下一步:在 issue #1 回报(SHA、指纹、vendor_check 摘要),由 spec_sources 验收后关闭。
+
 ## 2026-11-06 · QDR 4 相发生器抖动(ccr-a2094794-9qa40v,0.15.8)
 
 - 白抖动,内插之后、经跟踪器;闭式 235.7 对合成 235.5 fs。x1 加 200 fs 时眼宽 0.729 → 0.694 UI,仍过 0.65。

@@ -140,13 +140,16 @@ class Siblings:
 
 
 def _strip_header(lines: list[str]) -> str:
-    """Drop the leading run of ``# ...`` attribution comment lines."""
+    """Drop the two attribution lines (``# Vendored from ...`` and the
+    ``# Adapted-copy policy ...`` line after it) and nothing else: a vendored
+    YAML table's own body opens with a comment, which belongs to the copy
+    (0.16.0; until then every leading ``# `` line went, and the spec_sources
+    table read as DRIFT)."""
     n = 0
-    for ln in lines:
-        if ln.startswith("# "):
-            n += 1
-        else:
-            break
+    if lines and HEADER.match(lines[0]):
+        n = 1
+        if len(lines) > 1 and lines[1].startswith("# Adapted-copy policy"):
+            n = 2
     return "\n".join(lines[n:]).rstrip("\n")
 
 
@@ -173,7 +176,7 @@ def check(siblings: Siblings, manifest: dict) -> list[FileResult]:
     declared = manifest.get("files", {})
     seen: set[str] = set()
 
-    for f in sorted(VENDOR.rglob("*.py")):
+    for f in sorted([*VENDOR.rglob("*.py"), *VENDOR.rglob("*.yaml")]):
         if f.name == "__init__.py":
             continue
         rel = str(f.relative_to(VENDOR))
@@ -251,7 +254,7 @@ def _extracted_or_extended(rel, body, entry, mode) -> tuple[str, str]:
 def build_manifest(siblings: Siblings) -> dict:
     """(Re)build the manifest from the current tree. Hash-pins local files."""
     files: dict = {}
-    for f in sorted(VENDOR.rglob("*.py")):
+    for f in sorted([*VENDOR.rglob("*.py"), *VENDOR.rglob("*.yaml")]):
         if f.name == "__init__.py":
             continue
         rel = str(f.relative_to(VENDOR))
