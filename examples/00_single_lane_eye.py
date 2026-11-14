@@ -3,7 +3,8 @@
 Standard package, 32 GT/s, 25 mm, forwarded DDR clock from the shipped
 pll_simulator profile (Markulic 2016 SSPLL), everything read from
 ``configs/standard_32g_x1.yaml``. The statistical engine gives the number
-that matters -- the eye at BER 1e-27 against the survey targets -- and the
+that matters -- the eye at the table's raw BER (1e-15 at 32 GT/s since 0.17.0;
+1e-27 before) against the eye-mask targets -- and the
 time engine draws the eye the sampler sees and confirms it counts no errors
 where the statistics say there are none to count.
 

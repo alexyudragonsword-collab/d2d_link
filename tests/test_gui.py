@@ -63,9 +63,10 @@ def x1_result():
 def test_run_result_is_json_and_matches_the_example(x1_result):
     json.dumps(x1_result)                     # plain data across the process boundary
     lane = x1_result["lanes"][0]
-    assert x1_result["passes"] and abs(1e3 * lane["eye_height_v"] - 204.1) < 0.1          # FAIL 0.13.0-0.13.11 against 0.75 UI;
+    assert x1_result["passes"] and abs(1e3 * lane["eye_height_v"] - 224.3) < 0.1          # 204.1 at 1e-27 (before 0.17.0); FAIL 0.13.0-0.13.11 against 0.75 UI;
     assert x1_result["report"]["targets"]["eye_width_ui"]["key"] == "rx_eye_width_ui@24-32"   # PASS against the 0.65 UI tier (0.14.0; a range since 0.14.5)
-    assert abs(lane["eye_width_ui"] - 0.709) < 0.001
+    assert abs(lane["eye_width_ui"] - 0.783) < 0.001            # at 1e-15, the 32 GT/s raw BER (0.17.0); 0.709 at 1e-27
+    assert x1_result["report"]["targets"]["ber"]["key"] == "standard.raw_ber_target@32"
     assert x1_result["report"]["jitter_budget"][-1]["term"].startswith("total")
 
 
@@ -78,7 +79,7 @@ def test_sections_render_the_report_numbers(x1_result):
     cfg = load_config(REPO / "configs" / "standard_32g_x1.yaml")
     text = json.dumps([headline(cfg, x1_result).to_plotly_json(), verdict(x1_result).to_plotly_json(),
                        jitter(x1_result).to_plotly_json(), lanes(x1_result).to_plotly_json()], default=str)
-    for needle in ("204.1", "0.709", "365.5", "(spec)", "PASS" if x1_result["passes"] else "FAIL"):
+    for needle in ("224.3", "0.783", "365.5", "(spec)", "PASS" if x1_result["passes"] else "FAIL"):
         assert needle in text
 
 
@@ -123,7 +124,7 @@ def test_app_builds_and_edits_queue_runs(tmp_path):
     result, stale = core.current_result()
     assert result is not None and not stale
     page = json.dumps(core.page().to_plotly_json(), default=str)
-    assert "204.1" in page and "PASS" in page              # x1 passes the 0.65 UI tier at 32 GT/s (0.14.0)
+    assert "224.3" in page and "PASS" in page              # x1 passes the 0.65 UI tier at 32 GT/s (0.14.0)
     assert core.apply_edit("channel.length_mm", 30.0) and core.state.overrides == {"channel.length_mm": 30.0}
     assert not core.apply_edit("channel.length_mm", 30.0)          # unchanged: no new run
     assert not core.apply_edit("lanes.count", -4)                   # invalid: dropped, config intact
@@ -149,10 +150,11 @@ def test_every_bundled_config_opens_without_running():
 # ----------------------------------------------------------------- G2
 def _small():
     """A link the whole sensitivity sweep runs on in seconds."""
-    from d2d_link.config import ChannelConfig, ClockingConfig, LinkConfig, RxConfig, SimConfig
+    from d2d_link.config import ChannelConfig, ClockingConfig, LinkConfig, RxConfig, SimConfig, TargetConfig
 
+    # BER pinned at 1e-27 (0.17.0 made the 32 GT/s table target 1e-15): at 1e-15 nothing flips on this link
     return LinkConfig(channel=ChannelConfig(length_mm=2.0), clocking=ClockingConfig(), rx=RxConfig(noise_rms_v=0.02),
-                      sim=SimConfig(stat_phase_points=16))
+                      sim=SimConfig(stat_phase_points=16), target=TargetConfig(ber=1e-27))
 
 
 def test_sensitivity_and_rate_sweep_jobs_inline():
@@ -182,7 +184,7 @@ def test_g2_sections_and_figures(x1_result):
     assert len(fig.data) == 2            # the lane and its sampling marker
     text = json.dumps([eyes(x1_result, 0).to_plotly_json(), lanes(x1_result, 0).to_plotly_json(),
                        floor_plan(x1_result, 0).to_plotly_json(), inspector(x1_result, 0).to_plotly_json()], default=str)
-    assert "fp-eye" in text and "0.709" in text and "Inspector" in text
+    assert "fp-eye" in text and "0.783" in text and "Inspector" in text
     cfg = _small()
     m = JobManager(workers=0)
     s = m.submit("sensitivity", cfg)
@@ -366,13 +368,13 @@ def test_scenario_list_matches_the_files_own_run():
     '+1' suffix). Matching is by config hash now."""
     app = create_app(REPO / "configs", REPO / "configs" / "standard_32g_x1.yaml", workers=0)
     core = app.d2d
-    assert "204.1 mV" in _text(core.left())
+    assert "224.3 mV" in _text(core.left())
     core.apply_edit("channel.length_mm", 30.0)
     core.run()
     r30, _ = core.current_result()
     assert r30["report"]["link"]["length_mm"] == 30.0
     left = _text(core.left())
-    assert "204.1 mV" in left and f"{1e3 * r30['lanes'][0]['eye_height_v']:.1f} mV" not in left
+    assert "224.3 mV" in left and f"{1e3 * r30['lanes'][0]['eye_height_v']:.1f} mV" not in left
     assert set(core.scenario_hashes()) == {str(p) for p in sorted((REPO / "configs").glob("*.yaml"))}
 
 

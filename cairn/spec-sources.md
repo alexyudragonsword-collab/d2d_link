@@ -18,8 +18,10 @@ authoring_mode: ai_generated
   只剩 `standard.lane_repair` 是 `source: survey`(两份原文都说标准封装靠宽度降级,没写降到 x8)。表在共享库 spec_sources 的 `ucie.yaml`
   (vendored 在 `src/d2d_link/vendor/spec_sources/data/ucie.yaml`,pin bbc0ccb,0.16.0 时 d7b4d1e;`d2d_link.spec` 用 `legacy_keys/d2d_link.yaml` 按旧键名接住)。
   `grep -c "source: survey" src/d2d_link/vendor/spec_sources/data/ucie.yaml` = 1(测试断言这条命令的计数)。
-- 共享表另有两条本库还没读:`ucie.raw_ber_by_rate`(速率 × 封装的原始 BER 表:标准封装 12 GT/s 起、先进封装 16 GT/s 起为 1e-15,其余 1e-27)
-  与 `ucie.advanced.spare_lanes_per_32` = 2(bundled 的 x64 spare 配置 `spare_count: 4` 与之相符)。读不读、怎么读是 issue #2 留给本库的四个判定点之一(ROADMAP P1 #1)。
+- **原始 BER 目标按 封装 × 速率 查表(0.17.0,issue #2 第 2 点)**:`ucie.raw_ber_by_rate` 给标准封装 12 GT/s 起、先进封装 16 GT/s 起 1e-15,其余 1e-27。
+  垫片(`spec._raw_ber_tiers`)把它展开成 12 条 `<package>.raw_ber_target@<rate>`,每条是对那一条表的 `ref`(只查,不抄数),走原有的分档查表;
+  表外速率(20、40 GT/s)退回不分档的 `raw_ber_target` 1e-27 并告警。本库读的条目因此是 16 + 12 = 28 条。
+  另一条 `ucie.advanced.spare_lanes_per_32` = 2 本库不读(bundled 的 x64 spare 配置 `spare_count: 4` 与之相符)。
 - **许可约束(2026-11-14,issue #2 转述)**:UCIe 规范下载页的最终用户许可协议第 (ii) 款禁止把规范(全部或部分)输入任何 AI 系统,也禁止用 AI 分析、解读或从中提取内容。
   本库用 AI 协作,所以**不收、不索要规范原文**;核实只在 spec_sources 用公开材料做,本库只重新 pin。
   分档有两种键:`@<rate>` 精确档与 `@<lo>-<hi>` 闭区间档(0.14.5),同一层里精确档优先、区间重叠即报错。0.14.0–0.14.4 只有 `@24`、`@32`,28 GT/s 落回 0.75 UI(第五次体检)。
@@ -63,6 +65,10 @@ authoring_mode: ai_generated
   **更正(0.16.1)**:spec_sources 用 Hot Chips 2023 教程 slide 61 核实,0.65 UI 属实,条目改 `source: spec`;判定不变。
   它翻转了四个 bundled 配置的判定(x1 / x16 模块 / x16 repair / x64 spare 由不过变过),x5 仍不过;原文若仍是 0.75,删这一条(0.14.5 起合成 `@24-32` 一条)即回到 0.13。
 - 敏感性:`tools/budget_report.py --sensitivity` 对每条估计 ±20%(dB 值与剖面整体平移 ±3 dB;0.13.3 起含配置里的抖动值;眼罩目标 ±10 mV / ±0.05 UI)重跑,表里标出翻转结论的参数。
+  **0.17.0(原始 BER 按速率表,32 GT/s 1e-15;示例 13)**:x1 +0.205、x16 模块 +0.175、x16 repair +0.144、x64 spare +0.195,**什么都不翻**
+  (最近的都是目标 0.70 UI:+0.119 / +0.091 / +0.063 / +0.109;x16 repair 的 PLL 剖面 +3 dB 由 −0.034 变 +0.101,平坦前端 32 GHz 由 −0.014 变 +0.109);
+  **x5 耦合 −0.010,由"什么都不翻"变成被八个旋钮翻**:数据路径白抖 −20 % +0.004、Z0 60 Ω +0.005、PLL −3 dB +0.005、R_skin −20 % +0.008、ε_r 2.8 +0.025、
+  bump 间距 138 µm +0.043、介质 24 µm +0.057、目标 0.60 UI +0.072(最近不翻:tanδ −20 % −0.003)。以下是 1e-27 时的历史数。
   0.13.3 重跑:x1 名义裕度 −0.055、x16 模块 −0.051 —— **只有眼宽目标翻转**(0.70 UI 时 +0.013 / +0.017);离翻转最近的估计是 PLL 剖面 −3 dB(−0.024 / −0.031)
   与数据路径白抖 −20 %(−0.037 / −0.032)。x5 耦合 −0.214,什么都不翻(最近的是介质厚 24 µm −0.140、bump 间距 138 µm −0.154)。
   0.14.1(0.65 UI 分档 + 受害方直通 cos):x1 +0.091 不翻;x16 模块 +0.066,只有目标 0.70 UI 翻(−0.010);x5 −0.121 不翻(最近:目标 0.60 UI −0.047、介质 24 µm −0.054;0.14.0 时 −0.115 / 介质 −0.052)。

@@ -36,9 +36,10 @@ def test_attribution_switches_each_cause_off_and_its_shares_close_the_gap():
 
 def test_x1_sensitivity_numbers_the_docs_quote():
     """ROADMAP P1 #1, README and cairn/spec-sources.md quote the x1
-    sensitivity: +0.091 nominal, nothing flips; example 13 prints its
-    nearest sides, the 0.70 UI target (+0.013) and the PLL profile 3 dB up
-    (+0.029). Example 13 prints the
+    sensitivity: +0.205 nominal at the 32 GT/s raw BER 1e-15 (0.17.0; +0.091
+    at 1e-27), nothing flips; example 13 prints its nearest sides, the 0.70 UI
+    target (+0.119; +0.013 at 1e-27) and the PLL profile 3 dB up (+0.161;
+    +0.029). Example 13 prints the
     same for every bundled config (the module ones take minutes); x1 is the
     one cheap enough for the suite (~15 s). Before 0.14.2 no test or
     expected output produced these numbers (fourth health check)."""
@@ -46,14 +47,14 @@ def test_x1_sensitivity_numbers_the_docs_quote():
     from d2d_link.report import sensitivity
 
     s = sensitivity(load_config(REPO / "configs" / "standard_32g_x1.yaml"))
-    assert s["nominal"]["passes"] and s["nominal"]["margin"] == pytest.approx(0.0909, abs=5e-4)
+    assert s["nominal"]["passes"] and s["nominal"]["margin"] == pytest.approx(0.2053, abs=5e-4)
     assert not any(r["flips"] for r in s["rows"])
     rows = {r["label"]: r for r in s["rows"]}
-    assert rows["target.eye_width_ui"]["high"]["margin"] == pytest.approx(0.013, abs=1e-3)
-    assert rows["pll_shift_db"]["high"]["margin"] == pytest.approx(0.029, abs=1e-3)
+    assert rows["target.eye_width_ui"]["high"]["margin"] == pytest.approx(0.119, abs=1e-3)
+    assert rows["pll_shift_db"]["high"]["margin"] == pytest.approx(0.161, abs=1e-3)
     # the flat front end is a knob too (0.15.2): one design side, a 2 f_N pole, the other side the nominal itself
     fe = rows["rx_bw_hz (flat)"]
-    assert fe["low"]["value"] == 32e9 and fe["low"]["margin"] == pytest.approx(0.037, abs=1e-3) and fe["low"]["passes"]
+    assert fe["low"]["value"] == 32e9 and fe["low"]["margin"] == pytest.approx(0.159, abs=1e-3) and fe["low"]["passes"]
     assert fe["high"]["margin"] == s["nominal"]["margin"] and fe["source"] == "model"
     sides = sorted(r[k]["margin"] for r in s["rows"] for k in ("low", "high"))
     assert sides[0] == rows["target.eye_width_ui"]["high"]["margin"]          # the nearest side is the target's

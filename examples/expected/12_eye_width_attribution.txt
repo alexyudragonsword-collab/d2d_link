@@ -1,52 +1,52 @@
 standard_32g_x1: 1 lanes, 25 mm, crosstalk none, PI step 0.0000 UI
-  worst-lane eye width 0.7091 UI (lane 0); ISI and noise alone 0.8873 UI (lane 0); gap 0.1782 UI; target 0.65 UI -> PASS
+  worst-lane eye width 0.7835 UI (lane 0); ISI and noise alone 0.9111 UI (lane 0); gap 0.1277 UI; target 0.65 UI -> PASS
        cause  share [UI]  of gap  alone off [UI]  alone passes
-      jitter      0.1782    100%          0.8873           yes
-  shares sum to 0.1782 UI (= the gap, by construction)
+      jitter      0.1277    100%          0.9111           yes
+  shares sum to 0.1277 UI (= the gap, by construction)
 
 standard_32g_x16_module: 16 lanes, 20 mm, crosstalk fext, PI step 0.0156 UI
-  worst-lane eye width 0.6927 UI (lane 4); ISI and noise alone 0.9123 UI (lane 0); gap 0.2196 UI; target 0.65 UI -> PASS
+  worst-lane eye width 0.7639 UI (lane 2); ISI and noise alone 0.9319 UI (lane 0); gap 0.1680 UI; target 0.65 UI -> PASS
        cause  share [UI]  of gap  alone off [UI]  alone passes
-   crosstalk      0.0481     22%          0.7344           yes
-      jitter      0.1600     73%          0.8445           yes
-     PI step      0.0116      5%          0.7023           yes
-  shares sum to 0.2196 UI (= the gap, by construction)
+   crosstalk      0.0442     26%          0.8023           yes
+      jitter      0.1132     67%          0.8696           yes
+     PI step      0.0106      6%          0.7723           yes
+  shares sum to 0.1680 UI (= the gap, by construction)
 
 standard_32g_x16_repair: 16 lanes, 20 mm, crosstalk none, PI step 0.0624 UI
-  worst-lane eye width 0.6683 UI (lane 0); ISI and noise alone 0.9123 UI (lane 0); gap 0.2441 UI; target 0.65 UI -> PASS
+  worst-lane eye width 0.7438 UI (lane 0); ISI and noise alone 0.9319 UI (lane 0); gap 0.1881 UI; target 0.65 UI -> PASS
        cause  share [UI]  of gap  alone off [UI]  alone passes
-      jitter      0.1869     77%          0.8519           yes
-     PI step      0.0572     23%          0.7222           yes
-  shares sum to 0.2441 UI (= the gap, by construction)
+      jitter      0.1325     70%          0.8719           yes
+     PI step      0.0556     30%          0.7950           yes
+  shares sum to 0.1881 UI (= the gap, by construction)
 
 advanced_32g_x64_spare: 64 lanes, 2 mm, crosstalk none, PI step 0.0624 UI
-  worst-lane eye width 0.7104 UI (lane 0); ISI and noise alone 0.9615 UI (lane 0); gap 0.2511 UI; target 0.65 UI -> PASS
+  worst-lane eye width 0.7766 UI (lane 0); ISI and noise alone 0.9709 UI (lane 0); gap 0.1943 UI; target 0.65 UI -> PASS
        cause  share [UI]  of gap  alone off [UI]  alone passes
-      jitter      0.1930     77%          0.9001           yes
-     PI step      0.0581     23%          0.7652           yes
-  shares sum to 0.2511 UI (= the gap, by construction)
+      jitter      0.1375     71%          0.9097           yes
+     PI step      0.0568     29%          0.8290           yes
+  shares sum to 0.1943 UI (= the gap, by construction)
 
 standard_32g_x5_coupled: 5 lanes, 25 mm, crosstalk coupled, PI step 0.0156 UI
-  worst-lane eye width 0.5715 UI (lane 2); ISI and noise alone 0.8873 UI (lane 0); gap 0.3158 UI; target 0.65 UI -> 0.0785 UI short
+  worst-lane eye width 0.6433 UI (lane 2); ISI and noise alone 0.9111 UI (lane 0); gap 0.2678 UI; target 0.65 UI -> 0.0067 UI short
        cause  share [UI]  of gap  alone off [UI]  alone passes
-   crosstalk      0.1518     48%          0.7208           yes
-      jitter      0.1529     48%          0.7213           yes
-     PI step      0.0111      4%          0.5814            no
-  shares sum to 0.3158 UI (= the gap, by construction)
+   crosstalk      0.1467     55%          0.7903           yes
+      jitter      0.1107     41%          0.7524           yes
+     PI step      0.0104      4%          0.6517           yes
+  shares sum to 0.2678 UI (= the gap, by construction)
 
 advanced_32g_x64_spare + fext: 64 lanes, 2 mm, crosstalk fext, PI step 0.0624 UI
-  worst-lane eye width 0.6008 UI (lane 34); ISI and noise alone 0.9615 UI (lane 0); gap 0.3607 UI; target 0.65 UI -> 0.0492 UI short
+  worst-lane eye width 0.6709 UI (lane 34); ISI and noise alone 0.9709 UI (lane 0); gap 0.3000 UI; target 0.65 UI -> PASS
        cause  share [UI]  of gap  alone off [UI]  alone passes
-   crosstalk      0.1117     31%          0.7104           yes
-      jitter      0.1909     53%          0.7863           yes
-     PI step      0.0581     16%          0.6554           yes
-  shares sum to 0.3607 UI (= the gap, by construction)
+   crosstalk      0.1098     37%          0.7766           yes
+      jitter      0.1336     45%          0.7961           yes
+     PI step      0.0566     19%          0.7227           yes
+  shares sum to 0.3000 UI (= the gap, by construction)
 
 summary: the largest share per config, and whether any single cause switched off passes
-  standard_32g_x1                     jitter 0.1782 UI of 0.1782; one cause off passes: jitter
-  standard_32g_x16_module             jitter 0.1600 UI of 0.2196; one cause off passes: crosstalk, jitter, PI step
-  standard_32g_x16_repair             jitter 0.1869 UI of 0.2441; one cause off passes: jitter, PI step
-  advanced_32g_x64_spare              jitter 0.1930 UI of 0.2511; one cause off passes: jitter, PI step
-  standard_32g_x5_coupled             jitter 0.1529 UI of 0.3158; one cause off passes: crosstalk, jitter
-  advanced_32g_x64_spare + fext       jitter 0.1909 UI of 0.3607; one cause off passes: crosstalk, jitter, PI step
+  standard_32g_x1                     jitter 0.1277 UI of 0.1277; one cause off passes: jitter
+  standard_32g_x16_module             jitter 0.1132 UI of 0.1680; one cause off passes: crosstalk, jitter, PI step
+  standard_32g_x16_repair             jitter 0.1325 UI of 0.1881; one cause off passes: jitter, PI step
+  advanced_32g_x64_spare              jitter 0.1375 UI of 0.1943; one cause off passes: jitter, PI step
+  standard_32g_x5_coupled          crosstalk 0.1467 UI of 0.2678; one cause off passes: crosstalk, jitter, PI step
+  advanced_32g_x64_spare + fext       jitter 0.1336 UI of 0.3000; one cause off passes: crosstalk, jitter, PI step
 wrote examples/output/12_eye_width_attribution.png

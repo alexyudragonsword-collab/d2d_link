@@ -1,4 +1,4 @@
-noise-dominated: noise 31.52 mV, jitter 366 fs (0.012 UI), phase -0.0171 UI
+noise-dominated: noise 31.51 mV, jitter 366 fs (0.012 UI), phase -0.0178 UI
   statistical BER 1.000e-06 [~s]   time BER 1.500e-06 (30 errors / 2.0e+07 symbols, 95% 9.6e-07..2.2e-06) [~s]
   ratio time / statistical = 1.50  -> within 0.5-2x
 jitter-dominated: noise 3.00 mV, jitter 3224 fs (0.103 UI), phase -0.0156 UI

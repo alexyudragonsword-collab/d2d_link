@@ -27,8 +27,8 @@ Four readings of the single-lane standard-package link
    one zero, so it is itself a lowpass and a little peaking is free; the
    table shows where the cost starts.
 3. **Training.** Link training centres the sampler between the eye's edges
-   at the BER its eye monitor can see in its dwell, not at the 1e-27 the
-   link is judged at (``rx.training_ber``). An asymmetric bathtub puts that
+   at the BER its eye monitor can see in its dwell, not at the target BER the
+   link is judged at (1e-15 at 32 GT/s since 0.17.0; 1e-27 before) (``rx.training_ber``). An asymmetric bathtub puts that
    midpoint off the target opening's; the lane spends eye width on the
    offset. Read on x1 and on the x5 coupled module's lanes.
 4. **The time engine on the filtered noise.** With the noise at the input

@@ -2,7 +2,8 @@
 
 The milestone link with its analytic lossy line swept from 5 mm out past the
 table's reach. For every length the statistical engine reports the insertion
-loss, the eye height and width at BER 1e-27 and the BER at the eye centre;
+loss, the eye height and width at the target BER (1e-15 at 32 GT/s since 0.17.0;
+1e-27 before) and the BER at the eye centre;
 the reach is the last length at which the eye still clears both eye-mask
 targets and the BER target. It is compared with the table's figure for the
 package (``standard.reach_mm``, source: spec since 0.16.1) -- a factor of two either way
@@ -71,7 +72,7 @@ else:
 plt = plt_or_none()
 if plt is not None:
     fig, ax1 = plt.subplots(figsize=(7, 4.2))
-    ax1.plot([r[0] for r in rows], [1e3 * r[2] for r in rows], "o-", label="eye height at 1e-27 [mV]")
+    ax1.plot([r[0] for r in rows], [1e3 * r[2] for r in rows], "o-", label="eye height at the target BER [mV]")
     ax1.axhline(eh_t[0], color="C0", ls="--", lw=0.8, label=f"target {eh_t[0]:g} mV (source: {eh_t[1]})")
     ax1.axvline(reach.value, color="gray", ls=":", lw=0.8, label=f"table reach {reach.value:g} mm")
     ax1.set_xlabel("length [mm]")

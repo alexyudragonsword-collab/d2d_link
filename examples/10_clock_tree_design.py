@@ -2,8 +2,8 @@
 for the 32 GT/s standard-package link to pass?
 
 From 0.13.0 to 0.13.11 the bundled links failed the 0.75 UI eye-width target
-(since 0.14.0 32 GT/s takes the 0.65 UI tier, an unverified second-hand quote,
-and they pass it). The reason was the forwarded clock's own tree. Data and clock leave the die on the same Tx PLL.
+(since 0.14.0 32 GT/s takes the 0.65 UI tier -- a second-hand quote until
+0.16.1, source: spec since -- and they pass it). The reason was the forwarded clock's own tree. Data and clock leave the die on the same Tx PLL.
 The receiver samples the data with the clock after its distribution tree (delay
 tau, a first-order bandwidth on its phase). So what reaches the sampler is the
 PLL's phase noise through ``1 - G(f)``, with ``G = exp(-j2 pi f tau) / (1 + jf/f_t)``.

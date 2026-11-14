@@ -3,7 +3,7 @@
 Example 10 found that on the x16 module the clock tree's length does nothing.
 The receiver's local PLL (1 MHz natural frequency) re-times the forwarded
 clock, so the Tx PLL's floor above it is not tracked whatever the tree. Even a
--155 dBc/Hz floor leaves the worst lane at 0.714 UI. This example asks the
+-155 dBc/Hz floor leaves the worst lane at 0.779 UI (0.714 at 1e-27, before 0.17.0). This example asks the
 module's own question: how much residual jitter can it afford, and which
 design levers buy the difference?
 
@@ -12,7 +12,8 @@ design levers buy the difference?
    Gaussian RMS of the sampling residual alone. The curve is read by scaling
    every jitter source together (the config's white and wander terms by g,
    both PLL profiles by 20 log10 g dB), and sigma* is where it crosses the
-   eye-width target (0.65 UI at 32 GT/s since 0.14.0; 0.75 UI before). (Until 0.13.5 only the data path's white term moved; with
+   eye-width target (0.65 UI at 32 GT/s since 0.14.0; 0.75 UI before) at the
+   table's raw BER (1e-15 at 32 GT/s since 0.17.0; 1e-27 before). (Until 0.13.5 only the data path's white term moved; with
    the 0.13.6 far-end shape the module's eye no longer reaches the target
    even with that term at zero.)
 2. **Levers one at a time**, in closed form (``ForwardedClock.budget``):
@@ -92,7 +93,7 @@ print("1. worst-lane eye width against the residual's Gaussian RMS (every jitter
 print(f"{'g':>6s} {'sigma [fs]':>11s} {'eye width min [UI]':>19s} {'worst lane':>11s}")
 curve = []                                                  # (sigma fs, eye width UI)
 by_g = {}
-for g in (0.25, 0.5, 0.75, 1.0, 1.25, 1.5):           # 1.5 since 0.14.6: section 4's points past sigma* need the curve
+for g in (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0):  # 1.5 since 0.14.6: section 4's points past sigma* need the curve; 2.0 since 0.17.0 (1e-15 at 32 GT/s)
     c = scaled(g)
     r = base if g == 1.0 else run_link(c)
     curve.append((sigma_fs(c), r.eye_width_min_ui))

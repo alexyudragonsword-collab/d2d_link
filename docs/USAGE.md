@@ -48,7 +48,7 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 
 ## 两个引擎(铁律 3)
 
-- `run_statistical(cfg)`:主引擎,BER 到 1e-27,眼高 / 眼宽在目标 BER 处,浴盆,残余抖动预算。
+- `run_statistical(cfg)`:主引擎,BER 到 1e-27 及以下(目标按 封装 × 速率 查表:32 GT/s 1e-15,0.17.0),眼高 / 眼宽在目标 BER 处,浴盆,残余抖动预算。
 - `run_time(cfg, phase_ui=...)`:时域校核,`sim.n_symbols` 个符号(> 2^24 时抖动按块流式合成);`sim.engine: both` 时 `run_link` 两个都跑并给出比。
   `pytest -m slow tests/test_engines_deep.py` 跑 1e9 符号的 3e-8 一致性点(每周 CI);`D2D_DEEP_SYMBOLS` / `D2D_DEEP_BER` 可改。
 - `run_link(cfg)`:整个模块 —— lane 映射与修复、逐 lane skew 残余、邻 lane 串扰(按物理邻接,死 lane 与闲置备用 lane 静默)、

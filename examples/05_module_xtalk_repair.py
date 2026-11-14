@@ -78,7 +78,7 @@ if plt is not None:
     ax.bar(phys, [1e3 * r.eye_height_v for r in quiet.stat], color="none", edgecolor="C1", label="crosstalk off")
     ax.axhline(res16.targets["eye_height_mv"][0], color="r", ls="--", lw=0.8, label=f"target ({res16.targets['eye_height_mv'][1]})")
     ax.set_xlabel("physical lane")
-    ax.set_ylabel("eye height at 1e-27 [mV]")
+    ax.set_ylabel("eye height at the target BER [mV]")
     ax.set_title("x16 standard, lane 5 dead -> upper x8")
     ax.legend(fontsize=8)
     ax = axes[1]
@@ -86,7 +86,7 @@ if plt is not None:
     for p in lm.failed:
         ax.axvline(p, color="r", ls=":", lw=0.8)
     ax.set_xlabel("physical lane")
-    ax.set_ylabel("eye height at 1e-27 [mV]")
+    ax.set_ylabel("eye height at the target BER [mV]")
     ax.set_title("x64 advanced, spare repair (dead lanes dotted)")
     fig.tight_layout()
     path = OUT / "05_module_xtalk_repair.png"

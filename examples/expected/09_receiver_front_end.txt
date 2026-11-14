@@ -1,35 +1,35 @@
 x1 standard package, 25 mm, 32 GT/s, noise 3 mV, Tx pole 60 GHz, clock tree 20 GHz
   rx front end  main [mV]    noise at sampler: eye    noise at input: sigma_sampler / eye
-          flat      163.8          204.1 mV / 0.709 UI (white noise through a flat front end has no RMS)
-        48 GHz      162.9          199.0 mV / 0.691 UI          6.51 mV   131.7 mV / 0.628 UI
-        32 GHz      160.5          188.0 mV / 0.674 UI          5.32 mV   145.1 mV / 0.626 UI
-        24 GHz      157.2          173.2 mV / 0.653 UI          4.60 mV   144.8 mV / 0.613 UI
-        16 GHz      149.5          140.6 mV / 0.594 UI          3.76 mV   128.0 mV / 0.568 UI
+          flat      163.8          224.3 mV / 0.783 UI (white noise through a flat front end has no RMS)
+        48 GHz      162.8          219.6 mV / 0.768 UI          6.51 mV   171.3 mV / 0.726 UI
+        32 GHz      160.5          209.1 mV / 0.753 UI          5.32 mV   178.3 mV / 0.721 UI
+        24 GHz      157.2          194.8 mV / 0.735 UI          4.60 mV   174.2 mV / 0.707 UI
+        16 GHz      149.4          162.6 mV / 0.683 UI          3.76 mV   153.4 mV / 0.665 UI
   the flat front end is the idealisation of every earlier version; the bundled configs keep it until a design gives a number
 
 CTLE at 35 mm (the table reach x 1.4 of example 02), front end 32 GHz:
  CTLE peak  noise gain        at sampler: eye          at input: eye
-        0        1.772        146.9 mV / 0.622        106.4 mV / 0.551
-        1        1.323        147.8 mV / 0.607        131.2 mV / 0.578
-        2        1.407        164.5 mV / 0.632        143.1 mV / 0.600
-        4        1.621        210.4 mV / 0.680        176.1 mV / 0.644
-        6        1.911        270.7 mV / 0.706        216.0 mV / 0.668
+        0        1.772        168.4 mV / 0.707        139.2 mV / 0.660
+        1        1.323        169.8 mV / 0.694        157.9 mV / 0.675
+        2        1.407        186.4 mV / 0.717        171.1 mV / 0.695
+        4        1.621        232.0 mV / 0.760        207.7 mV / 0.736
+        6        1.911        290.5 mV / 0.783        252.1 mV / 0.756
   best peaking: 6 dB with the noise at the sampler, 6 dB with it at the input -- the CTLE's gain is bought with noise once the noise is where it physically enters
 
 training centres the eye at its own BER:
                   link  training BER  centre [UI]  offset [UI]  eye [UI]  eye [mV]
-                    x1  target 1e-27     -0.01715     +0.00000    0.7091     204.1
-                    x1         1e-03     -0.01876     -0.00161    0.7059     203.8
-                    x1         1e-06     -0.01849     -0.00134    0.7064     203.8
-                    x1         1e-09     -0.01823     -0.00109    0.7069     203.9
-       x1, dwell 1e+07         1e-06     -0.02032     -0.00318    0.7028     203.5   (centring sigma 0.00061 UI)
-       x1, dwell 1e+09         1e-06     -0.01867     -0.00153    0.7061     203.8   (centring sigma 0.00006 UI)
-    x5 coupled, lane 0         1e-03     -0.00017     -0.00472    0.6239     198.0   (target-centred 0.6334 UI)
-    x5 coupled, lane 1         1e-03     -0.02274     +0.01048    0.5764     194.2   (target-centred 0.5974 UI)
-    x5 coupled, lane 2         1e-03     +0.00475     -0.00839    0.5548     191.2   (target-centred 0.5715 UI)
-    x5 coupled, lane 3         1e-03     -0.00460     -0.00335    0.5894     193.4   (target-centred 0.5961 UI)
-    x5 coupled, lane 4         1e-03     -0.01691     -0.00042    0.6724     199.7   (target-centred 0.6732 UI)
-  x5 module FAIL target-centred, FAIL trained at 1e-3 (worst lane 2 -> 2); x1's bathtub is nearly symmetric and training costs 0.002 UI, the crosstalk-laden lanes pay up to 0.021 UI (lane 1)
+                    x1  target 1e-15     -0.01779     +0.00000    0.7835     224.3
+                    x1         1e-03     -0.01876     -0.00097    0.7815     224.1
+                    x1         1e-06     -0.01849     -0.00070    0.7821     224.2
+                    x1         1e-09     -0.01823     -0.00044    0.7826     224.2
+       x1, dwell 1e+07         1e-06     -0.02032     -0.00253    0.7784     223.9   (centring sigma 0.00061 UI)
+       x1, dwell 1e+09         1e-06     -0.01867     -0.00088    0.7817     224.1   (centring sigma 0.00006 UI)
+    x5 coupled, lane 0         1e-03     -0.00017     -0.00340    0.6972     219.4   (target-centred 0.7040 UI)
+    x5 coupled, lane 1         1e-03     -0.02274     +0.00819    0.6597     216.0   (target-centred 0.6760 UI)
+    x5 coupled, lane 2         1e-03     +0.00475     -0.00677    0.6298     213.6   (target-centred 0.6433 UI)
+    x5 coupled, lane 3         1e-03     -0.00460     -0.00224    0.6638     215.3   (target-centred 0.6683 UI)
+    x5 coupled, lane 4         1e-03     -0.01691     +0.00009    0.7450     220.7   (target-centred 0.7452 UI)
+  x5 module FAIL target-centred, FAIL trained at 1e-3 (worst lane 2 -> 2); x1's bathtub is nearly symmetric and training costs 0.002 UI, the crosstalk-laden lanes pay up to 0.016 UI (lane 1)
 
 time engine on a 1 mm line, 45 mV at the input of a 24 GHz front end, 400000 symbols:
   statistics: sigma at the sampler 69.07 mV (gain 1.535), BER 2.40e-03

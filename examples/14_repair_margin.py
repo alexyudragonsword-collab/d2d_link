@@ -1,11 +1,12 @@
 """Example 14: what the x16 repair module's thin margin rests on.
 
-Example 13 found the most fragile pass among the bundled configs:
+Example 13 finds the thinnest pass among the bundled configs:
 ``configs/standard_32g_x16_repair.yaml`` (x16, physical lane 5 dead, the
 module degraded to its intact x8 half) passes the 0.65 UI target with a
-relative margin of +0.028. It fails if the borrowed Tx PLL profile is 3 dB
-worse, and it is left with +0.005 if the data path's white jitter is 20 %
-higher. The x16 module, which has the same channel class, survives both.
+relative margin of +0.144 at the 32 GT/s raw BER of 1e-15 (0.17.0), and no
++-20 % / +-3 dB knob flips it: the borrowed Tx PLL profile 3 dB worse
+leaves +0.101. At 1e-27 (before 0.17.0) it had +0.028, failed at +3 dB and
+withstood only +1.5 dB; the x16 module, same channel class, survived both.
 
 Two things set the repair module apart from the x16 module:
 
@@ -16,8 +17,8 @@ Two things set the repair module apart from the x16 module:
   PLL and does not see that leak.
 - **a coarse phase interpolator.** The config declares a 1/16 UI deskew step
   (1.95 ps), and under a tracker that is the PI step (0.13.0). The x16 module
-  uses 1/64 UI. Example 12 puts the PI step at 23 % of this config's
-  eye-width gap.
+  uses 1/64 UI. Example 12 puts the PI step at 30 % of this config's
+  eye-width gap (23 % at 1e-27).
 
 This example takes the design levers one at a time. For each it gives the
 closed-form residual, the worst lane's margin at the nominal PLL and at

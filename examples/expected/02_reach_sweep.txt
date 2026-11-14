@@ -1,17 +1,17 @@
 standard package, 32 GT/s; table reach 25 mm (source: spec; 教程 slide 71；白皮书 Table 1)
 length [mm]  IL@Nyq [dB]  eye height [mV]  eye width [UI]      log10 BER  margin EH [mV]  pass
-          5        -0.55            307.5           0.745         -808.2           267.5   yes
-         10        -1.10            280.3           0.741         -668.3           240.3   yes
-         15        -1.65            253.8           0.733         -551.9           213.8   yes
-         20        -2.20            228.4           0.722         -454.4           188.4   yes
-         25        -2.75            204.1           0.709         -371.7           164.1   yes
-         30        -3.30            181.0           0.691         -304.7           141.0   yes
-         35        -3.85            159.5           0.669         -249.8           119.5   yes
-         40        -4.40            139.4           0.642         -205.2            99.4    no
-         45        -4.95            120.7           0.609         -169.3            80.7    no
-         50        -5.50            103.5           0.570         -140.2            63.5    no
-         55        -6.05             87.5           0.525         -116.2            47.5    no
-         60        -6.60             72.8           0.474          -96.2            32.8    no
+          5        -0.55            325.6           0.814         -808.2           285.6   yes
+         10        -1.10            299.0           0.811         -668.3           259.0   yes
+         15        -1.65            273.2           0.804         -551.7           233.2   yes
+         20        -2.20            248.3           0.795         -454.3           208.3   yes
+         25        -2.75            224.3           0.783         -371.2           184.3   yes
+         30        -3.30            201.7           0.767         -304.1           161.7   yes
+         35        -3.85            180.5           0.748         -249.0           140.5   yes
+         40        -4.40            160.5           0.723         -203.9           120.5   yes
+         45        -4.95            142.0           0.695         -167.7           102.0   yes
+         50        -5.50            124.7           0.661         -138.1            84.7   yes
+         55        -6.05            108.5           0.622         -113.8            68.5    no
+         60        -6.60             93.5           0.577          -93.4            53.5    no
 
-model reach: 35 mm is the last length that clears eye height 40 mV (source: spec), eye width and BER 1e-27 (source: spec); table reach 25 mm -> ratio 1.40x  (within 2x)
+model reach: 50 mm is the last length that clears eye height 40 mV (source: spec), eye width and BER 1e-15 (source: spec); table reach 25 mm -> ratio 2.00x  (within 2x)
 wrote examples/output/02_reach_sweep.png

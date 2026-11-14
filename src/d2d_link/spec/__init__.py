@@ -127,7 +127,30 @@ def _table() -> dict[str, SpecNumber]:
         e = shared[new]
         out[old] = SpecNumber(key=old, value=e.value, unit=e.unit, source=e.source, cite=e.cite,
                               note=e.note, quote=e.quote or "", section=e.section or "")
+    out.update(_raw_ber_tiers(shared, ss.ref))
     check_ranges(out)
+    return out
+
+
+RAW_BER_BY_RATE = "ucie.raw_ber_by_rate"
+
+
+def _raw_ber_tiers(shared: dict, ref) -> dict[str, SpecNumber]:
+    """``<package>.raw_ber_target@<rate>`` for every package and rate of
+    spec_sources' rate x package BER table (issue #2 point 2, 0.17.0): the
+    standard package needs 1e-15 from 12 GT/s, the advanced from 16 GT/s,
+    1e-27 below. Each is a ``ref`` into that one entry (lookup only, no
+    copied number); the plain ``raw_ber_target`` (1e-27) stays the fallback
+    for a rate the table does not list."""
+    by = shared[RAW_BER_BY_RATE]
+    out = {}
+    for package in ("standard", "advanced"):
+        for rate in by.value["data_rate_gtps"]:
+            key = f"{package}.raw_ber_target@{float(rate):g}"
+            v = ref(f"{RAW_BER_BY_RATE}#{package}@data_rate_gtps={rate}", shared)
+            out[key] = SpecNumber(key=key, value=float(v), unit=shared["ucie.raw_ber_target"].unit, source=by.source, cite=by.cite,
+                                  note=f"{RAW_BER_BY_RATE} 的 {package} 列在 {rate} GT/s 的值(本库按 封装 × 速率 分档读)。",
+                                  quote=by.quote or "", section=by.section or "")
     return out
 
 

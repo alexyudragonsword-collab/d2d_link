@@ -12,7 +12,7 @@ from d2d_link.engine.statistical import resolved_targets
 
 def test_every_entry_is_tagged_and_cited():
     table = spec.all_entries()
-    assert len(table) == 16
+    assert len(table) == 16 + 12                     # + <package>.raw_ber_target@<rate> from ucie.raw_ber_by_rate (0.17.0)
     for key, e in table.items():
         assert e.source in spec.SOURCES, key
         assert e.cite, key
@@ -82,7 +82,7 @@ def test_package_lookup():
 
 def test_targets_resolve_with_their_source():
     t = resolved_targets(LinkConfig())
-    assert t["ber"] == (1e-27, "spec") and t["eye_height_mv"][1] == "spec"
+    assert t["ber"] == (1e-15, "spec") and t["eye_height_mv"][1] == "spec"          # 32 GT/s standard: 1e-15 (0.17.0)
     from d2d_link.config import TargetConfig
     t2 = resolved_targets(LinkConfig(target=TargetConfig(eye_height_mv=50.0)))
     assert t2["eye_height_mv"] == (50.0, "config")
@@ -157,7 +157,7 @@ def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
     assert spec.tier_keys("rx_eye_width_ui", "standard", 32.0) == [
         "standard.rx_eye_width_ui@32", "standard.rx_eye_width_ui", "rx_eye_width_ui@32", "rx_eye_width_ui"]
     cfg = LinkConfig()
-    assert target_keys(cfg) == {"ber": "raw_ber_target", "eye_height_mv": "rx_eye_height_mv",
+    assert target_keys(cfg) == {"ber": "standard.raw_ber_target@32", "eye_height_mv": "rx_eye_height_mv",
                                 "eye_width_ui": "rx_eye_width_ui@24-32"}          # the 24-32 GT/s range (0.14.5)
     table = dict(spec.all_entries())
     base = table["rx_eye_width_ui"]
@@ -264,7 +264,7 @@ def test_shim_keys_are_the_old_keys():
     from d2d_link.vendor.spec_sources import reader as ss
 
     legacy = ss.legacy_keys("d2d_link")
-    assert list(spec.all_entries()) == list(legacy)
+    assert list(spec.all_entries())[:len(legacy)] == list(legacy)             # then the BER tiers (0.17.0)
     shared = ss.load_table(spec.SURVEY_FILE)
     for old, new in legacy.items():
         e, s = spec.survey(old), shared[new]
@@ -272,3 +272,27 @@ def test_shim_keys_are_the_old_keys():
         assert e.quote == (s.quote or "") and e.section == (s.section or "")
     assert ss.audit_tags(spec.SURVEY_FILE) == []
     assert spec.survey_tiered("rx_eye_width_ui", "standard", 28.0).key == "rx_eye_width_ui@24-32"
+
+
+def test_raw_ber_target_follows_the_rate_by_package_table():
+    """Issue #2 point 2 (0.17.0): the raw BER target is the rate x package
+    table spec_sources quotes -- 1e-15 from 12 GT/s on the standard package
+    and from 16 GT/s on the advanced, 1e-27 below -- each tier a ``ref`` into
+    ``ucie.raw_ber_by_rate``; a rate the table does not list falls back to
+    the plain 1e-27 entry. Until 0.16.1 every rate used 1e-27."""
+    from d2d_link.config import LinkConfig, PackageConfig, with_data_rate
+    from d2d_link.engine import statistical as st
+    from d2d_link.vendor.spec_sources import reader as ss
+
+    shared = ss.load_table(spec.SURVEY_FILE)
+    for kind, first_relaxed in (("standard", 12), ("advanced", 16)):
+        cfg = LinkConfig(package=PackageConfig(kind=kind))
+        for rate in (4, 8, 12, 16, 24, 32):
+            c = with_data_rate(cfg, rate)
+            want = ss.ref(f"ucie.raw_ber_by_rate#{kind}@data_rate_gtps={rate}", shared)
+            assert want == (1e-15 if rate >= first_relaxed else 1e-27), (kind, rate)
+            assert st.resolved_targets(c)["ber"] == (want, "spec"), (kind, rate)
+            assert st.target_keys(c)["ber"] == f"{kind}.raw_ber_target@{rate}"
+    st._OFF_TABLE_WARNED.clear()
+    with pytest.warns(UserWarning):
+        assert st.resolved_targets(with_data_rate(LinkConfig(), 20))["ber"] == (1e-27, "spec")    # no tier: the plain entry

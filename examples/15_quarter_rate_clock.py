@@ -23,7 +23,7 @@ this model, both ``source: model`` (no spec text is available):
   (``clocking.qdr_quadrature_ui``) splits the 0/180 pair from the 90/270
   pair. The lane samples at (-dcd - q, -dcd + q, dcd - q, dcd + q) / 2,
   each a quarter of the time: a bounded box like the PI step, so at
-  1e-27 it costs about its width.
+  the target BER (1e-15 at 32 GT/s since 0.17.0) it costs about its width.
 
 Every point is a dataclass replace of a bundled config.
 """

@@ -125,7 +125,7 @@ def test_sensitivity_report_names_the_deciding_guesses(budget_tool):
 
     cfg = LinkConfig(channel=ChannelConfig(length_mm=25.0), clocking=ClockingConfig(pll_profile=PROFILE),
                      sim=SimConfig(stat_phase_points=16),
-                     target=TargetConfig(eye_height_mv=215.0))              # 222 mV nominal: 20 % more skin loss (203) closes it
+                     target=TargetConfig(eye_height_mv=215.0, ber=1e-27))   # 222 mV nominal: 20 % more skin loss (203) closes it (BER pinned: 0.17.0)
     sens = budget_tool.sensitivity(cfg)
     labels = {r["label"]: r for r in sens["rows"]}
     assert {"rdc_ohm_m", "r_skin", "loss_tangent", "z0_ohm", "target.eye_height_mv", "target.eye_width_ui"} <= set(labels)

@@ -8,7 +8,7 @@ from scipy.special import erfcinv
 
 from conftest import PROFILE
 from d2d_link.channel.model import LinkResponse
-from d2d_link.config import ChannelConfig, ClockingConfig, LinkConfig, RxConfig, SimConfig, load_config
+from d2d_link.config import ChannelConfig, ClockingConfig, LinkConfig, RxConfig, SimConfig, TargetConfig, load_config
 from d2d_link.engine.statistical import (StatisticalEngine, isi_model, jitter_quadrature, log10_tail, qfunc,
                                          run_statistical, tail_probability)
 from d2d_link.vendor.halo.waveform import Waveform
@@ -89,7 +89,7 @@ def test_isi_grid_converges_with_hundreds_of_crosstalk_cursors():
     assert fine.extras["n_cursors"] > 300 and fine.extras["isi_bins"] > coarse.extras["isi_bins"]
     assert abs(fine.eye_width_ui - coarse.eye_width_ui) < 0.002
     assert abs(fine.eye_height_v - coarse.eye_height_v) < 1e-3
-    assert fine.eye_width_ui == pytest.approx(0.575, abs=0.01)      # 0.590 with the sqrt2 u/(1+u) FEXT shape (0.13.5); 0.632 on 0.12 (constant tan d, PLL floor zeroed); 0.699 with the non-causal line (0.11); 0.685 before the geometry-derived L / C (0.5.0); 0.671 with 12 cursors enumerated
+    assert fine.eye_width_ui == pytest.approx(0.647, abs=0.01)      # at 1e-15, the 32 GT/s raw BER (0.17.0); 0.575 at 1e-27; 0.590 with the sqrt2 u/(1+u) FEXT shape (0.13.5); 0.632 on 0.12 (constant tan d, PLL floor zeroed); 0.699 with the non-causal line (0.11); 0.685 before the geometry-derived L / C (0.5.0); 0.671 with 12 cursors enumerated
 
 
 def test_tails_live_in_the_log_domain():
@@ -134,10 +134,12 @@ def test_eye_width_is_capped_at_one_ui():
 
 
 def test_reaches_1e_minus_27_with_a_finite_eye():
+    """32 GT/s asks 1e-15 of the table since 0.17.0; the engine must still
+    reach 1e-27 (the table's target up to 8 / 12 GT/s), so the config asks."""
     cfg = LinkConfig(clocking=ClockingConfig(pll_profile=PROFILE, data_path_rj_s=200e-15, clock_path_rj_s=200e-15),
-                     sim=SimConfig(stat_phase_points=32))
+                     sim=SimConfig(stat_phase_points=32), target=TargetConfig(ber=1e-27))
     r = run_statistical(cfg)
-    assert r.target_ber == 1e-27 and r.targets["ber"][1] == "spec"
+    assert r.target_ber == 1e-27 and r.targets["ber"][1] == "config"
     assert r.ber < 1e-27 and 0.0 < r.eye_height_v < 0.4 and 0.5 < r.eye_width_ui < 1.0
     assert r.passes
 
@@ -204,7 +206,7 @@ def test_bathtub_window_follows_the_eye_wherever_the_reference_sits():
     # the milestone-1 link keeps its +-0.5 UI window and its numbers
     r1 = run_statistical(load_config(REPO / "configs" / "standard_32g_x1.yaml"))
     assert r1.bathtub_phase_ui[0] == -0.5 and r1.bathtub_phase_ui[-1] == 0.5 and r1.bathtub_ber.size == 65
-    assert r1.eye_width_ui == pytest.approx(0.7094, abs=0.0005)     # 0.7614 on 0.12; 0.7741 with the non-causal line (0.11)
+    assert r1.eye_width_ui == pytest.approx(0.7835, abs=0.0005)     # at 1e-15 (0.17.0); 0.7094 at 1e-27; 0.7614 on 0.12; 0.7741 with the non-causal line (0.11)
 
 
 def test_eye_width_does_not_depend_on_the_phase_grid():
