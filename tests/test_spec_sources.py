@@ -221,9 +221,11 @@ def test_the_eye_width_tier_is_a_rate_range():
     st._OFF_TABLE_WARNED.clear()
     with pytest.warns(UserWarning, match="neither in the survey's rate list"):
         assert st.resolved_targets(with_data_rate(cfg, 40))["eye_width_ui"][0] == 0.75
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        st.resolved_targets(with_data_rate(cfg, 28))                    # inside the range: no warning
+    st._OFF_TABLE_WARNED.clear()
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        st.resolved_targets(with_data_rate(cfg, 28))                    # inside the range: no eye-width warning
+    assert not any("eye-width" in str(w.message) for w in rec)          # (the raw BER warns there since 0.17.1)
     table = dict(spec.all_entries())
     base = table["rx_eye_width_ui@24-32"]
     table["rx_eye_width_ui@28"] = dataclasses.replace(base, key="rx_eye_width_ui@28", value=0.60)
@@ -294,5 +296,42 @@ def test_raw_ber_target_follows_the_rate_by_package_table():
             assert st.resolved_targets(c)["ber"] == (want, "spec"), (kind, rate)
             assert st.target_keys(c)["ber"] == f"{kind}.raw_ber_target@{rate}"
     st._OFF_TABLE_WARNED.clear()
-    with pytest.warns(UserWarning):
+    with pytest.warns(UserWarning, match="raw-BER tiers"):
         assert st.resolved_targets(with_data_rate(LinkConfig(), 20))["ber"] == (1e-27, "spec")    # no tier: the plain entry
+
+
+def test_raw_ber_fallback_off_the_table_is_flagged():
+    """spec_sources' review of issue #2: 28 GT/s sits inside the eye-width
+    range tier (no warning there) but in no raw-BER tier, so its BER fell
+    back to the plain 1e-27 silently although 24 and 32 GT/s both ask
+    1e-15. Since 0.17.1 it warns once per rate and package and the report
+    flags ``targets.ber.off_table``; a listed rate and a configured BER do
+    not."""
+    import warnings
+
+    from d2d_link.clock.forwarded import ForwardedClock
+    from d2d_link.config import LinkConfig, PackageConfig, SimConfig, TargetConfig, with_data_rate
+    from d2d_link.engine import run_link
+    from d2d_link.engine import statistical as st
+    from d2d_link.report import report as build_report
+    from d2d_link.report import to_markdown
+
+    st._OFF_TABLE_WARNED.clear()
+    for kind in ("standard", "advanced"):
+        c28 = with_data_rate(LinkConfig(package=PackageConfig(kind=kind)), 28)
+        assert st.off_table_ber(c28) and not st.off_table_rate(c28)
+        with pytest.warns(UserWarning, match=f"28 GT/s is not in the {kind} package's raw-BER tiers") as rec:
+            assert st.resolved_targets(c28)["ber"] == (1e-27, "spec")
+        assert not any("eye-width" in str(w.message) for w in rec)              # the eye width is covered by @24-32
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            st.resolved_targets(c28)                                            # once per rate and package
+    c32 = LinkConfig()
+    assert not st.off_table_ber(c32)
+    assert not st.off_table_ber(with_data_rate(LinkConfig(target=TargetConfig(ber=1e-27)), 28))   # the config's own claim
+    assert st.off_table_targets(with_data_rate(LinkConfig(), 28)) == {"ber": True, "eye_height_mv": False, "eye_width_ui": False}
+
+    c = with_data_rate(LinkConfig(sim=SimConfig(stat_phase_points=16)), 28)
+    rep = build_report(c, run_link(c), ForwardedClock(c))
+    assert rep["targets"]["ber"]["off_table"] is True and rep["targets"]["eye_width_ui"]["off_table"] is False
+    assert "| ber | 1e-27 | spec | raw_ber_target (rate in no tier" in to_markdown(rep)

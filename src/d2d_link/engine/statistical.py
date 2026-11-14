@@ -53,7 +53,7 @@ from scipy.special import erfc, log_ndtr
 from ..channel.model import LinkResponse, link_response, noise_shaping_gain
 from ..clock.forwarded import ForwardedClock, JitterBudget
 from ..config.schema import LinkConfig
-from ..spec import survey_tiered
+from ..spec import all_entries, survey_tiered
 
 SQRT2 = math.sqrt(2.0)
 LN10 = math.log(10.0)
@@ -112,19 +112,48 @@ def off_table_rate(cfg: LinkConfig) -> bool:
     return "@" not in key and "." not in key and not any(abs(rate - r) < 1e-9 for r in rates)
 
 
+def off_table_ber(cfg: LinkConfig) -> bool:
+    """True when the raw BER target comes from the plain ``raw_ber_target``
+    (1e-27) although the table tiers the BER by package and rate
+    (``<package>.raw_ber_target@<rate>``, 0.17.0) and none of the tiers
+    covers this rate: the plain entry's source states 1e-27 for the low
+    rates only, so 28 GT/s between two 1e-15 rates is judged at 1e-27
+    without the table saying so (spec_sources' review of issue #2; 0.17.1)."""
+    if cfg.target.ber is not None:
+        return False
+    pkg = cfg.package.kind
+    key = survey_tiered("raw_ber_target", pkg, cfg.data_rate_gtps).key
+    return key == "raw_ber_target" and any(k.startswith(f"{pkg}.raw_ber_target@") for k in all_entries())
+
+
+def off_table_targets(cfg: LinkConfig) -> dict[str, bool]:
+    """Per target: whether it fell back to an entry that does not state it
+    for this rate (the report's ``targets.<name>.off_table``)."""
+    return {"ber": off_table_ber(cfg), "eye_height_mv": False, "eye_width_ui": off_table_rate(cfg)}
+
+
 def _warn_off_table_rate(cfg: LinkConfig) -> None:
-    """Warn once per rate per process when ``off_table_rate`` holds (0.14.5)."""
-    rate = float(cfg.data_rate_gtps)
-    if rate in _OFF_TABLE_WARNED:
+    """Warn once per rate and package per process when a target falls back
+    off the table (eye width 0.14.5; raw BER 0.17.1)."""
+    rate, pkg = float(cfg.data_rate_gtps), cfg.package.kind
+    if (rate, pkg) in _OFF_TABLE_WARNED:
         return
+    parts = []
     if off_table_rate(cfg):
-        key = survey_tiered("rx_eye_width_ui", cfg.package.kind, rate).key
+        key = survey_tiered("rx_eye_width_ui", pkg, rate).key
         rates = [float(r) for r in survey_tiered("data_rates_gtps").value]
-        _OFF_TABLE_WARNED.add(rate)
+        parts.append(f"{rate:g} GT/s is neither in the survey's rate list {rates} nor in a rate tier: the eye-width "
+                     f"target falls back to {key!r}, whose source does not state it for this rate")
+    if off_table_ber(cfg):
+        tiers = sorted(float(k.rsplit("@", 1)[1]) for k in all_entries() if k.startswith(f"{pkg}.raw_ber_target@"))
+        plain = survey_tiered("raw_ber_target", pkg, rate)
+        parts.append(f"{rate:g} GT/s is not in the {pkg} package's raw-BER tiers {tiers}: the BER target falls back to "
+                     f"'raw_ber_target' = {float(plain.value):g}, which the rate x package table states for the low rates only")
+    if parts:
+        _OFF_TABLE_WARNED.add((rate, pkg))
         import warnings
 
-        warnings.warn(f"{rate:g} GT/s is neither in the survey's rate list {rates} nor in a rate tier: the eye-width "
-                      f"target falls back to {key!r}, whose source does not state it for this rate", stacklevel=3)
+        warnings.warn("; ".join(parts), stacklevel=3)
 
 
 def resolved_targets(cfg: LinkConfig) -> dict:

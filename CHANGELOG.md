@@ -4,6 +4,16 @@
 
 ---
 
+## [0.17.1] — 2026-11-14 — 表外速率的 BER 退回也告警
+
+- spec_sources 验收 issue #2 时指出:表外速率退回 1e-27 时查表层不告警。核对发现 28 GT/s 的漏洞:它在眼宽区间 `@24-32` 里,原有的告警(只看眼宽)不响,
+  BER 却不在任何 `<package>.raw_ber_target@<rate>` 分档里,悄悄按 1e-27 判(两边 24 / 32 GT/s 都是 1e-15)。
+- `engine.statistical.off_table_ber` / `off_table_targets`:BER 退回不分档条目、而该封装有 BER 分档时为真(配置自己写 `target.ber` 不算)。
+  告警按 速率 × 封装 各一次,眼宽与 BER 两部分合在一条里;报表 `targets.ber.off_table`(此前只有眼宽有这个标志),Markdown 的 Targets 表注明。
+- 不动数:指纹 3597 / 3597 逐位不变;bundled 配置都在 32 GT/s。28 GT/s 该取多少留在 ROADMAP P1 #4(要 spec_sources 的区间条目)。
+
+---
+
 ## [0.17.0] — 2026-11-14 — issue #2 的四个判定点
 
 - **眼罩口径(第 1 点,不动数)**:保留含抖动的眼对眼罩的比法,标明比规范严 —— UCIe 的眼罩判信道自己的眼(无噪、无抖的行为级 TX/RX)。

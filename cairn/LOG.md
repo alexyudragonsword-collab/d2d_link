@@ -3,6 +3,13 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短(数字原值、被推翻的判断、下一步),
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-11-14 · 表外速率的 BER 退回也告警(ccr-a2094794-9qa40v,0.17.1)
+
+- spec_sources 验收 issue #2(已关闭,consumers.yaml pin 改 bbc0ccb)时提醒:查表层退回 1e-27 不告警。
+- 被推翻:0.17.0 的 CHANGELOG / spec-sources.md 说「表外速率退回 1e-27 并告警」—— 告警只看眼宽;28 GT/s 在 `@24-32` 里,BER 悄悄按 1e-27 判(邻档都是 1e-15)。
+- 改:`off_table_ber`,告警按 速率 × 封装 一次,报表 `targets.ber.off_table`。指纹逐位不变。
+- 下一步:ROADMAP P1 #4,请 spec_sources 加 BER 区间条目(用户先选了只加告警)。
+
 ## 2026-11-14 · issue #2 第 1 / 3 / 4 点(ccr-a2094794-9qa40v,0.17.0,不动数)
 
 - 第 1 点:眼罩是信道合规判据(无噪无抖 TX/RX),本库比含抖动的眼 —— 用户选保留,`report.MASK_CRITERION` 写进报表与 GUI。本库的「不过」不等于不合规。

@@ -36,6 +36,11 @@
    30 ps 树的泄漏仍占它残余的 37 %。各设计项把它推到:PI 步长 1/32 UI +7.9 dB、树 15 ps +9.4、加本地 PLL +9.3、数据路径白抖 100 fs +7.3、树 0 ps > 12 dB。
    要做:真实发端 PLL 在 fs/2 以内的相噪、片上路径抖动的实测或设计值;Mo 等 2021(OJ-SSCS)的 16 nm 时钟分配实测数待读原文(isl.utoronto.ca 不在会话网络白名单)。
 
+4. **24–32 GT/s 之间的速率,原始 BER 目标没有出处**。`ucie.raw_ber_by_rate` 只列 4 / 8 / 12 / 16 / 24 / 32 GT/s;28 GT/s 不在任何 `<package>.raw_ber_target@<rate>` 分档里,
+   退回不分档的 1e-27,而两边的 24 / 32 GT/s 都是 1e-15(复现:`resolved_targets(with_data_rate(LinkConfig(), 28))["ber"]` = (1e-27, 'spec'),key `raw_ber_target`)。
+   0.17.1 起它告警、报表标 `off_table`,但判定仍按 1e-27。要做:请 spec_sources 加区间条目(如 `ucie.standard.raw_ber_target@12-32`、`ucie.advanced.raw_ber_target@16-32`,
+   issue #2 提过的方案 b),若公开原文支持「区间内都是 1e-15」;重新 pin 后 28 GT/s 落到 1e-15。bundled 配置都是 32 GT/s,不受影响。
+
 ## P2 — 一致性与能力
 
 0. **性能**(性能轮 III,0.12.5 之后):统计引擎每 lane 1.0 s(x1),x5 耦合模块 ~14 s、x16 模块 ~18 s(空闲机器;0.11 的 128 UI 窗是 21 / 29 s),示例 05 / 07 见 LOG。

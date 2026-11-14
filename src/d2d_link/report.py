@@ -59,11 +59,12 @@ def report(cfg, res, clock) -> dict:
     ui = cfg.ui
     rows = budget_rows(cfg, clock)
     total = math.sqrt(sum(v ** 2 for _, v in rows))
-    from d2d_link.engine.statistical import off_table_rate, target_keys
+    from d2d_link.engine.statistical import off_table_targets, target_keys
 
     lm = res.lanes
     t = res.targets
     keys = target_keys(cfg)
+    off = off_table_targets(cfg)
     out = {
         "link": {"data_rate_gtps": cfg.data_rate_gtps, "package": cfg.package.kind,
                  "length_mm": cfg.channel.length_mm, "ui_ps": ui * 1e12,
@@ -81,7 +82,7 @@ def report(cfg, res, clock) -> dict:
         "jitter_budget": [{"term": name, "fs": 1e15 * v, "ui": v / ui} for name, v in rows]
                          + [{"term": "total (power sum)", "fs": 1e15 * total, "ui": total / ui}],
         "targets": {k: {"value": v, "source": src, "key": keys[k],
-                        **({"off_table": off_table_rate(cfg)} if k == "eye_width_ui" else {})} for k, (v, src) in t.items()},
+                        **({"off_table": off[k]} if k in ("eye_width_ui", "ber") else {})} for k, (v, src) in t.items()},
         "mask_criterion": MASK_CRITERION,
         "crosstalk": ({"mode": cfg.channel.xtalk, **describe(cfg)} if cfg.channel.xtalk == "coupled"
                       else {"mode": cfg.channel.xtalk, **_xtalk_level(cfg, res)}),

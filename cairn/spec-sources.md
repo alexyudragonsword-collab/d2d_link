@@ -20,7 +20,12 @@ authoring_mode: ai_generated
   `grep -c "source: survey" src/d2d_link/vendor/spec_sources/data/ucie.yaml` = 1(测试断言这条命令的计数)。
 - **原始 BER 目标按 封装 × 速率 查表(0.17.0,issue #2 第 2 点)**:`ucie.raw_ber_by_rate` 给标准封装 12 GT/s 起、先进封装 16 GT/s 起 1e-15,其余 1e-27。
   垫片(`spec._raw_ber_tiers`)把它展开成 12 条 `<package>.raw_ber_target@<rate>`,每条是对那一条表的 `ref`(只查,不抄数),走原有的分档查表;
-  表外速率(20、40 GT/s)退回不分档的 `raw_ber_target` 1e-27 并告警。本库读的条目因此是 16 + 12 = 28 条。
+  表外速率(20、40 GT/s)退回不分档的 `raw_ber_target` 1e-27。本库读的条目因此是 16 + 12 = 28 条。
+  **坑(0.17.0 漏了,0.17.1 补)**:原先只有眼宽的退回会告警(`off_table_rate`),28 GT/s 落在眼宽区间 `@24-32` 里不算表外,BER 却在任何分档之外、
+  悄悄按 1e-27 判 —— 两边的 24 / 32 GT/s 都是 1e-15(spec_sources 验收 issue #2 时指出查表层不告警)。0.17.1 起 `off_table_ber` 单独判:
+  键退回了不分档的 `raw_ber_target`、而该封装有 BER 分档时告警(每个 速率 × 封装 一次),报表 `targets.ber.off_table` 置真、Markdown 注明;
+  配置自己写了 `target.ber` 不算。28 GT/s 该是多少要等原文给区间(ROADMAP P1 #4)。
+  contains: pitfall
   另一条 `ucie.advanced.spare_lanes_per_32` = 2 本库不读(bundled 的 x64 spare 配置 `spare_count: 4` 与之相符)。
 - **许可约束(2026-11-14,issue #2 转述)**:UCIe 规范下载页的最终用户许可协议第 (ii) 款禁止把规范(全部或部分)输入任何 AI 系统,也禁止用 AI 分析、解读或从中提取内容。
   本库用 AI 协作,所以**不收、不索要规范原文**;核实只在 spec_sources 用公开材料做,本库只重新 pin。
