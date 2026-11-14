@@ -14,6 +14,9 @@
   现在被 8 个估计翻。模型 reach 35 → 50 mm(对表 25 mm 2.00×,压在 2× 判据边上)。示例 11 的抖动缩放延到 g = 2.0(σ* 400.6 → 586.0 fs)。
   物理测试里以 1e-27 为对象的在配置里钉 `target.ber: 1e-27`;图轴标签不再写死 1e-27。指纹 974 / 3597 个值动了(统计眼、BER、采样相位及随相位的游标 / 时域样本)。
 - **发送摆幅(第 3 点,不动数)**:0.4 V 是原文的下限(强烈建议上限 < 0.85 V);保留为 bundled 配置与 schema 的默认 —— 最坏情况判定。只改注释与文档。
+- **quarter-rate 时钟(第 4 点,不动数)**:`forwarded_qdr` 的方案本身有公开出处(`ucie.forwarded_clock` 的 note:24 / 32 GT/s 可取 rate/4,4 路交织),写进 schema 注释、示例 15、
+  `cairn/forwarded-clock.md`;建模细节仍是 source: model,默认仍 DDR。`LinkConfig.forwarded_clock_hz` 对 QDR 给 rate/4(此前一律 rate/2;只有报表读它),
+  新增 `clock_scheme_label`;报表 JSON 加 `clock_scheme`,Markdown、GUI 与示例 00 打印「GHz DDR / QDR」。
 
 ---
 

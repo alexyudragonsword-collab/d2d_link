@@ -76,7 +76,12 @@ t_rx[k]   = (h_tree ⊛ t_pll)[k − τ] + n_t[k]                   树:延时 �
   量化核的两端节点带小数权重,使方差正好是 w²/12(0.12 取整到整数个节点,x5 的 1/64 UI 多 11 % 方差)。
 - **发端 DCD**(段 15,`ForwardedClock.sampling_dcd_ui()`):fs/2 的单音,无本地 PLL 时经 Re E(1 − ρG)(fs/2) 到达采样器(30 ps 树 ≈ 1.7),有本地 PLL 时全额;0.12 当作完全抵消。
 
-## 四分之一速率前向时钟(0.15.0 / 0.15.1,示例 15;全部 source: model)
+## 四分之一速率前向时钟(0.15.0 / 0.15.1,示例 15;方案有公开出处,建模 source: model)
+
+- **出处(0.17.0,issue #2 第 4 点)**:方案本身在公开原文里 —— Hot Chips 2023 教程 slide 54「Supports 2-way and 4-way interleaving TRX」与 slide 57 的时钟频率表
+  (32 GT/s:16 或 8 GHz;24 GT/s:12 或 6 GHz;后者 4 路交织),见 `ucie.forwarded_clock` 的 note(source: spec,值只写了 DDR 那一种)。
+  本库怎么建它(边沿间线性内插、cos² 与镜像项、I/Q 偏差、4 相发生器抖动)原文没说,仍是 source: model;spec_sources 记的「45° / 135°」相位安排本库没有单独建模,对应关系未核实。
+  默认仍是 `forwarded_ddr`(用户选:补出处、默认不变)。报表与 GUI 0.17.0 起按方案打印时钟频率与 DDR / QDR(此前对 QDR 也写「16 GHz DDR」)。
 
 - `clocking.scheme: forwarded_qdr`:时钟 fs/4、边沿 2 UI 一个、4 相发生器在边沿间线性内插。在 UI 网格上就是「隔一个保留、其余取左右均值」:
   相位音调 f 留下 cos²(πf/fs) 的自己(fs/4 处 1/2、fs/2 处 0),外加同样权重的镜像 fs/2 − f(`JitterBudget.edge_alias_s`)。

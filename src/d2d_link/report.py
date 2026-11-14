@@ -67,7 +67,7 @@ def report(cfg, res, clock) -> dict:
     out = {
         "link": {"data_rate_gtps": cfg.data_rate_gtps, "package": cfg.package.kind,
                  "length_mm": cfg.channel.length_mm, "ui_ps": ui * 1e12,
-                 "forwarded_clock_ghz": cfg.forwarded_clock_hz / 1e9,
+                 "forwarded_clock_ghz": cfg.forwarded_clock_hz / 1e9, "clock_scheme": cfg.clock_scheme_label,
                  "lanes_requested": lm.requested_width, "lanes_active": lm.active_width,
                  "repair": lm.mode, "failed": list(lm.failed), "unrepaired": list(lm.unrepaired),
                  "insertion_loss_nyquist_db": res.stat[0].extras["insertion_loss_nyquist_db"] if res.stat else None,
@@ -109,7 +109,7 @@ def to_markdown(rep: dict) -> str:
     L = rep["link"]
     lines = [f"# Timing budget: {L['package']} package, {L['data_rate_gtps']:g} GT/s, {L['length_mm']:g} mm, "
              f"{L['lanes_active']}/{L['lanes_requested']} lanes -- {L['verdict']}", "",
-             f"UI {L['ui_ps']:.3f} ps, forwarded clock {L['forwarded_clock_ghz']:g} GHz DDR, insertion loss "
+             f"UI {L['ui_ps']:.3f} ps, forwarded clock {L['forwarded_clock_ghz']:g} GHz {L.get('clock_scheme', 'DDR')}, insertion loss "
              f"{L['insertion_loss_nyquist_db']:.2f} dB at Nyquist; repair {L['repair']}, failed {L['failed']}"
              + (f", UNREPAIRED {L['unrepaired']}" if L["unrepaired"] else "") + ".", "",
              f"Tx PLL in band {L['tx_pll_rms_fs']:.1f} fs RMS; local PLL {L['local_pll_rms_fs']:.1f} fs.", "",

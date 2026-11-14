@@ -17,6 +17,8 @@ def test_defaults_are_the_milestone_link():
     assert cfg.data_rate_gtps == 32.0 and cfg.lanes.count == 1
     assert cfg.clocking.scheme == "forwarded_ddr"
     assert cfg.forwarded_clock_hz == pytest.approx(16e9)
+    qdr = LinkConfig(clocking=ClockingConfig(scheme="forwarded_qdr"))      # rate/4 (0.17.0; read only by reports)
+    assert qdr.forwarded_clock_hz == pytest.approx(8e9) and qdr.clock_scheme_label == "QDR" and cfg.clock_scheme_label == "DDR"
     assert cfg.ui == pytest.approx(31.25e-12)
     assert cfg.dt == pytest.approx(cfg.ui / 32)
 

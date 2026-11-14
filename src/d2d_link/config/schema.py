@@ -289,7 +289,9 @@ class ClockingConfig:
     """
 
     scheme: Literal["forwarded_ddr", "forwarded_qdr"] = "forwarded_ddr"   # qdr (0.15.0): the clock at a quarter of
-                                          # the data rate, four sampling phases from a 4-phase generator
+                                          # the data rate, four sampling phases from a 4-phase generator. The option
+                                          # itself is in the public UCIe text (ucie.forwarded_clock, source: spec: rate/4
+                                          # at 24 / 32 GT/s, 4-way interleaved); how it is modelled is source: model
     pll_profile: Optional[str] = None     # clock profile file; None -> white PLL (pll_rj_s only)
     pll_f0_hz: Optional[float] = None     # carrier override for the profile's phase scale
     pll_shift_db: float = 0.0             # uniform dB shift of the profile (same shape, other RMS)
@@ -589,8 +591,13 @@ class LinkConfig:
 
     @property
     def forwarded_clock_hz(self) -> float:
-        """The forwarded clock's frequency: DDR, so half the data rate."""
-        return 0.5 * self.symbol_rate
+        """The forwarded clock's frequency: half the data rate for DDR, a
+        quarter for QDR (until 0.17.0 always half; only reports read it)."""
+        return (0.25 if self.clocking.scheme == "forwarded_qdr" else 0.5) * self.symbol_rate
+
+    @property
+    def clock_scheme_label(self) -> str:
+        return "QDR" if self.clocking.scheme == "forwarded_qdr" else "DDR"
 
     def xtalk_db(self) -> tuple[float, float]:
         """(nearest, second neighbour) far-end crosstalk at Nyquist [dB]: the

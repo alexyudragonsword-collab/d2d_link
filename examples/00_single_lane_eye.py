@@ -33,7 +33,7 @@ clock = ForwardedClock(cfg)
 b = clock.budget()
 
 print(f"link: {cfg.package.kind} package, {cfg.data_rate_gtps:g} GT/s, {cfg.channel.length_mm:g} mm, "
-      f"{cfg.lanes.count} lane, forwarded clock {cfg.forwarded_clock_hz / 1e9:g} GHz DDR")
+      f"{cfg.lanes.count} lane, forwarded clock {cfg.forwarded_clock_hz / 1e9:g} GHz {cfg.clock_scheme_label}")
 rl = cfg.rlgc()
 print(f"channel: insertion loss {resp.channel.insertion_loss_db(cfg.f_nyquist):.2f} dB at Nyquist "
       f"({cfg.f_nyquist / 1e9:g} GHz), main cursor {1e3 * resp.main_amplitude:.1f} mV of "

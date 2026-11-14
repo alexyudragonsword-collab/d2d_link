@@ -57,7 +57,7 @@ def lede(cfg, result: dict | None) -> html.P:
                       "and carries its source.", className="lede")
     L = result["report"]["link"]
     il = L["insertion_loss_nyquist_db"]
-    bits = [f"UI {L['ui_ps']:.3f} ps, forwarded clock {L['forwarded_clock_ghz']:g} GHz DDR, "
+    bits = [f"UI {L['ui_ps']:.3f} ps, forwarded clock {L['forwarded_clock_ghz']:g} GHz {L.get('clock_scheme', 'DDR')}, "
             f"insertion loss {il:.2f} dB at Nyquist; repair {L['repair']}, failed {L['failed']}. "
             f"Tx PLL in band {L['tx_pll_rms_fs']:.1f} fs RMS; local PLL {L['local_pll_rms_fs']:.1f} fs. "]
     x = result["report"]["crosstalk"]

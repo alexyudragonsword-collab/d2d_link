@@ -43,6 +43,8 @@ authoring_mode: ai_generated
 
 ## 决策记录
 
+- **2026-11-14(0.17.0,issue #2 第 4 点)quarter-rate 时钟补出处,默认不变**:`ucie.forwarded_clock` 的 note 记了 24 / 32 GT/s 另有 rate/4 一档(4 路交织)。
+  `forwarded_qdr`(0.15.0)这个方案因此有公开出处;实现细节仍是 source: model(`cairn/forwarded-clock.md`)。bundled 配置仍用 DDR。顺手修了报表 / GUI 对 QDR 也打印「GHz DDR」与半速率时钟。
 - **2026-11-14(0.17.0,issue #2 第 3 点)发送摆幅取下限 0.4 V**:原文(教程 slide 56)0.4 V 是最小摆幅,另强烈建议上限 < 0.85 V。
   用户选保留 0.4 V:bundled 配置与 `TxConfig.swing_vpp` 默认都是最坏情况的判定;0.85 V 只是建议的上限,不进判定、不进表外的默认。
   `tests/test_spec_sources.py::test_bundled_configs_stay_inside_the_survey_envelope` 仍断言配置摆幅等于表值。

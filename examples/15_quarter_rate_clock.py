@@ -5,7 +5,9 @@ both edges sampling, so the receiver sees the clock's phase once per UI --
 at the data's own rate. A quarter-rate clock runs at fs/4: its edges come
 every 2 UI, and the receiver's four sampling phases (0 / 90 / 180 / 270
 degrees) come from a 4-phase generator between them. Two things change in
-this model, both ``source: model`` (no spec text is available):
+this model, both ``source: model``. The scheme itself is in the public
+UCIe text (``ucie.forwarded_clock``'s note: rate/4 at 24 / 32 GT/s, 4-way
+interleaved; issue #2 point 4, 0.17.0); how it is modelled is not:
 
 - **the clock's phase is seen at its edges only, and interpolated between
   them.** On the UI grid: every other sample kept, the rest the mean of
