@@ -103,6 +103,7 @@ Crosstalk、Receiver、Sweeps(tracker 带宽 / 本地 PLL / reach);右栏队列(
 0.16.1 起其中 15 条是 `source: spec`:spec_sources 对照公开原文(Hot Chips 2023 UCIe 教程、UCIe 1.0 白皮书)核实,带原句与页码;剩下 `standard.lane_repair` 一条仍是 `source: survey`(降到 x8 两份原文都没写)。引擎只按 key 取,结果行打印 `source: xxx`。
 UCIe 规范本身的下载许可禁止把规范交给 AI 系统,本库不收规范原文(见 `cairn/spec-sources.md`)。
 **眼罩的口径比规范严**:原文的眼罩判的是信道自己的眼(无噪、无抖的行为级 TX/RX),本库拿含时钟路径残余抖动、收端噪声与串扰的眼去比;0.17.0 起报表 Targets 节写明这一点(issue #2 第 1 点,用户选保留)。
+**发送摆幅取下限**:bundled 配置都用 0.4 V,是原文的最小摆幅(另强烈建议上限 < 0.85 V);判定按最坏情况(issue #2 第 3 点)。
 **0.14.0 起眼宽目标分档:4–16 GT/s 0.75 UI、24–32 GT/s 0.65 UI**(0.14.5 起是一条区间 `@24-32`,28 GT/s 也取 0.65;表外且不在区间里的速率退回 0.75 并告警)(0.14.0 时出自二手转述;0.16.1 起核实:教程 slide 61 'Channel Specification')。**0.17.0 起原始 BER 目标按 封装 × 速率 查表**(`ucie.raw_ber_by_rate`,source: spec;issue #2 第 2 点):标准封装 12 GT/s 起、先进封装 16 GT/s 起 1e-15,其余 1e-27;32 GT/s 的 bundled 配置都按 `<package>.raw_ber_target@32` = 1e-15 判,表外速率退回 1e-27 并告警。按它 bundled 配置里 x1、x16 模块、x16 repair、x64 spare 都过,只有 x5 耦合不过(0.643 UI,差 0.007)。敏感性(示例 13):x1 +0.205、x16 模块 +0.175、x16 repair +0.144、x64 spare +0.195 什么都不翻;**x5 −0.010 被 8 项翻**(最近:数据路径白抖 −20 % +0.004、Z0 60 Ω +0.005、发端 PLL −3 dB +0.005)。1e-27 时(0.14.2–0.16.1):x1 +0.091、x64 +0.093 不翻,x16 模块 +0.066 被目标 0.70 UI 翻,x16 repair +0.028 被目标 0.70 UI(−0.045)与 PLL +3 dB(−0.034)翻,x5 −0.121 什么都不翻。目标按 封装 × 速率档 分档查表(0.13.5):原文的分档数字一来,加 `standard.rx_eye_width_ui@32` 这样的条目即可,报表写明用的是哪一档。
 
 ```bash

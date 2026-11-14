@@ -43,6 +43,9 @@ authoring_mode: ai_generated
 
 ## 决策记录
 
+- **2026-11-14(0.17.0,issue #2 第 3 点)发送摆幅取下限 0.4 V**:原文(教程 slide 56)0.4 V 是最小摆幅,另强烈建议上限 < 0.85 V。
+  用户选保留 0.4 V:bundled 配置与 `TxConfig.swing_vpp` 默认都是最坏情况的判定;0.85 V 只是建议的上限,不进判定、不进表外的默认。
+  `tests/test_spec_sources.py::test_bundled_configs_stay_inside_the_survey_envelope` 仍断言配置摆幅等于表值。
 - **2026-11-14(0.17.0,issue #2 第 1 点)眼罩口径:保留含抖动的比法,标明比规范严**。原文的眼罩是信道合规判据(无噪、无抖的行为级 TX/RX 看信道自己的眼);
   本库的眼含时钟路径残余抖动、收端噪声与串扰。用户选保留(设计裕度口径),不另算信道眼;`report.MASK_CRITERION` 进报表 JSON(`mask_criterion`)、Markdown 的 Targets 节与 GUI 判定卡。
   后果:本库的「不过」不等于不合规 —— x5 耦合 0.572 UI 是含抖动的眼。

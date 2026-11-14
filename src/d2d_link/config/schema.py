@@ -388,7 +388,8 @@ class ClockingConfig:
 
 @dataclass(frozen=True)
 class TxConfig:
-    swing_vpp: float = 0.4          # launched swing into a matched load [V pp]
+    swing_vpp: float = 0.4          # launched swing into a matched load [V pp]; the spec's minimum (tx_swing_vpp, source: spec;
+                                    # the strongly recommended maximum is < 0.85 V): every bundled config judges the worst case (issue #2 point 3)
     bw_hz: Optional[float] = None   # driver first-order bandwidth; None = twice the Nyquist frequency
                                     # (the data rate in Hz); inf = ideal brick-wall edges (rings at the
                                     # band edge: a short, clean line then reads an eye wider than 1 UI)
