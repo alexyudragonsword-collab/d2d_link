@@ -320,7 +320,7 @@ def test_raw_ber_fallback_off_the_table_is_flagged():
     for kind in ("standard", "advanced"):
         c28 = with_data_rate(LinkConfig(package=PackageConfig(kind=kind)), 28)
         assert st.off_table_ber(c28) and not st.off_table_rate(c28)
-        with pytest.warns(UserWarning, match=f"28 GT/s is not in the {kind} package's raw-BER tiers") as rec:
+        with pytest.warns(UserWarning, match=f"28 GT/s is not one of UCIe's data rates .* none of the {kind} package's raw-BER tiers") as rec:
             assert st.resolved_targets(c28)["ber"] == (1e-27, "spec")
         assert not any("eye-width" in str(w.message) for w in rec)              # the eye width is covered by @24-32
         with warnings.catch_warnings():
@@ -334,4 +334,4 @@ def test_raw_ber_fallback_off_the_table_is_flagged():
     c = with_data_rate(LinkConfig(sim=SimConfig(stat_phase_points=16)), 28)
     rep = build_report(c, run_link(c), ForwardedClock(c))
     assert rep["targets"]["ber"]["off_table"] is True and rep["targets"]["eye_width_ui"]["off_table"] is False
-    assert "| ber | 1e-27 | spec | raw_ber_target (rate in no tier" in to_markdown(rep)
+    assert "| ber | 1e-27 | spec | raw_ber_target (not one of UCIe's data rates" in to_markdown(rep)

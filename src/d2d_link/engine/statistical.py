@@ -118,7 +118,10 @@ def off_table_ber(cfg: LinkConfig) -> bool:
     (``<package>.raw_ber_target@<rate>``, 0.17.0) and none of the tiers
     covers this rate: the plain entry's source states 1e-27 for the low
     rates only, so 28 GT/s between two 1e-15 rates is judged at 1e-27
-    without the table saying so (spec_sources' review of issue #2; 0.17.1)."""
+    without the table saying so (spec_sources' review of issue #2; 0.17.1).
+    No public text gives a raw BER between the listed rates -- 28 GT/s is not
+    a UCIe data rate at all -- so the fallback stays (spec_sources#22,
+    closed "not added"; the warning says so since 0.17.2)."""
     if cfg.target.ber is not None:
         return False
     pkg = cfg.package.kind
@@ -145,10 +148,12 @@ def _warn_off_table_rate(cfg: LinkConfig) -> None:
         parts.append(f"{rate:g} GT/s is neither in the survey's rate list {rates} nor in a rate tier: the eye-width "
                      f"target falls back to {key!r}, whose source does not state it for this rate")
     if off_table_ber(cfg):
-        tiers = sorted(float(k.rsplit("@", 1)[1]) for k in all_entries() if k.startswith(f"{pkg}.raw_ber_target@"))
+        rates = [float(r) for r in survey_tiered("data_rates_gtps").value]
         plain = survey_tiered("raw_ber_target", pkg, rate)
-        parts.append(f"{rate:g} GT/s is not in the {pkg} package's raw-BER tiers {tiers}: the BER target falls back to "
-                     f"'raw_ber_target' = {float(plain.value):g}, which the rate x package table states for the low rates only")
+        parts.append(f"{rate:g} GT/s is not one of UCIe's data rates {rates}, so it is in none of the {pkg} package's "
+                     f"raw-BER tiers: the BER target falls back to 'raw_ber_target' = {float(plain.value):g}, which the "
+                     f"rate x package table states for the low rates only; no public text gives a raw BER between the "
+                     f"listed rates (spec_sources#22)")
     if parts:
         _OFF_TABLE_WARNED.add((rate, pkg))
         import warnings

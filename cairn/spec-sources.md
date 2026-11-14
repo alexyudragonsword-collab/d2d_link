@@ -24,7 +24,10 @@ authoring_mode: ai_generated
   **坑(0.17.0 漏了,0.17.1 补)**:原先只有眼宽的退回会告警(`off_table_rate`),28 GT/s 落在眼宽区间 `@24-32` 里不算表外,BER 却在任何分档之外、
   悄悄按 1e-27 判 —— 两边的 24 / 32 GT/s 都是 1e-15(spec_sources 验收 issue #2 时指出查表层不告警)。0.17.1 起 `off_table_ber` 单独判:
   键退回了不分档的 `raw_ber_target`、而该封装有 BER 分档时告警(每个 速率 × 封装 一次),报表 `targets.ber.off_table` 置真、Markdown 注明;
-  配置自己写了 `target.ber` 不算。28 GT/s 该是多少要等原文给区间(ROADMAP P1 #4)。
+  配置自己写了 `target.ber` 不算。
+  **原文未覆盖(0.17.2,spec_sources#22 关闭「不加」)**:教程 slide 53 的 BER 表只列 6 个离散速率,UCIe 1.x 也只有这 6 档(28 GT/s 不是 UCIe 速率);
+  眼罩能做区间是因为 slide 61 的表头本身写着「24-32Gb/s」,BER 表没有。所以 28 GT/s 这类速率维持退回 1e-27 并告警,告警与报表注明「不是 UCIe 的速率」。
+  若要按邻档判,是本库自己的取舍,应作 `assumed` 条目放本地表并注明理由 —— 用户 2026-11-14 选了不做。
   contains: pitfall
   另一条 `ucie.advanced.spare_lanes_per_32` = 2 本库不读(bundled 的 x64 spare 配置 `spare_count: 4` 与之相符)。
 - **许可约束(2026-11-14,issue #2 转述)**:UCIe 规范下载页的最终用户许可协议第 (ii) 款禁止把规范(全部或部分)输入任何 AI 系统,也禁止用 AI 分析、解读或从中提取内容。

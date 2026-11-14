@@ -120,7 +120,7 @@ def to_markdown(rep: dict) -> str:
         lines.append(f"| {row['term']} | {row['fs']:.1f} | {row['ui']:.4f} |")
     lines += ["", "## Targets", "", "| quantity | value | source | table key |", "|---|---:|---|---|"]
     for k, v in rep["targets"].items():
-        note = " (rate in no tier: fallback, unstated for this rate)" if v.get("off_table") else ""
+        note = " (not one of UCIe's data rates: fallback, unstated for this rate)" if v.get("off_table") else ""
         lines.append(f"| {k} | {v['value']:g} | {v['source']} | {v.get('key', '')}{note} |")
     if rep.get("mask_criterion"):
         lines += ["", rep["mask_criterion"]]

@@ -4,6 +4,14 @@
 
 ---
 
+## [0.17.2] — 2026-11-14 — 表外速率的 BER:原文未覆盖,维持告警
+
+- spec_sources#22 关闭「不加」:公开材料的 BER 表只列 4 / 8 / 12 / 16 / 24 / 32 GT/s,没有区间,28 GT/s 也不是 UCIe 1.x 的速率。
+- 告警与报表措辞:表外速率的 BER 告警说明「不是 UCIe 的数据速率之一」并指向 spec_sources#22;Markdown Targets 表的注由「rate in no tier」改为
+  「not one of UCIe's data rates」。判定不变(仍退回 1e-27),指纹逐位不变。ROADMAP P1 #4 删去(没有可做的了),结论记进 `cairn/spec-sources.md`。
+
+---
+
 ## [0.17.1] — 2026-11-14 — 表外速率的 BER 退回也告警
 
 - spec_sources 验收 issue #2 时指出:表外速率退回 1e-27 时查表层不告警。核对发现 28 GT/s 的漏洞:它在眼宽区间 `@24-32` 里,原有的告警(只看眼宽)不响,
