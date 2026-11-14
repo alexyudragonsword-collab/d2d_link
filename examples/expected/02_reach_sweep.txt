@@ -1,4 +1,4 @@
-standard package, 32 GT/s; survey reach 25 mm (source: survey; UCIe Consortium white paper (2022): standard package reach up to 25 mm)
+standard package, 32 GT/s; table reach 25 mm (source: spec; 教程 slide 71；白皮书 Table 1)
 length [mm]  IL@Nyq [dB]  eye height [mV]  eye width [UI]      log10 BER  margin EH [mV]  pass
           5        -0.55            307.5           0.745         -808.2           267.5   yes
          10        -1.10            280.3           0.741         -668.3           240.3   yes
@@ -13,5 +13,5 @@ length [mm]  IL@Nyq [dB]  eye height [mV]  eye width [UI]      log10 BER  margin
          55        -6.05             87.5           0.525         -116.2            47.5    no
          60        -6.60             72.8           0.474          -96.2            32.8    no
 
-model reach: 35 mm is the last length that clears eye height 40 mV (source: survey), eye width and BER 1e-27 (source: survey); survey reach 25 mm -> ratio 1.40x  (within 2x)
+model reach: 35 mm is the last length that clears eye height 40 mV (source: spec), eye width and BER 1e-27 (source: spec); table reach 25 mm -> ratio 1.40x  (within 2x)
 wrote examples/output/02_reach_sweep.png

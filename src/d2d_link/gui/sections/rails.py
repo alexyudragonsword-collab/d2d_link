@@ -20,11 +20,12 @@ def this_page(state, result: dict | None, job, failed=None, edit_error: str | No
     elif result:
         rep = result["report"]
         n_model = sum(1 for k in ("rdc_ohm_m", "r_skin", "loss_tangent", "z0_ohm") if k in rep["channel_model"])
+        n_spec = sum(1 for v in rep["targets"].values() if v["source"] == "spec")
         n_survey = sum(1 for v in rep["targets"].values() if v["source"] == "survey")
         rows = [("rendered from", f"run · {result['elapsed_s']:.1f} s"),
                 ("engine", f"statistical · BER {rep['targets']['ber']['value']:.0e}"),
                 ("overrides vs YAML", str(len(state.overrides)) if state.overrides else "none"),
-                ("sources leaned on", html.Span([chip("model"), f" {n_model} ", chip("survey"), f" {n_survey}"]))]
+                ("sources leaned on", html.Span([chip("model"), f" {n_model} ", chip("spec"), f" {n_spec} ", chip("survey"), f" {n_survey}"]))]
     elif job is not None and job.status in ("queued", "running"):
         rows = [("status", job.status), ("overrides vs YAML", str(len(state.overrides)) or "none")]
     else:

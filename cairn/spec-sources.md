@@ -13,28 +13,37 @@ authoring_mode: ai_generated
 
 ## 当前结论
 
-- 全部 16 条都是 `source: survey`(0.14.0 起含眼宽 24–32 GT/s 分档;0.14.5 起是一条区间 `@24-32`,此前 `@24`、`@32` 两条),见共享库 spec_sources 的 `ucie.yaml`(0.16.0 起 vendored 在 `src/d2d_link/vendor/spec_sources/data/ucie.yaml`,pin d7b4d1e;issue #1;`d2d_link.spec` 用 `legacy_keys/d2d_link.yaml` 按旧键名接住);没有一条读过规范原文。`grep -c "source: survey" src/d2d_link/vendor/spec_sources/data/ucie.yaml` = 16
-  (文件头注释不再含该字串,测试断言这条命令的计数)。
-- 综述来源是公开材料的记忆与转述(Das Sharma 2022 的 UCIe 综述、Consortium 白皮书、Hot Chips 34 概览),**数值本身未经核对**,
-  每条 note 都写了"未核实"。最不可靠的三条:收端眼宽(0.14.0 起 24 / 32 GT/s 用 0.65 UI 分档,出自二手转述;判定悬在它上面)、眼高 40 mV(眼罩表的速率档与封装归属不明)、1e-15 的 retry 口径。
+- **0.16.1(issue #2)起本库读的 16 条里 15 条是 `source: spec`**:spec_sources 对照公开原文(UCIe Consortium Hot Chips 2023 教程、UCIe 1.0 白皮书)逐条核实,
+  每条带 `quote` 与 `section`(页码 / 表号)。眼宽 0.65 UI(24–32 GT/s)属实:教程 slide 61 'Channel Specification'。
+  只剩 `standard.lane_repair` 是 `source: survey`(两份原文都说标准封装靠宽度降级,没写降到 x8)。表在共享库 spec_sources 的 `ucie.yaml`
+  (vendored 在 `src/d2d_link/vendor/spec_sources/data/ucie.yaml`,pin bbc0ccb,0.16.0 时 d7b4d1e;`d2d_link.spec` 用 `legacy_keys/d2d_link.yaml` 按旧键名接住)。
+  `grep -c "source: survey" src/d2d_link/vendor/spec_sources/data/ucie.yaml` = 1(测试断言这条命令的计数)。
+- 共享表另有两条本库还没读:`ucie.raw_ber_by_rate`(速率 × 封装的原始 BER 表:标准封装 12 GT/s 起、先进封装 16 GT/s 起为 1e-15,其余 1e-27)
+  与 `ucie.advanced.spare_lanes_per_32` = 2(bundled 的 x64 spare 配置 `spare_count: 4` 与之相符)。读不读、怎么读是 issue #2 留给本库的四个判定点之一(ROADMAP P1 #1)。
+- **许可约束(2026-11-14,issue #2 转述)**:UCIe 规范下载页的最终用户许可协议第 (ii) 款禁止把规范(全部或部分)输入任何 AI 系统,也禁止用 AI 分析、解读或从中提取内容。
+  本库用 AI 协作,所以**不收、不索要规范原文**;核实只在 spec_sources 用公开材料做,本库只重新 pin。
   分档有两种键:`@<rate>` 精确档与 `@<lo>-<hi>` 闭区间档(0.14.5),同一层里精确档优先、区间重叠即报错。0.14.0–0.14.4 只有 `@24`、`@32`,28 GT/s 落回 0.75 UI(第五次体检)。
   表外速率又不在任何区间里(20、40 GT/s)时退回不分档的那条,并告警一次。
-- 升级流程:用户把原文贴进 `cairn/Reference/`(只追加)→ 对应条目改 `source: spec`、加 `quote` 与 `section` → `tests/test_spec_sources.py`
-  自动要求 quote 非空 → LOG 记一条。
+- 升级流程:spec_sources 用公开原文核实并改 `source: spec`、加 `quote` 与 `section` → 本库重新 vendor + pin(`tools/vendor_check.py --strict`)
+  → `tests/test_spec_sources.py` 自动要求 quote 非空、`grep -c "source: survey"` 等于未核实条数 → 指纹逐位不变(只换标签不动数)→ LOG 记一条。
+  0.16.0 前的流程是"用户把原文贴进 `cairn/Reference/`",与上面的许可约束冲突,已作废。
 - **分档(0.13.5;0.13.10 定了优先级)**:目标按 `<package>.<key>@<rate>` → `<package>.<key>` → `<key>@<rate>` → `<key>` 查表(`spec.survey_tiered`)。
   封装压过速率:标准与先进封装是两套电气规范,封装自己的数在每个速率都成立,除非该封装另给了那个速率的数;只给速率的条目是封装没说话时的退路。
   原文的眼罩若按速率档 / 封装给数,就加对应的分档条目(如 `standard.rx_eye_width_ui@32`,`source: spec`),只接管那一档;
   没写到的档继续落到综述的通用值。报表的 Targets 表多一列 table key,GUI 的未核实输入卡按这个 key 取出处。
-  今天没有分档条目:综述的眼罩不带速率与封装,不为凑表复制同一个未核实的数(铁律 5)。
+  0.13.5 时没有分档条目;0.14.0 起有速率区间 `rx_eye_width_ui@24-32`(0.16.1 起 spec),还没有封装分档条目。
 
 ## 规范数字进入模型的地方(里程碑 3)
 
 - `standard.bump_pitch_um` / `advanced.bump_pitch_um` 的中值是耦合线串扰估计的默认 lane 间距(`channel/coupled.py::trace_pitch_um`),
-  报表与示例打印 `pitch 115 um (source: survey)`;配置里显式给 `channel.trace_pitch_um` 时标 `config`。
+  报表与示例打印 `pitch 115 um (source: spec)`(0.16.1 前 survey);配置里显式给 `channel.trace_pitch_um` 时标 `config`。
 - `data_rates_gtps` 是示例 07 的扫描轴。
 
 ## 决策记录
 
+- **2026-11-14(0.16.1,issue #2)重新 pin 到 spec_sources@bbc0ccb**:15 条 survey → spec,值与单位一条没动,指纹 3597 个值逐位不变,
+  报表与示例的出处标签从 survey 变 spec;GUI 的来源 chip 改取表条目自己的标签(此前写死 survey)。issue 的四个判定点(眼罩口径、32 GT/s 原始 BER、
+  发送摆幅、quarter-rate 时钟)另起提交,见 ROADMAP P1 #1。另:旧 cite 说"白皮书写 BER < 1e-27",是错的(白皮书没写这个数),spec_sources 已改。
 - **2026-11-13(0.16.0,issue #1)UCIe 表迁到共享库 spec_sources**:16 条从本库 `data/spec/ucie_survey.yaml` 迁进 spec_sources 的 `data/ucie.yaml`(键 `ucie.*`),
   本库 vendor + pin(d7b4d1e),`d2d_link.spec` 用 `legacy_keys/d2d_link.yaml` 按旧键名接住。理由:同一批外部数字被多个库(mmw60_trx、fmcw_radar…)引用,
   一处核实、各库重新 pin。代价:改数要先改 spec_sources 再重新 vendor;本库的守卫只数 survey,spec_sources 的 `audit_tags` 四个标签都数(已加进测试)。
@@ -48,6 +57,7 @@ authoring_mode: ai_generated
   ε_eff 3.94 / 5.75,与叠层的 ε_r 3.5 / 3.3 矛盾(体检 #3)。`grep -c "source: model"` = 30(0.13.3 起含第二邻串扰偏移 −12 dB;0.13.11 起含时钟路径抖动:数据 / 时钟路径白抖 200 fs、树 100 fs、路径漫游 200 fs、漫游拐角 1 MHz,各两种封装 —— 2026-11-05 检索未找到片上 D2D 路径的公开实测值,cite 里写了最近的参照与没读到的原文);`tests/test_spec_sources.py` 守着两张表互不混放。
 - **眼罩分档(0.14.0,用户 2026-11-05 决定采用)**:`rx_eye_width_ui@24-32` = 0.65 UI(0.14.5 前是 `@24` / `@32` 两条)(source: survey),出自一篇 2025 年 UCIe 48/64 GT/s 分析论文
   (ResearchGate 395249532)对规范的转述:"4–16 GT/s 要求 EH/EW = 40 mV / 0.75 UI,24–32 GT/s 为 40 mV / 0.65 UI"。只读到检索摘要,论文与规范原文都未读,**未核实**。
+  **更正(0.16.1)**:spec_sources 用 Hot Chips 2023 教程 slide 61 核实,0.65 UI 属实,条目改 `source: spec`;判定不变。
   它翻转了四个 bundled 配置的判定(x1 / x16 模块 / x16 repair / x64 spare 由不过变过),x5 仍不过;原文若仍是 0.75,删这一条(0.14.5 起合成 `@24-32` 一条)即回到 0.13。
 - 敏感性:`tools/budget_report.py --sensitivity` 对每条估计 ±20%(dB 值与剖面整体平移 ±3 dB;0.13.3 起含配置里的抖动值;眼罩目标 ±10 mV / ±0.05 UI)重跑,表里标出翻转结论的参数。
   0.13.3 重跑:x1 名义裕度 −0.055、x16 模块 −0.051 —— **只有眼宽目标翻转**(0.70 UI 时 +0.013 / +0.017);离翻转最近的估计是 PLL 剖面 −3 dB(−0.024 / −0.031)

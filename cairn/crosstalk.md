@@ -18,7 +18,7 @@ authoring_mode: ai_generated
 
 - **`xtalk: fext`**(M2):行为级 —— 幅度 `xtalk_adjacent_db`(预设 −30 / −24 dB,`source: model`),形状 j·sin(2πfτ)(0.13.6;此前 k√2·u/(1+u),见下)。
 - **`xtalk: coupled`**(M3):一阶耦合微带估计 —— κ = 1/(1 + (s/h)²)、速度失配 (1 − ε_eff/ε_r)、幅度随耦合长度线性增长、Nyquist 处取值、
-  sin(2πf_Nτ) 不超过 0 dB(0.13.6 前线性取值、上限 −3 dB)。标准封装 25 mm:**−18.7 dB**(之前 −18.6),先进 2 mm −56.9 dB。bump 间距是 `source: survey`,叠层是 `source: model`。
+  sin(2πf_Nτ) 不超过 0 dB(0.13.6 前线性取值、上限 −3 dB)。标准封装 25 mm:**−18.7 dB**(之前 −18.6),先进 2 mm −56.9 dB。bump 间距是 `source: spec`(0.16.1 前 survey;教程 slide 53 / 71、白皮书 Table 1),叠层是 `source: model`。
 - **远端形状(0.13.6,第三次体检 P1 #4)**:弱耦合对的偶、奇模延时差 2τ,相对平均延时的直通路径,受害方远端是 **X/H = j·sin(2πfτ)** ——
   2πfτ ≪ 1 时就是攻击方的导数(耦合线一阶 j2πfτ),永不超过 1。τ 由 Nyquist 处的配置 / 估计电平定。此前的 k√2·u/(1+u)(u = jf/f_N)
   在 Nyquist 以下高 3 dB、以上饱和:它在采样点也有大的串扰,而导数在对齐攻击方的脉冲峰附近为零、在边沿最大。

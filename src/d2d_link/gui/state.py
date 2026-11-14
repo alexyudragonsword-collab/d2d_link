@@ -3,7 +3,7 @@
 One browser, one ``PageState``: the config file, the overrides the page has
 accumulated on top of it, the job that produced the result on screen. The
 state never computes anything; ``source_of`` only classifies where a value
-came from so the drawer can say ``yaml`` / ``default`` / ``model`` / ``survey``.
+came from so the drawer can say ``yaml`` / ``default`` / ``model`` / ``spec`` / ``survey``.
 """
 
 from __future__ import annotations
@@ -12,13 +12,16 @@ import dataclasses
 from pathlib import Path
 from typing import Any
 
+from ..channel.coupled import trace_pitch_um
 from ..config import LinkConfig, apply_overrides, load_config
 from ..config.form import FIELDS, config_to_values
 from ..config.schema import RLGC_PRESET_KEYS, STACKUP_KEYS
+from ..spec import survey_tiered
 
 MODEL_PRESET_PATHS = {f"channel.{k}" for k in (*RLGC_PRESET_KEYS, *STACKUP_KEYS)} | {
     "channel.xtalk_adjacent_db", "channel.xtalk_second_db", "channel.trace_pitch_um"}
-SURVEY_PATHS = {"target.ber", "target.eye_height_mv", "target.eye_width_ui"}
+SURVEY_PATHS = {"target.ber": "raw_ber_target", "target.eye_height_mv": "rx_eye_height_mv",   # field -> table key (as engine.statistical.target_keys)
+                "target.eye_width_ui": "rx_eye_width_ui"}
 
 
 def _get(obj: Any, path: str) -> Any:
@@ -30,12 +33,15 @@ def _get(obj: Any, path: str) -> Any:
 def source_of(cfg: LinkConfig, path: str, file_cfg: LinkConfig | None = None) -> str:
     """Where the value on screen comes from: ``override`` (edited on the
     page), ``yaml`` (set in the file), ``default`` (the schema's), ``model``
-    (empty, resolved from a model preset) or ``survey`` (empty, resolved
-    from the survey table)."""
+    (empty, resolved from a model preset) or the table entry's own tag,
+    ``spec`` or ``survey`` (empty, resolved from the vendored UCIe table;
+    since 0.16.1 most entries are ``spec``)."""
     v = _get(cfg, path)
     if v is None:
-        if path in SURVEY_PATHS or path == "channel.trace_pitch_um":
-            return "survey"
+        if path in SURVEY_PATHS:
+            return survey_tiered(SURVEY_PATHS[path], cfg.package.kind, cfg.data_rate_gtps).source
+        if path == "channel.trace_pitch_um":
+            return trace_pitch_um(cfg)[1]
         if path in MODEL_PRESET_PATHS:
             return "model"
         return "default"

@@ -32,7 +32,7 @@ Markulic 2016 SSPLL 剖面(100 Hz..f0/2 186 fs,由 pll_simulator 算到 16 GHz 2
 |---|---|---|
 | `00_single_lane_eye.py` | 这条链路的抖动预算与眼 | 发端 PLL 带内 226.5 fs(0.13.7 起剖面本身由 pll_simulator 算到 16 GHz,平在 −145 dBc/Hz 底噪);经前向时钟,**泄漏 223.4 fs** 经 30 ps 树的延时 / 带宽到达采样器 —— 树 ≈ 1 UI,在 fs/2 附近反相,把 PLL 跟不上的底噪加倍。残余 365.5 fs = 泄漏 223 + 数据路径 200 + 时钟路径 184 + 树 100(功率和)。眼高 204.1 mV / 眼宽 0.709 UI @ 1e-27,对 32 GT/s 的综述目标 40 mV / 0.65 UI 裕度 +164.1 mV / **+0.059 UI,过**(0.14.0 起 24 / 32 GT/s 用 0.65 UI 分档,二手转述未核实;0.13 对 0.75 UI 时 −0.041 不过)。时域 40 万符号 0 误码 |
 | `01_tracking_bandwidth_sweep.py` | 残余随跟踪带宽 | 相关 = 1、理想树:残余 0.000 fs;无跟踪 282.84 = √(200² + 200²);带宽 ∞ → 0。白路径抖动下 100 MHz 以下几乎不动(365.6 → 360.8 fs),半程点 4.2 GHz;ρ 0 → 385.1 fs;眼宽 0.709 → 0.887 UI |
-| `02_reach_sweep.py` | 走线能到多长 | 对 0.65 UI(0.14.0)**reach 35 mm**(0.669 UI;40 mm 0.642 不过),对综述 25 mm 1.40×。0.13 对 0.75 UI 时没有长度通过(5 mm 0.745 UI,30 ps 时钟树泄漏单独就让它不过),理想树时信道 reach 25 mm |
+| `02_reach_sweep.py` | 走线能到多长 | 对 0.65 UI(0.14.0)**reach 35 mm**(0.669 UI;40 mm 0.642 不过),对规范表 25 mm 1.40×。0.13 对 0.75 UI 时没有长度通过(5 mm 0.745 UI,30 ps 时钟树泄漏单独就让它不过),理想树时信道 reach 25 mm |
 | `03_stat_vs_time.py` | 统计 / 时域在 1e-6 处的一致性 | 噪声主导 1e-6:时域 / 统计 1.50(30 误码 / 2e7);抖动主导 1e-6:1.12(16 误码 / 2e7);混合 1e-5:0.90(18 / 2e6)。三点都在 0.5–2× 内(两引擎都钉在调噪声的相位上采样) |
 
 ## 里程碑 2:多 lane 模块与收端本地时钟
@@ -49,7 +49,7 @@ Markulic 2016 SSPLL 剖面(100 Hz..f0/2 186 fs,由 pll_simulator 算到 16 GHz 2
 
 ## 里程碑 3:串扰的耦合线估计、速率档扫描、预算报表
 
-`channel.xtalk: coupled` 用规范表里的 bump 间距(source: survey)和封装叠层预设(模型估计)算 FEXT 幅度:标准封装 25 mm **−18.7 dB**,
+`channel.xtalk: coupled` 用规范表里的 bump 间距(source: spec)和封装叠层预设(模型估计)算 FEXT 幅度:标准封装 25 mm **−18.7 dB**,
 先进封装 2 mm −56.9 dB。`tools/budget_report.py` 把一条链路的时序预算写成报表。
 
 | 示例 | 问题 | 答案(当前版本) |
@@ -99,9 +99,10 @@ Crosstalk、Receiver、Sweeps(tracker 带宽 / 本地 PLL / reach);右栏队列(
 
 ## 规范数字
 
-本库拿不到 UCIe 规范原文。速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 16 条(眼宽按速率区间分档),全部在共享库 spec_sources 的 `ucie.yaml`(0.16.0 起 vendored 在 `src/d2d_link/vendor/spec_sources/data/ucie.yaml`,pin 在 spec_sources@d7b4d1e;`d2d_link.spec` 按旧键名读),
-每条 `source: survey` 并注明综述出处与"未核实";引擎只按 key 取,结果行打印 `source: xxx`。
-**0.14.0 起眼宽目标分档:4–16 GT/s 0.75 UI、24–32 GT/s 0.65 UI**(0.14.5 起是一条区间 `@24-32`,28 GT/s 也取 0.65;表外且不在区间里的速率退回 0.75 并告警)(后者来自一篇 2025 年分析论文的转述,二手、未核实,用户决定采用)。按它 bundled 配置里 x1、x16 模块、x16 repair、x64 spare 都过,只有 x5 耦合不过。敏感性(0.14.2,示例 13):x1 +0.091、x64 spare +0.093 什么都不翻;x16 模块 +0.066 只在目标 0.70 UI 时翻(−0.010);**x16 repair +0.028 被目标 0.70 UI(−0.045)与发端 PLL 剖面 +3 dB(−0.034)翻**;x5 −0.121 什么都不翻。目标按 封装 × 速率档 分档查表(0.13.5):原文的分档数字一来,加 `standard.rx_eye_width_ui@32` 这样的条目即可,报表写明用的是哪一档。
+速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 16 条(眼宽按速率区间分档),全部在共享库 spec_sources 的 `ucie.yaml`(0.16.0 起 vendored 在 `src/d2d_link/vendor/spec_sources/data/ucie.yaml`,0.16.1 起 pin 在 spec_sources@bbc0ccb;`d2d_link.spec` 按旧键名读)。
+0.16.1 起其中 15 条是 `source: spec`:spec_sources 对照公开原文(Hot Chips 2023 UCIe 教程、UCIe 1.0 白皮书)核实,带原句与页码;剩下 `standard.lane_repair` 一条仍是 `source: survey`(降到 x8 两份原文都没写)。引擎只按 key 取,结果行打印 `source: xxx`。
+UCIe 规范本身的下载许可禁止把规范交给 AI 系统,本库不收规范原文(见 `cairn/spec-sources.md`)。
+**0.14.0 起眼宽目标分档:4–16 GT/s 0.75 UI、24–32 GT/s 0.65 UI**(0.14.5 起是一条区间 `@24-32`,28 GT/s 也取 0.65;表外且不在区间里的速率退回 0.75 并告警)(0.14.0 时出自二手转述;0.16.1 起核实:教程 slide 61 'Channel Specification')。按它 bundled 配置里 x1、x16 模块、x16 repair、x64 spare 都过,只有 x5 耦合不过。敏感性(0.14.2,示例 13):x1 +0.091、x64 spare +0.093 什么都不翻;x16 模块 +0.066 只在目标 0.70 UI 时翻(−0.010);**x16 repair +0.028 被目标 0.70 UI(−0.045)与发端 PLL 剖面 +3 dB(−0.034)翻**;x5 −0.121 什么都不翻。目标按 封装 × 速率档 分档查表(0.13.5):原文的分档数字一来,加 `standard.rx_eye_width_ui@32` 这样的条目即可,报表写明用的是哪一档。
 
 ```bash
 grep "source: survey" src/d2d_link/vendor/spec_sources/data/ucie.yaml

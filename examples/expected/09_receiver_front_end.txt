@@ -7,7 +7,7 @@ x1 standard package, 25 mm, 32 GT/s, noise 3 mV, Tx pole 60 GHz, clock tree 20 G
         16 GHz      149.5          140.6 mV / 0.594 UI          3.76 mV   128.0 mV / 0.568 UI
   the flat front end is the idealisation of every earlier version; the bundled configs keep it until a design gives a number
 
-CTLE at 35 mm (the survey reach x 1.4 of example 02), front end 32 GHz:
+CTLE at 35 mm (the table reach x 1.4 of example 02), front end 32 GHz:
  CTLE peak  noise gain        at sampler: eye          at input: eye
         0        1.772        146.9 mV / 0.622        106.4 mV / 0.551
         1        1.323        147.8 mV / 0.607        131.2 mV / 0.578

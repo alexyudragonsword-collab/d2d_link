@@ -21,7 +21,7 @@ authoring_mode: ai_generated
 - **铁律 1 在代码里怎么守**:`gui/` 只 import `config`、`config.form`、`config.loader`、`engine`(`run_link`)、`report`、`spec`、`clock.forwarded`(worker 里建闭式预算)、
   `channel.coupled.describe`;`test_gui_imports_only_the_public_surface` 用 AST 扫每个文件。worker(`gui/jobs.py::execute`)返回纯 dict(可 pickle、可 JSON),
   页面永远拿不到 `LinkResult` 对象。
-- **铁律 5 在页面上**:每个规范 / 模型数带来源 chip(survey 紫、model 橙、yaml 蓝、default 灰、override 琥珀、spec 绿);右栏"未核实输入"列出判定依赖的 survey 条目与 cite。
+- **铁律 5 在页面上**:每个规范 / 模型数带来源 chip(survey 紫、model 橙、yaml 蓝、default 灰、override 琥珀、spec 绿;0.16.1 起目标与 bump 间距多是 spec,`gui/state.py::source_of` 取表条目自己的标签);右栏"未核实输入"列出判定依赖的 survey 条目与 cite。
 - **长任务**:`JobManager` = `ProcessPoolExecutor(2)` + 按 (kind, 配置哈希, 参数) 的结果缓存;页面 `dcc.Interval` 1 s 轮询,回调永不阻塞;`workers=0` 内联跑(测试)。
   ETA 按同 kind、同 lane 数的历史平均。
 - 耗时基准(空闲机器):x1 1.6 s、x5 耦合 21 s、x16 29 s、bundled x64(无串扰、去重)0.9 s。

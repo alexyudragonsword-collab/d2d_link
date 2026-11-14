@@ -11,7 +11,7 @@ SOURCE_TITLE = {
     "yaml": "set in the config file",
     "override": "edited on this page",
     "default": "the schema's default",
-    "spec": "quoted from the specification text",
+    "spec": "quoted from a public UCIe text (spec_sources, source: spec)",
 }
 
 

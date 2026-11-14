@@ -79,7 +79,7 @@ print("  the flat front end is the idealisation of every earlier version; the bu
 # ------------------------------------------------------------- 2. CTLE cost
 reach = dataclasses.replace(x1, channel=dataclasses.replace(x1.channel, length_mm=35.0))
 reach = with_rx(reach, bw_hz=32e9)
-print(f"CTLE at {reach.channel.length_mm:g} mm (the survey reach x 1.4 of example 02), front end {reach.rx.bw_hz / 1e9:g} GHz:")
+print(f"CTLE at {reach.channel.length_mm:g} mm (the table reach x 1.4 of example 02), front end {reach.rx.bw_hz / 1e9:g} GHz:")
 print(f"{'CTLE peak':>10s} {'noise gain':>11s} {'at sampler: eye':>22s} {'at input: eye':>22s}")
 ctle_rows = []
 for pk in (0.0, 1.0, 2.0, 4.0, 6.0):

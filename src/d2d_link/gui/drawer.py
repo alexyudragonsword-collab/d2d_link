@@ -84,7 +84,7 @@ def drawer_head() -> html.Div:
     button and fire the toggle callback (which closed the drawer each tick
     in the first G1 build)."""
     return html.Div([html.H3("All fields"),
-                     html.Span([chip("yaml"), " ", chip("default"), " ", chip("model"), " ", chip("survey"),
+                     html.Span([chip("yaml"), " ", chip("default"), " ", chip("model"), " ", chip("spec"), " ", chip("survey"),
                                 " ", chip("override")], className="legend"),
                      html.Button("✕", id="btn-drawer-close", className="q-cancel")], className="drawer-head")
 

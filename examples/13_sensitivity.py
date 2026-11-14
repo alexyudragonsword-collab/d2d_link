@@ -3,7 +3,7 @@
 ``tools/budget_report.py --sensitivity`` (``report.sensitivity``) moves every
 number a config's verdict leans on and is not a specification value -- the
 ``source: model`` presets (trace loss, Z0, stack-up, behavioural crosstalk),
-the ``source: survey`` numbers (bump pitch, the eye-mask targets) and the
+the UCIe table's numbers (bump pitch, the eye-mask targets; ``source: spec`` since 0.16.1) and the
 clock-path jitters the config claims -- by +-20 % (dB levels and the PLL
 profiles' level by +-3 dB; the targets by +-10 mV / +-0.05 UI), reruns the
 link, and reads the worst lane's margin: min(eye height, eye width) over

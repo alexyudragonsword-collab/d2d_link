@@ -80,7 +80,7 @@ def verdict(result: dict) -> html.Section:
         if result.get("unrepaired"):
             what.append(f"unrepaired failed lanes {result['unrepaired']}")
         sentence = "; ".join(what) + "."
-    aside = ("targets resolve to the survey table: none set in the YAML" if all(v["source"] == "survey" for v in t.values())
+    aside = ("targets resolve to the UCIe table: none set in the YAML" if all(v["source"] in ("spec", "survey") for v in t.values())
              else "targets: " + ", ".join(f"{k} {v['source']}" for k, v in t.items()))
     return section("verdict", "1", "Verdict", aside, tiles, html.Div(bars, className="bars"),
                    html.P(sentence, className="note"))

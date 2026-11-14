@@ -1,13 +1,13 @@
-"""Example 07: every data rate of the survey table, both packages, the whole module.
+"""Example 07: every data rate of the UCIe table, both packages, the whole module.
 
-The rates a UCIe link can run at are in the survey table (``data_rates_gtps``,
-source: survey). For each of them the standard package is run at its survey
+The rates a UCIe link can run at are in the UCIe table (``data_rates_gtps``,
+source: spec since 0.16.1). For each of them the standard package is run at its table
 reach (25 mm) and the advanced package at its (2 mm), as a five-lane module
 with the coupled-line crosstalk estimate (the pitch is the package's bump
 pitch from the same table) and the milestone-2 clocking, and the middle
 lane -- the one with two neighbours on each side -- is reported: eye height
 and width at the target BER, the residual jitter as a fraction of the UI,
-and the verdict against the survey targets. The budget report tool writes
+and the verdict against the table's targets. The budget report tool writes
 the 32 GT/s standard-package case out in full.
 
 The UI shrinks with the rate while the jitter in seconds does not, and the
@@ -28,9 +28,9 @@ from d2d_link.spec import survey
 rates = survey("data_rates_gtps")
 print(f"data rates {rates.value} {rates.unit} (source: {rates.source})")
 
-# the x5 module at the standard package's survey reach is a config file of its
+# the x5 module at the standard package's table reach is a config file of its
 # own (ROADMAP P1 #2 reproduces from it); the advanced case is the same module
-# on the other package, at that package's survey reach
+# on the other package, at that package's table reach
 module = load_config(CONFIGS / "standard_32g_x5_coupled.yaml")
 adv_reach = float(survey("reach_mm", "advanced").value)
 cases = {"standard": module,
@@ -42,7 +42,7 @@ results = {}
 for name, cfg in cases.items():
     reach = survey("reach_mm", cfg.package.kind)
     x = describe(cfg)
-    print(f"\n{name} package at {cfg.channel.length_mm:g} mm (survey reach {reach.value:g} mm): pitch {x['pitch_um']:g} um "
+    print(f"\n{name} package at {cfg.channel.length_mm:g} mm (table reach {reach.value:g} mm): pitch {x['pitch_um']:g} um "
           f"(source: {x['pitch_source']}), stack-up w {x['trace_width_um']:g} / h {x['dielectric_height_um']:g} um, "
           f"eps_r {x['eps_r']:g} -> eps_eff {x['eps_eff']:.2f} (source: {x['stackup_source']}), "
           f"FEXT estimate {x['fext_adjacent_db']:.1f} dB at Nyquist for 32 GT/s")

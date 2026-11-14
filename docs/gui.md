@@ -38,7 +38,7 @@ d2d-link-gui configs/standard_32g_x1.yaml --no-cache       # 不写磁盘缓存
 - **6 Crosstalk / 7 Receiver**:报表原句。
 - **A–C Sweeps**:tracker 带宽、本地 PLL 自然频率、reach,各一个按钮入队(每点一次运行),完成后眼宽 + 时钟残余曲线与表。
 - **右栏**:This page(来源计数、overrides 数)、Queue(进度 / 剩余时间 / 取消)、Inspector(选中 lane 的眼对目标、浴盆、事实)、Data rate × package、Export(Markdown 与 CLI 逐字同文、JSON、overrides YAML)、Unverified inputs(survey 条目 + cite)。
-- **All fields 抽屉**:由 `config/form.py::SECTIONS` 生成,折叠组一行摘要,来源标签 yaml / default / model / survey / override;改动只写 overrides,按 Re-run 才跑。
+- **All fields 抽屉**:由 `config/form.py::SECTIONS` 生成,折叠组一行摘要,来源标签 yaml / default / model / spec / survey / override;改动只写 overrides,按 Re-run 才跑。
 
 ## 耗时(空闲机器,2 个 worker;运行一行是 0.12.2,其余 0.11 量的,0.12 的 512 UI 窗让每次运行多约 20 %)
 

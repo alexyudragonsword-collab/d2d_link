@@ -78,7 +78,7 @@ def test_sections_render_the_report_numbers(x1_result):
     cfg = load_config(REPO / "configs" / "standard_32g_x1.yaml")
     text = json.dumps([headline(cfg, x1_result).to_plotly_json(), verdict(x1_result).to_plotly_json(),
                        jitter(x1_result).to_plotly_json(), lanes(x1_result).to_plotly_json()], default=str)
-    for needle in ("204.1", "0.709", "365.5", "survey", "PASS" if x1_result["passes"] else "FAIL"):
+    for needle in ("204.1", "0.709", "365.5", "(spec)", "PASS" if x1_result["passes"] else "FAIL"):
         assert needle in text
 
 
@@ -95,7 +95,7 @@ def test_state_overrides_and_sources():
     st.open(REPO / "configs" / "standard_32g_x1.yaml")
     assert source_of(st.cfg, "channel.length_mm", st.file_cfg) == "yaml"
     assert source_of(st.cfg, "channel.z0_ohm", st.file_cfg) == "model"
-    assert source_of(st.cfg, "target.eye_width_ui", st.file_cfg) == "survey"
+    assert source_of(st.cfg, "target.eye_width_ui", st.file_cfg) == "spec"
     st.set("channel.length_mm", 30.0)
     assert st.overrides == {"channel.length_mm": 30.0} and st.cfg.channel.length_mm == 30.0
     assert source_of(st.cfg, "channel.length_mm", st.file_cfg) == "override"

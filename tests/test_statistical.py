@@ -137,7 +137,7 @@ def test_reaches_1e_minus_27_with_a_finite_eye():
     cfg = LinkConfig(clocking=ClockingConfig(pll_profile=PROFILE, data_path_rj_s=200e-15, clock_path_rj_s=200e-15),
                      sim=SimConfig(stat_phase_points=32))
     r = run_statistical(cfg)
-    assert r.target_ber == 1e-27 and r.targets["ber"][1] == "survey"
+    assert r.target_ber == 1e-27 and r.targets["ber"][1] == "spec"
     assert r.ber < 1e-27 and 0.0 < r.eye_height_v < 0.4 and 0.5 < r.eye_width_ui < 1.0
     assert r.passes
 

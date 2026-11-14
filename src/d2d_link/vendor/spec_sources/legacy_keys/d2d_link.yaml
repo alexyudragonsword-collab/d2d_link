@@ -1,4 +1,4 @@
-# Vendored from spec_sources@d7b4d1eb510617d69784622c593c8ed31ab32b8b: src/spec_sources/legacy_keys/d2d_link.yaml
+# Vendored from spec_sources@bbc0ccb49de4e0071e0bc21ea6bbe73fd92e1428: src/spec_sources/legacy_keys/d2d_link.yaml
 # Adapted-copy policy: see src/d2d_link/vendor/__init__.py
 # d2d_link 的裸键名 → spec_sources 的键名（给 d2d_link/spec 的垫片用：它在自己的命名空间里继续用旧名，
 # 数从这里读）。源表：d2d_link@6789810ccb6328324673222b2f64cc21f748451e src/d2d_link/data/spec/ucie_survey.yaml。

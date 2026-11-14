@@ -76,7 +76,7 @@ if plt is not None:
     phys = [p for p in res16.lanes.logical_to_physical]
     ax.bar(phys, [1e3 * r.eye_height_v for r in res16.stat], color="C0", label="crosstalk on")
     ax.bar(phys, [1e3 * r.eye_height_v for r in quiet.stat], color="none", edgecolor="C1", label="crosstalk off")
-    ax.axhline(res16.targets["eye_height_mv"][0], color="r", ls="--", lw=0.8, label="target (survey)")
+    ax.axhline(res16.targets["eye_height_mv"][0], color="r", ls="--", lw=0.8, label=f"target ({res16.targets['eye_height_mv'][1]})")
     ax.set_xlabel("physical lane")
     ax.set_ylabel("eye height at 1e-27 [mV]")
     ax.set_title("x16 standard, lane 5 dead -> upper x8")

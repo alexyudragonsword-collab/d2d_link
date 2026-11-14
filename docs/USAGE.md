@@ -41,7 +41,7 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 | `clocking` | 方案:`scheme`(`forwarded_ddr` 默认 / `forwarded_qdr` 四分之一速率,`qdr_quadrature_ui` 为 I/Q 偏差、`qdr_phase_rj_s` 为 4 相发生器白抖动,source: model);发端:`pll_profile`、`correlation`、`data_path_rj_s`、`clock_path_rj_s`、`*_wander_s` + `wander_corner_hz`;收端:`local_pll_profile` + `local_pll_fn_hz`(环路自然频率,锁到前向时钟,必须给;−3 dB 带宽 = 2.48 f_n @ ζ = 1,旧键 `local_pll_bw_hz` 仍可读、给 DeprecationWarning)、`tree_delay_ps`、`tree_bw_hz`、`tree_rj_s`、`track_bw_hz`、`track_delay_ui`(延迟在反馈路径里,过快 + 延迟会被 schema 之后的构造拒绝为不稳定)、`pi_step_ui`、`dcd_ui`(收端)、`tx_dcd_ui`(发端共模,有本地 PLL 时才显现)、`wander_floor_hz`(漫游 RMS 的频带下沿) |
 | `tx` / `rx` | `swing_vpp`、`bw_hz`;`noise_rms_v` + `noise_at`(`sampler`:采样点处的 RMS,默认;`input`:前端输入处的白噪声,以奈奎斯特带内 RMS 给出,经前端 × CTLE 整形后到采样器,需要有限的 `bw_hz`)、`bw_hz`(收端前端一阶极点,留空 = 平坦,段 7)、`ctle.*`、`sampling_phase_ui`、`vref_offset_v`、`training_ber`(训练在哪个 BER 上找眼边并居中;留空 = 目标 BER) |
 | `sim` | `osr`、`n_symbols`、`seed`、`pattern`、`engine`、`time_mode`(waveform / samples)+ `time_cursor_floor`、统计引擎的 ISI 分布 bin(`stat_isi_bin_v`)/ 相位网格参数、`stat_cursor_reach`(每侧读几个光标,默认 256)与 `stat_cursor_floor`(两端低于峰值这一比例的光标丢掉,默认 1e-6;段 9b) |
-| `target` | 留空 = 规范表(带 `source: survey`);写了 = 配置自己的主张 |
+| `target` | 留空 = 规范表(带 `source: spec`,0.16.1 起);写了 = 配置自己的主张 |
 
 `d2d_link.config.form.SECTIONS` 按 Halo 的方式声明了每个字段的表单行(标签、类型、显示比例);段 8 的浏览器 GUI 的抽屉由它生成,
 测试保证它与 schema 双向一致。
@@ -58,7 +58,7 @@ print(res.summary())      # 每 lane:BER(10^log10)、眼高/眼宽对目标(带 
 ## 规范数字(铁律 5)
 
 ```bash
-grep "source: survey" src/d2d_link/vendor/spec_sources/data/ucie.yaml   # 所有未核实的规范数字(共享库 spec_sources,vendored)
+grep "source: survey" src/d2d_link/vendor/spec_sources/data/ucie.yaml   # 所有未核实的规范数字(共享库 spec_sources,vendored;0.16.1 起只剩 1 条)
 grep "source: model"  src/d2d_link/data/spec/model_presets.yaml   # 所有模型估计数(走线损耗、叠层、行为级串扰)
 python tools/budget_report.py configs/standard_32g_x5_coupled.yaml --sensitivity   # 哪些估计 ±20%(dB 值 ±3 dB)会翻转结论;--attribution 拆眼宽缺口
 ```
@@ -77,7 +77,7 @@ d2d-link-gui configs/standard_32g_x5_coupled.yaml --also sensitivity,rate_sweep 
 
 页面就是 `tools/budget_report.py` 的报表:标题句里带下划线的值(封装、速率、长度、lane 数、串扰、布线)是控件,改一个就入队重跑,
 旧数字置灰保留到新结果落地;右栏是本页来源、队列、导出(Markdown 与 CLI 同文、JSON、overrides YAML)与"未核实输入";
-"All fields" 抽屉列出全部字段,带来源标签(yaml / default / model / survey / override)。GUI 不含仿真逻辑(铁律 1,`tests/test_gui.py` 守着)。
+"All fields" 抽屉列出全部字段,带来源标签(yaml / default / model / spec / survey / override)。GUI 不含仿真逻辑(铁律 1,`tests/test_gui.py` 守着)。
 
 ## 工具
 

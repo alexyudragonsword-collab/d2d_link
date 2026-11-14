@@ -55,7 +55,7 @@ authoring_mode: ai_generated
 ## 5 规范数字只用原文
 
 - 怎么守:`src/d2d_link/vendor/spec_sources/data/ucie.yaml`(spec_sources 的共享表,vendored + pin,0.16.0;此前是本库自己的 `data/spec/ucie_survey.yaml`)每条带 `source`;`tests/test_spec_sources.py` 核对 `grep "source: survey"` 的行数等于
-  未核实条目数,`source: spec` 必须带 `quote`,引擎代码里没有 1e-27 / 25.0 / 0.75 字面量。
+  未核实条目数(0.16.1 起 1 条),`source: spec` 必须带 `quote`,引擎代码里没有 1e-27 / 25.0 / 0.75 字面量。
 - 边界:综述来源本身的可靠性不在测试范围 —— 见 `spec-sources.md` 的逐条备注。
 - 延伸(段 2):规范不管、仿真又必须有的数(走线 R / tanδ / Z0、叠层 w / h / ε_r、行为级串扰电平)是**模型估计**,在
   `src/d2d_link/data/spec/model_presets.yaml` 里每条 `source: model` + cite + note;`grep -c "source: model"` = 30(0.13.11 起含时钟路径抖动五项 × 两种封装)。L、C 不在表里,由 Z0 与

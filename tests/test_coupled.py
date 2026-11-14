@@ -20,9 +20,9 @@ COUPLED = ChannelConfig(length_mm=25.0, xtalk="coupled")
 
 def test_pitch_comes_from_the_survey_table_unless_configured():
     pitch, src = trace_pitch_um(LinkConfig(channel=COUPLED))
-    assert pitch == pytest.approx(115.0) and src == "survey"        # midpoint of 100..130 um
+    assert pitch == pytest.approx(115.0) and src == "spec"        # midpoint of 100..130 um
     pitch, src = trace_pitch_um(LinkConfig(package=PackageConfig(kind="advanced"), channel=COUPLED))
-    assert pitch == pytest.approx(40.0) and src == "survey"
+    assert pitch == pytest.approx(40.0) and src == "spec"
     pitch, src = trace_pitch_um(LinkConfig(channel=dataclasses.replace(COUPLED, trace_pitch_um=80.0)))
     assert pitch == 80.0 and src == "config"
 
@@ -83,7 +83,7 @@ def test_coupled_mode_feeds_the_lane_model():
     res = run_link(cfg)
     assert res.stat[1].extras["xtalk_rms_v"] > 0.0
     d = describe(cfg)
-    assert d["pitch_source"] == "survey" and d["fext_adjacent_db"] == pytest.approx(cfg.xtalk_db()[0])
+    assert d["pitch_source"] == "spec" and d["fext_adjacent_db"] == pytest.approx(cfg.xtalk_db()[0])
     # the standard package at its survey reach: the estimate is stronger than the behavioural preset
     assert fext_db(cfg)[0] > -30.0
 
@@ -103,13 +103,13 @@ def test_budget_report_markdown_and_json(budget_tool, tmp_path):
                      sim=SimConfig(stat_phase_points=16))
     rep = budget_tool.build(cfg)
     md = budget_tool.to_markdown(rep)
-    for needle in ("# Timing budget", "## Clock-path jitter", "## Targets", "source: survey", "## Lanes", "| 1 | 1 |"):
+    for needle in ("# Timing budget", "## Clock-path jitter", "## Targets", "source: spec", "## Lanes", "| 1 | 1 |"):
         assert needle in md, needle
     terms = {r["term"]: r for r in rep["jitter_budget"]}
     total = terms["total (power sum)"]["fs"]
     assert total == pytest.approx(np.sqrt(sum(r["fs"] ** 2 for n, r in terms.items() if not n.startswith("total"))))
     assert terms["phase-interpolator quantisation (uniform)"]["fs"] > 0.0
-    assert rep["crosstalk"]["mode"] == "coupled" and rep["crosstalk"]["pitch_source"] == "survey"
+    assert rep["crosstalk"]["mode"] == "coupled" and rep["crosstalk"]["pitch_source"] == "spec"
     json.loads(json.dumps(rep))                                         # serialisable
     out = tmp_path / "b.md"
     assert budget_tool.main([str(REPO / "configs" / "standard_32g_x1.yaml"), "-o", str(out),
@@ -129,7 +129,7 @@ def test_sensitivity_report_names_the_deciding_guesses(budget_tool):
     labels = {r["label"]: r for r in sens["rows"]}
     assert {"rdc_ohm_m", "r_skin", "loss_tangent", "z0_ohm", "target.eye_height_mv", "target.eye_width_ui"} <= set(labels)
     assert "trace_pitch_um" not in labels                                   # one lane: no crosstalk knobs
-    assert labels["r_skin"]["source"] == "model" and labels["target.eye_width_ui"]["source"] == "survey"
+    assert labels["r_skin"]["source"] == "model" and labels["target.eye_width_ui"]["source"] == "spec"
     assert labels["target.eye_height_mv"]["source"] == "config"
     assert sens["nominal"]["passes"] and labels["r_skin"]["flips"] and labels["target.eye_height_mv"]["flips"]
     assert labels["r_skin"]["high"]["passes"] is False and labels["r_skin"]["low"]["passes"] is True
@@ -140,7 +140,7 @@ def test_sensitivity_report_names_the_deciding_guesses(budget_tool):
     coupled = LinkConfig(channel=COUPLED, lanes=LaneConfig(count=3), sim=SimConfig(stat_phase_points=16))
     knobs = {k["label"]: k for k in budget_tool.sensitivity_knobs(coupled)}
     assert {"trace_pitch_um", "eps_r", "dielectric_height_um", "trace_width_um"} <= set(knobs)
-    assert knobs["trace_pitch_um"]["source"] == "survey" and knobs["eps_r"]["source"] == "model"
+    assert knobs["trace_pitch_um"]["source"] == "spec" and knobs["eps_r"]["source"] == "model"
 
 
 

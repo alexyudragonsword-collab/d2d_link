@@ -4,6 +4,21 @@
 
 ---
 
+## [0.16.1] — 2026-11-14 — 重新 pin spec_sources:15 / 16 条改 source: spec(只换标签,指纹逐位不变;issue #2)
+
+- 三个 vendored 文件(`reader.py`、`data/ucie.yaml`、`legacy_keys/d2d_link.yaml`)重新拷自 spec_sources@`bbc0ccb49de4e0071e0bc21ea6bbe73fd92e1428`,CI vendor-drift 的检出同步。
+  spec_sources 对照公开原文(Hot Chips 2023 UCIe 教程、UCIe 1.0 白皮书)核实:本库读的 16 条里 15 条 survey → spec(带原句与页码),值与单位一条没动;
+  `standard.lane_repair` 仍是 survey。眼宽 0.65 UI(24–32 GT/s)属实(教程 slide 61)。共享表新增 `ucie.raw_ber_by_rate`、`ucie.advanced.spare_lanes_per_32`,本库暂不读。
+- 报表、示例、GUI 打印的出处标签从 survey 变 spec。GUI:`state.source_of` 改取表条目自己的标签(此前对目标与 bump 间距写死 survey),来源计数与图例加 spec chip,
+  判定卡的旁注改为"targets resolve to the UCIe table"。
+- 测试:11 条把 survey 当期望的断言改成 spec;`grep -c "source: survey"` = 1。
+- 示例:02 / 07 / 09 的「survey reach」改成「table reach」,02 首行打印条目的 section(页码)而不是整段 cite;16 个期望输出里 7 个只变了标签与这几处措辞。
+- 文档:UCIe 规范下载许可禁止把规范交给 AI —— AGENTS 铁律 5、CONTRIBUTING、`cairn/spec-sources.md` 写明本库不收规范原文,核实只在 spec_sources 做;
+  ROADMAP P1 #1 改成 issue #2 留下的四个判定点(眼罩口径、32 GT/s 原始 BER、发送摆幅、quarter-rate 时钟)。
+- 验收:指纹 3597 / 3597 逐位相同;`vendor_check --strict --fail-on-skip` 9 个文件 8 verbatim + 1 adapted、无漂移。
+
+---
+
 ## [0.16.0] — 2026-11-13 — UCIe 表迁到共享库 spec_sources(只搬家,指纹逐位不变;issue #1)
 
 - `src/d2d_link/data/spec/ucie_survey.yaml` 删除;16 条改从共享库 spec_sources 读:`reader.py`、`data/ucie.yaml`(键 `ucie.*`)、`legacy_keys/d2d_link.yaml`

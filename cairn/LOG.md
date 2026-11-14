@@ -3,6 +3,14 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短(数字原值、被推翻的判断、下一步),
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-11-14 · 重新 pin spec_sources@bbc0ccb(ccr-a2094794-9qa40v,0.16.1,issue #2)
+
+- spec_sources 用 Hot Chips 2023 教程与 UCIe 1.0 白皮书核实:本库读的 16 条 15 条 survey → spec,值一条没动;`grep -c "source: survey"` 16 → 1(`standard.lane_repair`)。
+- 被推翻:0.14.0 起把 0.65 UI 记为"二手转述、未核实"—— 原文(教程 slide 61)确实是 0.65;判定不变。旧 cite 说白皮书写 BER < 1e-27,也是错的。
+- 被推翻:旧流程"用户把规范原文贴进 cairn/Reference/"。UCIe 规范下载许可第 (ii) 款禁止交给 AI;AGENTS 铁律 5、CONTRIBUTING、spec-sources.md 改为只在 spec_sources 用公开材料核实。
+- 只换标签:指纹 3597 / 3597 逐位相同;11 条测试把 survey 期望改成 spec;GUI 的 `source_of` 原先对目标与 bump 间距写死 survey,改取表条目的标签。
+- 下一步:issue #2 的四个判定点(ROADMAP P1 #1)交用户选,各自单独提交;32 GT/s 原始 BER 若按速率表取 1e-15,数会动。
+
 ## 2026-11-13 · UCIe 表迁到 spec_sources(ccr-a2094794-9qa40v,0.16.0,issue #1)
 
 - 照 spec_sources 的迁移说明(bef20fb)做:vendor 三个文件(pin d7b4d1e)、删 ucie_survey.yaml、垫片按旧键名接住;核对 16 条只有 `@24-32` 的 note 变了一处。

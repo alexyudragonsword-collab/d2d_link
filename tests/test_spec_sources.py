@@ -60,7 +60,7 @@ def test_grep_lists_every_unverified_number():
     import subprocess
 
     out = subprocess.run(["grep", "-c", "source: survey", str(spec.SURVEY_FILE)], capture_output=True, text=True)
-    assert int(out.stdout.strip()) == len(spec.unverified()) == 16
+    assert int(out.stdout.strip()) == len(spec.unverified()) == 1          # standard.lane_repair (0.16.1, issue #2)
 
 
 def test_spec_source_needs_a_quote():
@@ -82,7 +82,7 @@ def test_package_lookup():
 
 def test_targets_resolve_with_their_source():
     t = resolved_targets(LinkConfig())
-    assert t["ber"] == (1e-27, "survey") and t["eye_height_mv"][1] == "survey"
+    assert t["ber"] == (1e-27, "spec") and t["eye_height_mv"][1] == "spec"
     from d2d_link.config import TargetConfig
     t2 = resolved_targets(LinkConfig(target=TargetConfig(eye_height_mv=50.0)))
     assert t2["eye_height_mv"] == (50.0, "config")
@@ -102,7 +102,8 @@ def test_code_does_not_hardcode_the_table():
 
 
 def test_tag_format():
-    assert spec.survey("tx_swing_vpp").tag().endswith("(source: survey)")
+    assert spec.survey("tx_swing_vpp").tag() == "0.4 V (source: spec)"
+    assert spec.survey("standard.lane_repair").tag().endswith("(source: survey)")
 
 
 def test_bundled_configs_stay_inside_the_survey_envelope():
@@ -146,7 +147,7 @@ def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
     """The lookup is tiered so a mask's numbers land per tier:
     ``<package>.<key>@<rate>`` first, the plain key last (0.13.5). Since
     0.14.0 24 and 32 GT/s take the 0.65 UI tier a 2025 analysis quotes
-    (``rx_eye_width_ui@24-32``, a range since 0.14.5; source: survey, unverified); every
+    (``rx_eye_width_ui@24-32``, a range since 0.14.5; source: spec since 0.16.1); every
     other rate takes the plain 0.75 UI, and the report names the key."""
     import dataclasses
 
@@ -165,7 +166,7 @@ def test_targets_resolve_through_rate_and_package_tiers(monkeypatch):
     monkeypatch.setattr(spec, "_table", lambda: table)
     import d2d_link.engine.statistical as st
     monkeypatch.setattr(st, "survey_tiered", lambda *a, **k: spec.survey_tiered(*a, **k, table=table))
-    assert resolved_targets(cfg)["eye_width_ui"] == (0.65, "survey")
+    assert resolved_targets(cfg)["eye_width_ui"] == (0.65, "spec")
     assert target_keys(cfg)["eye_width_ui"] == "standard.rx_eye_width_ui@32"
     adv = dataclasses.replace(cfg, package=dataclasses.replace(cfg.package, kind="advanced"))
     assert resolved_targets(adv)["eye_width_ui"][0] == 0.70                      # rate tier, no package tier
@@ -215,7 +216,7 @@ def test_the_eye_width_tier_is_a_rate_range():
     for rate, want, key in ((24, 0.65, "rx_eye_width_ui@24-32"), (28, 0.65, "rx_eye_width_ui@24-32"),
                             (32, 0.65, "rx_eye_width_ui@24-32"), (16, 0.75, "rx_eye_width_ui")):
         c = with_data_rate(cfg, rate)
-        assert st.resolved_targets(c)["eye_width_ui"] == (want, "survey"), rate
+        assert st.resolved_targets(c)["eye_width_ui"] == (want, "spec"), rate
         assert st.target_keys(c)["eye_width_ui"] == key, rate
     st._OFF_TABLE_WARNED.clear()
     with pytest.warns(UserWarning, match="neither in the survey's rate list"):

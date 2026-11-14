@@ -1,4 +1,4 @@
-# Vendored from spec_sources@d7b4d1eb510617d69784622c593c8ed31ab32b8b: src/spec_sources/data/ucie.yaml
+# Vendored from spec_sources@bbc0ccb49de4e0071e0bc21ea6bbe73fd92e1428: src/spec_sources/data/ucie.yaml
 # Adapted-copy policy: see src/d2d_link/vendor/__init__.py
 # ucie —— UCIe（Universal Chiplet Interconnect Express）规范的数：速率、BER、眼罩、摆幅、两种封装的 bump / reach / 宽度 / 修复。
 #
@@ -13,6 +13,9 @@
 # 是 legacy_keys/d2d_link.yaml，给它的垫片用。cite / note 里的"本库"指 d2d_link，"示例 02"、ClockingConfig、
 # TxConfig、lanes.spare_count、0.14.x 都是它的；下一次因核实改动这条时改成明确的库名（ROADMAP）。
 # 键名里的 @lo-hi 是 d2d_link 的速率区间档（它的 survey_tiered 按数据速率挑）。
+# 里程碑 2 第 3 批（2026-11-14）：16 条里 15 条对上联盟公开的 Hot Chips 2023 教程与 2022 白皮书，改为 spec（值不变，
+# tests/test_extraction.py::VERIFIED），并新增 ucie.raw_ber_by_rate、ucie.advanced.spare_lanes_per_32 两条。UCIe 规范本身的
+# 许可协议禁止把规范输入 AI 系统，本库不读规范。改过的条目 note 写明库名，不再用"本库"指 d2d_link。
 # 前缀：ucie.*。
 
 entries:
@@ -21,113 +24,161 @@ entries:
   ucie.data_rates_gtps:
     value: [4, 8, 12, 16, 24, 32]
     unit: GT/s
-    source: survey
-    cite: "D. Das Sharma et al., 'Universal Chiplet Interconnect Express (UCIe): An Open Industry Standard for Innovations with Chiplets at Package Level', IEEE Trans. CPMT 2022; UCIe Consortium white paper (2022)"
-    note: "未核实:速率档按综述所列,规范原文的速率表未读到。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文；D. Das Sharma, 'Universal Chiplet Interconnect Express (UCIe): Building an open chiplet ecosystem', UCIe Consortium white paper, 2022-02（UCIe 1.0），www.uciexpress.org/_files/ugd/0c1418_c5970a68ab214ffc97fab16d11581449.pdf；2026-11-14 读原文"
+    section: "教程 slide 53 'Data Rate, BER, and Channel Reach'、slide 71 'UCIe 1.0: Supports Standard and Advanced Packages'；白皮书 Table 1 'UCIe 1.0 Characteristics and Key Metrics'"
+    quote: "Signaling: Unidirectional NRZ [...] Data Rate: 4, 8, 12, 16, 24, 32 Gb/s. [...] Table 1: Data Rate (GT/s) | 4, 8, 12, 16, 24, 32 | Lower speeds must be supported -interop (e.g., 4, 8, 12 for 12G device)"
+    note: "UCIe 1.0 的速率档，两种封装相同；低速率必须支持，以便互通。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.forwarded_clock:
     value: "differential forwarded clock, DDR: clock rate = data rate / 2"
     unit: text
-    source: survey
-    cite: "Das Sharma 2022 (IEEE Micro / Hot Chips 34 UCIe 1.0 overview)"
-    note: "未核实:本库 ClockingConfig.scheme = forwarded_ddr 依此;是否四分之一速率等变体未查。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文；D. Das Sharma, 'Universal Chiplet Interconnect Express (UCIe): Building an open chiplet ecosystem', UCIe Consortium white paper, 2022-02（UCIe 1.0），www.uciexpress.org/_files/ugd/0c1418_c5970a68ab214ffc97fab16d11581449.pdf；2026-11-14 读原文"
+    section: "教程 slide 54 'PHY Architecture'、slide 57 'PHY Clocking Architecture'（数据率与时钟频率表）；白皮书 'UCIe supports different data rates...' 一段"
+    quote: "Differential Forwarded Clock, Single-Ended Data. [...] Supports 2-way and 4-way interleaving TRX [...] slide 57 table, Data rate (GT/s) | Clock freq. (fCK) (GHz): 32 | 16, 8; 24 | 12, 6; 16 | 8; 12 | 6; 8 | 4; 4 | 2 [...] a differential forwarded clock per direction"
+    note: "差分前向时钟，每方向一条，数据单端。时钟频率 = 速率 / 2（2 路交织，相位 90° / 270°）在每个速率都列了；24 / 32 GT/s 另有速率 / 4 的一档（6 / 8 GHz，4 路交织，相位 45° / 135°），本条的值只说了前一种。d2d_link 的 ClockingConfig.scheme = forwarded_ddr 依此。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.raw_ber_target:
     value: 1.0e-27
     unit: BER
-    source: survey
-    cite: "UCIe Consortium white paper (2022) 'BER < 1e-27'; Das Sharma 2022"
-    note: "未核实:综述把 1e-27 作为无 FEC 的原始 BER 目标;另有说法 24/32 GT/s 配 CRC+retry 放宽到 1e-15。两种说法都未见原文,此处取严格值。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文"
+    section: "教程 slide 53 'Data Rate, BER, and Channel Reach' 的 BER 表"
+    quote: "BER: Data Rate (Gb/s) 4 8 12 16 24 32; Advanced Package 1.00E-27 1.00E-27 1.00E-27 1.00E-15 1.00E-15 1.00E-15; Standard Package 1.00E-27 1.00E-27 1.00E-15 1.00E-15 1.00E-15 1.00E-15 [...] CRC and Retry for BER 1E-15 to achieve FIT rate <<1"
+    note: "**1e-27 只是低速率的数**：先进封装 4 / 8 / 12 Gb/s、标准封装 4 / 8 Gb/s；更高的速率是 1e-15，靠 CRC 与重传把 FIT 压到 << 1（ucie.raw_ber_with_retry；整张表见 ucie.raw_ber_by_rate）。迁入时的 cite 写'UCIe Consortium white paper (2022) BER < 1e-27'，那份白皮书里没有这句（它只写 FIT 期望约 1e-10）。d2d_link 原来'取严格值'用 1e-27，而 24–32 GT/s 时原文是 1e-15。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.raw_ber_with_retry:
     value: 1.0e-15
     unit: BER
-    source: survey
-    cite: "UCIe 1.0 overview talks (Hot Chips 34, 2022)"
-    note: "未核实:据称 24 / 32 GT/s 允许的原始 BER(有 CRC + retry);本库不建协议层,只留此参数位。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文"
+    section: "教程 slide 53 'Data Rate, BER, and Channel Reach' 的 BER 表"
+    quote: "BER: Data Rate (Gb/s) 4 8 12 16 24 32; Advanced Package 1.00E-27 1.00E-27 1.00E-27 1.00E-15 1.00E-15 1.00E-15; Standard Package 1.00E-27 1.00E-27 1.00E-15 1.00E-15 1.00E-15 1.00E-15 [...] CRC and Retry for BER 1E-15 to achieve FIT rate <<1"
+    note: "原始 BER 1e-15 的速率档：先进封装 16 / 24 / 32 Gb/s、标准封装 12 / 16 / 24 / 32 Gb/s（迁入时的 note 说只在 24 / 32，原文的范围更宽）。靠 D2D 适配层的 CRC 与重传达到 FIT << 1。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
+
+  ucie.raw_ber_by_rate:
+    value: {data_rate_gtps: [4, 8, 12, 16, 24, 32], advanced: [1.0e-27, 1.0e-27, 1.0e-27, 1.0e-15, 1.0e-15, 1.0e-15], standard: [1.0e-27, 1.0e-27, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15]}
+    unit: "GT/s, BER, BER"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文"
+    section: "教程 slide 53 'Data Rate, BER, and Channel Reach' 的 BER 表"
+    quote: "BER: Data Rate (Gb/s) 4 8 12 16 24 32; Advanced Package 1.00E-27 1.00E-27 1.00E-27 1.00E-15 1.00E-15 1.00E-15; Standard Package 1.00E-27 1.00E-27 1.00E-15 1.00E-15 1.00E-15 1.00E-15 [...] CRC and Retry for BER 1E-15 to achieve FIT rate <<1"
+    note: "分速率、分封装的原始 BER。读法如 ref('ucie.raw_ber_by_rate#standard@data_rate_gtps=24')。1e-15 的档靠 CRC 与重传达到 FIT << 1。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.rx_eye_height_mv:
     value: 40.0
     unit: mV
-    source: survey
-    cite: "public UCIe 1.0 electrical summaries (eye mask 'EH ≥ 40 mV')"
-    note: "未核实:收端眼高下限;原文的 eye-mask 表与所属速率档 / 封装未读到,数值待确认。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文"
+    section: "教程 slide 61 'Channel Specification'"
+    quote: "Channel needs to meet minimum eye mask under channel compliance simulation with noiseless jitter-less behavioral TX and RX models [...] Data Rate 4-16Gb/s 24-32Gb/s; Overall (Eye Closure due to Channel); Eye Height 40mV 40mV; Eye Width (rectangular eye mask with specified eye height) 0.75 UI | 0.65 UI with Equalization Enabled"
+    note: "**是信道合规的眼罩，不是收端的眼图规格**：用无噪声、无抖动的行为级 TX / RX 模型仿真信道，眼不能小于这个矩形。两个速率档都是 40 mV。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.rx_eye_width_ui:
     value: 0.75
     unit: UI
-    source: survey
-    cite: "public UCIe 1.0 electrical summaries (eye mask 'EW ≥ 0.75 UI')"
-    note: "未核实:收端眼宽下限;同上,数值待确认。0.14.0 起 24–32 GT/s 由下面的区间档接管;表外速率也落到这一条,并告警。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文"
+    section: "教程 slide 61 'Channel Specification'"
+    quote: "Channel needs to meet minimum eye mask under channel compliance simulation with noiseless jitter-less behavioral TX and RX models [...] Data Rate 4-16Gb/s 24-32Gb/s; Overall (Eye Closure due to Channel); Eye Height 40mV 40mV; Eye Width (rectangular eye mask with specified eye height) 0.75 UI | 0.65 UI with Equalization Enabled"
+    note: "4–16 Gb/s 的信道合规眼宽（无噪声、无抖动的行为级 TX / RX 模型下，矩形眼罩，眼高 40 mV）。d2d_link 0.14.0 起 24–32 GT/s 用 ucie.rx_eye_width_ui@24-32。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.rx_eye_width_ui@24-32:
     value: 0.65
     unit: UI
-    source: survey
-    cite: "Analysis of UCIe 48/64 GT/s Electrical Links (2025, ResearchGate 395249532), quoting the UCIe eye mask: 'For data rates between 4 and 16 GT/s, the required values are EH/EW = 40 mV / 0.75 UI, and for data rates between 24 and 32 GT/s, the required values are EH/EW = 40 mV / 0.65 UI'"
-    note: "未核实:二手转述(只读到检索摘要,论文原文与 UCIe 规范原文都未读)。采用于 0.14.0(用户 2026-11-05 决定;0.14.5 起是一条 24–32 GT/s 区间,此前 @24、@32 两条只认这两个速率);规范原文到了改成 spec 标签或删去。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文"
+    section: "教程 slide 61 'Channel Specification'"
+    quote: "Channel needs to meet minimum eye mask under channel compliance simulation with noiseless jitter-less behavioral TX and RX models [...] Data Rate 4-16Gb/s 24-32Gb/s; Overall (Eye Closure due to Channel); Eye Height 40mV 40mV; Eye Width (rectangular eye mask with specified eye height) 0.75 UI | 0.65 UI with Equalization Enabled"
+    note: "24–32 Gb/s 的信道合规眼宽，开均衡（24G 以上 TX 必须有 1-tap 去加重 TXLE，slide 55）。迁入时引的是 ResearchGate 上的二手转述，现在读到联盟教程原文，值相同。和另两条一样，是无噪声、无抖动的行为级 TX / RX 模型下信道的眼罩；d2d_link 的判定落在这一条上，若它把这条当作含抖动的收端判据，就比原文更严。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.tx_swing_vpp:
     value: 0.4
     unit: V
-    source: survey
-    cite: "Das Sharma 2022: ~0.4 V single-ended swing, terminated at the higher rates"
-    note: "未核实:发端摆幅标称值;本库 TxConfig.swing_vpp 默认值取自此。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文"
+    section: "教程 slide 56 'TX and RX Voltage Compatibility'"
+    quote: "Mininum TX swing 0.4V [...] Strongly recommend max TX voltage < 0.85V for compatibility with future process nodes"
+    note: "**原文是最小值**（原文拼作 Mininum），不是标称值；另外建议 TX 电压最高 < 0.85 V。d2d_link 的 TxConfig.swing_vpp 默认值取这条，等于取了下限。紧耦合模式（共享或前向电源、信道支持更大的眼罩）下眼罩改为 250 mV / 0.7 UI，对应 TX 摆幅 0.75 V、最高 16 Gb/s（slide 62），本表没登记。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   # ------------------------------------------------------------ 标准封装
   ucie.standard.bump_pitch_um:
     value: [100, 130]
     unit: um
-    source: survey
-    cite: "UCIe Consortium white paper (2022): standard package bump pitch 100-130 um"
-    note: "未核实。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文；D. Das Sharma, 'Universal Chiplet Interconnect Express (UCIe): Building an open chiplet ecosystem', UCIe Consortium white paper, 2022-02（UCIe 1.0），www.uciexpress.org/_files/ugd/0c1418_c5970a68ab214ffc97fab16d11581449.pdf；2026-11-14 读原文"
+    section: "教程 slide 53、slide 71；白皮书 Table 1"
+    quote: "Advanced Package (25-55um bump pitch): Up to 2mm and 32Gb/s, TX drive control. [...] Standard Package (100-130um bump pitch): [...] Table 1: Width (each cluster) | 16 | 64 | Width degradation in Standard, spare lanes in Advanced; Bump Pitch (um) | 100 – 130 | 25 - 55 | Interoperate across bump pitches in each package type across nodes; Channel Reach (mm) | <= 25 | <=2"
+    note: "白皮书的 KPI 按标准封装 110 µm、先进封装 45 µm 估算。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.standard.reach_mm:
     value: 25.0
     unit: mm
-    source: survey
-    cite: "UCIe Consortium white paper (2022): standard package reach up to 25 mm"
-    note: "未核实:示例 02 的 reach 上限与此比;差 2× 以上在 cairn/LOG.md 写原因。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文；D. Das Sharma, 'Universal Chiplet Interconnect Express (UCIe): Building an open chiplet ecosystem', UCIe Consortium white paper, 2022-02（UCIe 1.0），www.uciexpress.org/_files/ugd/0c1418_c5970a68ab214ffc97fab16d11581449.pdf；2026-11-14 读原文"
+    section: "教程 slide 71；白皮书 Table 1"
+    quote: "Advanced Package (25-55um bump pitch): Up to 2mm and 32Gb/s, TX drive control. [...] Standard Package (100-130um bump pitch): [...] Table 1: Width (each cluster) | 16 | 64 | Width degradation in Standard, spare lanes in Advanced; Bump Pitch (um) | 100 – 130 | 25 - 55 | Interoperate across bump pitches in each package type across nodes; Channel Reach (mm) | <= 25 | <=2"
+    note: "上限 25 mm。电气汇总表（slide 69）另有一列标准封装 4–16 Gb/s、能效目标 0.25–0.5 pJ/b、reach 2–10 mm。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.standard.module_width_lanes:
     value: 16
     unit: lanes
-    source: survey
-    cite: "Das Sharma 2022: standard package module x16"
-    note: "未核实。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文；D. Das Sharma, 'Universal Chiplet Interconnect Express (UCIe): Building an open chiplet ecosystem', UCIe Consortium white paper, 2022-02（UCIe 1.0），www.uciexpress.org/_files/ugd/0c1418_c5970a68ab214ffc97fab16d11581449.pdf；2026-11-14 读原文"
+    section: "教程 slide 54 'PHY Architecture'；白皮书 Table 1 与 'UCIe supports different data rates...' 一段"
+    quote: "Basic module data width: [...] x64 for advanced packaging [...] x16 for standard packaging [...] N single-ended, unidirectional, full-duplex Data Lanes (N = 16 for standard package and 64 for advanced package)"
+    note: "1 / 2 / 4 个 cluster 可以并成一条链路（白皮书 Figure 6）；标准封装的凸点排布另有 x32 一种（教程 'UCIe-S: Standard Package Bump Maps'）。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.standard.lane_repair:
     value: "width degradation (x16 -> x8), no spare lanes"
     unit: text
     source: survey
     cite: "Das Sharma 2022 / UCIe 1.0 overview"
-    note: "未核实:标准封装靠降宽度修复,先进封装靠备用 lane;本库两种都做成配置项。"
+    note: "未核实:标准封装靠降宽度修复、没有备用 lane，已见联盟白皮书（'the standard package supports width degradation to handle failures'）与 Hot Chips 2023 教程（'Width degrade for Standard pkg'）；降到 x8 这一点两者都没写，所以仍标 survey。本库两种修复都做成配置项。"
 
   # ------------------------------------------------------------ 先进封装
   ucie.advanced.bump_pitch_um:
     value: [25, 55]
     unit: um
-    source: survey
-    cite: "UCIe Consortium white paper (2022): advanced package bump pitch 25-55 um"
-    note: "未核实。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文；D. Das Sharma, 'Universal Chiplet Interconnect Express (UCIe): Building an open chiplet ecosystem', UCIe Consortium white paper, 2022-02（UCIe 1.0），www.uciexpress.org/_files/ugd/0c1418_c5970a68ab214ffc97fab16d11581449.pdf；2026-11-14 读原文"
+    section: "教程 slide 53、slide 71；白皮书 Table 1"
+    quote: "Advanced Package (25-55um bump pitch): Up to 2mm and 32Gb/s, TX drive control. [...] Standard Package (100-130um bump pitch): [...] Table 1: Width (each cluster) | 16 | 64 | Width degradation in Standard, spare lanes in Advanced; Bump Pitch (um) | 100 – 130 | 25 - 55 | Interoperate across bump pitches in each package type across nodes; Channel Reach (mm) | <= 25 | <=2"
+    note: "白皮书说先进封装在 25–55 µm 之间互通，KPI 按 45 µm 估算，25 µm 时带宽密度最多高 3.24 倍。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.advanced.reach_mm:
     value: 2.0
     unit: mm
-    source: survey
-    cite: "UCIe Consortium white paper (2022): advanced package reach up to 2 mm"
-    note: "未核实。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文；D. Das Sharma, 'Universal Chiplet Interconnect Express (UCIe): Building an open chiplet ecosystem', UCIe Consortium white paper, 2022-02（UCIe 1.0），www.uciexpress.org/_files/ugd/0c1418_c5970a68ab214ffc97fab16d11581449.pdf；2026-11-14 读原文"
+    section: "教程 slide 53、slide 71；白皮书 Table 1"
+    quote: "Advanced Package (25-55um bump pitch): Up to 2mm and 32Gb/s, TX drive control. [...] Standard Package (100-130um bump pitch): [...] Table 1: Width (each cluster) | 16 | 64 | Width degradation in Standard, spare lanes in Advanced; Bump Pitch (um) | 100 – 130 | 25 - 55 | Interoperate across bump pitches in each package type across nodes; Channel Reach (mm) | <= 25 | <=2"
+    note: "上限 2 mm，到 32 Gb/s，RX 不端接。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.advanced.module_width_lanes:
     value: 64
     unit: lanes
-    source: survey
-    cite: "Das Sharma 2022: advanced package module x64"
-    note: "未核实。"
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文；D. Das Sharma, 'Universal Chiplet Interconnect Express (UCIe): Building an open chiplet ecosystem', UCIe Consortium white paper, 2022-02（UCIe 1.0），www.uciexpress.org/_files/ugd/0c1418_c5970a68ab214ffc97fab16d11581449.pdf；2026-11-14 读原文"
+    section: "教程 slide 54 'PHY Architecture'；白皮书 Table 1 与 'UCIe supports different data rates...' 一段"
+    quote: "Basic module data width: [...] x64 for advanced packaging [...] x16 for standard packaging [...] N single-ended, unidirectional, full-duplex Data Lanes (N = 16 for standard package and 64 for advanced package)"
+    note: "1 / 2 / 4 个 cluster 可以并成一条链路（白皮书 Figure 6）。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
 
   ucie.advanced.lane_repair:
     value: "spare lanes (lane repair by remapping)"
     unit: text
-    source: survey
-    cite: "Das Sharma 2022 / UCIe 1.0 overview"
-    note: "未核实:备用 lane 的数量未见原文,本库由 lanes.spare_count 配置。"
+    source: spec
+    cite: "D. Das Sharma, 'Universal Chiplet Interconnect Express (UCIe): Building an open chiplet ecosystem', UCIe Consortium white paper, 2022-02（UCIe 1.0），www.uciexpress.org/_files/ugd/0c1418_c5970a68ab214ffc97fab16d11581449.pdf；2026-11-14 读原文；UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文"
+    section: "白皮书 'UCIe supports different data rates...' 一段与 Table 1；教程 slide 60 'Other PHY Features'、slide 68 'Main band Training [2]'"
+    quote: "The advanced package supports spare lanes to handle faulty lanes (including clock, valid, sideband, etc) where as the standard package supports width degradation to handle failures. [...] Redundancy & Repair for Advanced Package [...] Two per 32 bits [...] Apply repair for Advanced pkg and Width degrade for Standard pkg"
+    note: "每 32 条数据通道配 2 条备用（ucie.advanced.spare_lanes_per_32），时钟、valid、sideband 也能修。'by remapping' 是迁入时的说法，原文写的是 spare lanes / repair。d2d_link 的 lanes.spare_count 是配置项，x64 模块按原文是 4 条。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"
+
+  ucie.advanced.spare_lanes_per_32:
+    value: 2
+    unit: spare lanes per 32 data lanes
+    source: spec
+    cite: "UCIe Consortium, Hot Chips 2023 UCIe tutorial, 'Electrical, Form-Factor, and Compliance'（slides 52–81，'Property of Universal Chiplet Interconnect Express (UCIe) 2023'），hc2023.hotchips.org/assets/program/tutorials/ucie/Electrical%20Form%20Factor%20and%20Compliance.pdf；2026-11-14 读原文"
+    section: "教程 slide 60 'Other PHY Features'"
+    quote: "Redundancy & Repair for Advanced Package [...] Two per 32 bits"
+    note: "先进封装的备用通道数：每 32 位 2 条，x64 模块即 4 条。规范本身的许可协议禁止把规范输入 AI 系统，spec_sources 不读规范，读的是联盟公开的教程与白皮书。"

@@ -222,7 +222,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: alexyudragonsword-collab/spec_sources
-          ref: d7b4d1eb510617d69784622c593c8ed31ab32b8b
+          ref: bbc0ccb49de4e0071e0bc21ea6bbe73fd92e1428
           path: _siblings/spec_sources
       - uses: actions/setup-python@v5
         with:

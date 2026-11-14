@@ -8,7 +8,7 @@ x16 repair: 16 lanes, failed [5] -> width_degrade; tree 30 ps / 20 GHz, tracker 
     tree                             100.0 fs  ( 7.5 % of the power)
   and the PI step: a bounded box of 1.95 ps (RMS 563 fs, but at the target BER a box costs about its width, not 14 sigma of its RMS)
 
-levers one at a time (worst-lane margin = eye width over the 0.65 UI target, source: survey, relative):
+levers one at a time (worst-lane margin = eye width over the 0.65 UI target, source: spec, relative):
   lever                      residual [fs]   margin  eye [UI]  at +3 dB  withstands
   bundled                            365.5   +0.028    0.6683    -0.034     +1.5 dB
   PI step 1/32 UI                    365.5   +0.074    0.6979    +0.011     +3.4 dB

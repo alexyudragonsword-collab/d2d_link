@@ -28,7 +28,7 @@ die-to-die / UCIe 短距并行链路的行为级仿真框架:前向时钟、多 
 | `CHANGELOG.md`(根) | 已交付的演进 | 按里程碑追加 |
 | `cairn/LOG.md` | 时间序日志 | 新条目加在顶部,每条 ≤ 20 行:数字原值、被推翻的判断、下一步 |
 | `cairn/<topic>.md` | 知识专题文档(当前真相) | 就地更新;坑放正文小节并用 `contains` 标注 |
-| `cairn/Reference/` | 外部原始输入(规范原文贴进来放这里) | 按需创建,只追加 |
+| `cairn/Reference/` | 外部原始输入(公开材料;UCIe 规范本身不收) | 按需创建,只追加 |
 
 > 工程资产(配置、规范数字表、期望输出)留在代码树里;`cairn/` 只放关于它们的知识。面向使用者的 `README.md`、`docs/` 与面向协作者的 `cairn/` 读者不同,不要互相搬运。
 
@@ -38,7 +38,7 @@ die-to-die / UCIe 短距并行链路的行为级仿真框架:前向时钟、多 
 2. **前向时钟的抖动跟踪是核心机制** —— 数据与前向时钟共享发端 PLL 的相噪,收端看到的是两者之差经跟踪带宽滤波后的残余。禁止任何"把前向时钟当独立时钟"的捷径;相关 = 1 时残余抖动必须为零(`tests/test_forwarded_clock.py`)。
 3. **统计引擎是主引擎** —— BER 1e-27 不可能时域仿真出来;时域引擎只在可测 BER 上做一致性检查,LTI + 高斯噪声下两者必须在 2× 内:~1e-4 与 1e-6 在套件(`tests/test_engines.py`),3e-8(1e9 符号)每周(`tests/test_engines_deep.py`,`pytest -m slow`),1e-8 本身要 2.5e9 符号约 5 小时、手动触发。
 4. **多 lane 从第一天就在** —— lane 间 skew、公共时钟、lane repair 是配置项;单 lane 只是 `lanes.count = 1`(`tests/test_lanes.py`)。
-5. **规范数字只用原文** —— 拿不到原文的数字全部标 `source: survey` 并注明出处,不编;`grep "source: survey"` 一次列全(`tests/test_spec_sources.py`)。原文贴进来后再改成 `source: spec`。规范不管的模型估计数(走线损耗、叠层、行为级串扰)标 `source: model`,`grep "source: model"` 一次列全,`budget_report.py --sensitivity` 看哪些估计决定结论。
+5. **规范数字只用原文** —— 拿不到原文的数字全部标 `source: survey` 并注明出处,不编;`grep "source: survey"` 一次列全(`tests/test_spec_sources.py`)。核实在共享库 spec_sources 做(公开原文:Hot Chips 2023 教程、白皮书),核实后改 `source: spec` 再重新 pin;UCIe 规范本身的下载许可禁止交给 AI,不要贴进来。规范不管的模型估计数(走线损耗、叠层、行为级串扰)标 `source: model`,`grep "source: model"` 一次列全,`budget_report.py --sensitivity` 看哪些估计决定结论。
 6. **数值指纹** —— 重构必须用 `tools/fingerprint.py` 证明逐位不变(`tests/test_fingerprint.py`)。
 
 开工前先读 `cairn/engineering-pitfalls.md`。
