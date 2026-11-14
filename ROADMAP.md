@@ -39,7 +39,7 @@
 4. **24–32 GT/s 之间的速率,原始 BER 目标没有出处**。`ucie.raw_ber_by_rate` 只列 4 / 8 / 12 / 16 / 24 / 32 GT/s;28 GT/s 不在任何 `<package>.raw_ber_target@<rate>` 分档里,
    退回不分档的 1e-27,而两边的 24 / 32 GT/s 都是 1e-15(复现:`resolved_targets(with_data_rate(LinkConfig(), 28))["ber"]` = (1e-27, 'spec'),key `raw_ber_target`)。
    0.17.1 起它告警、报表标 `off_table`,但判定仍按 1e-27。要做:请 spec_sources 加区间条目(如 `ucie.standard.raw_ber_target@12-32`、`ucie.advanced.raw_ber_target@16-32`,
-   issue #2 提过的方案 b),若公开原文支持「区间内都是 1e-15」;重新 pin 后 28 GT/s 落到 1e-15。bundled 配置都是 32 GT/s,不受影响。
+   issue #2 提过的方案 b;已提 spec_sources#22),若公开原文支持「区间内都是 1e-15」;重新 pin 后 28 GT/s 落到 1e-15。原文不支持就维持告警、记为原文未覆盖。bundled 配置都是 32 GT/s,不受影响。
 
 ## P2 — 一致性与能力
 
