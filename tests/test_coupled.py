@@ -103,7 +103,8 @@ def test_budget_report_markdown_and_json(budget_tool, tmp_path):
                      sim=SimConfig(stat_phase_points=16))
     rep = budget_tool.build(cfg)
     md = budget_tool.to_markdown(rep)
-    for needle in ("# Timing budget", "## Clock-path jitter", "## Targets", "source: spec", "## Lanes", "| 1 | 1 |"):
+    for needle in ("# Timing budget", "## Clock-path jitter", "## Targets", "source: spec", "stricter than the spec's criterion",
+                   "## Lanes", "| 1 | 1 |"):
         assert needle in md, needle
     terms = {r["term"]: r for r in rep["jitter_budget"]}
     total = terms["total (power sum)"]["fs"]

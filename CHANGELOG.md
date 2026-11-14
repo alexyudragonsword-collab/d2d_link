@@ -4,6 +4,13 @@
 
 ---
 
+## [0.17.0] — 2026-11-14 — issue #2 的四个判定点
+
+- **眼罩口径(第 1 点,不动数)**:保留含抖动的眼对眼罩的比法,标明比规范严 —— UCIe 的眼罩判信道自己的眼(无噪、无抖的行为级 TX/RX)。
+  `report.MASK_CRITERION` 进报表 JSON 的 `mask_criterion`、Markdown Targets 节表下一句、GUI 判定卡。
+
+---
+
 ## [0.16.1] — 2026-11-14 — 重新 pin spec_sources:15 / 16 条改 source: spec(只换标签,指纹逐位不变;issue #2)
 
 - 三个 vendored 文件(`reader.py`、`data/ucie.yaml`、`legacy_keys/d2d_link.yaml`)重新拷自 spec_sources@`bbc0ccb49de4e0071e0bc21ea6bbe73fd92e1428`,CI vendor-drift 的检出同步。

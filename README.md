@@ -102,6 +102,7 @@ Crosstalk、Receiver、Sweeps(tracker 带宽 / 本地 PLL / reach);右栏队列(
 速率档、BER 目标、bump 间距、reach、模块宽度、眼罩共 16 条(眼宽按速率区间分档),全部在共享库 spec_sources 的 `ucie.yaml`(0.16.0 起 vendored 在 `src/d2d_link/vendor/spec_sources/data/ucie.yaml`,0.16.1 起 pin 在 spec_sources@bbc0ccb;`d2d_link.spec` 按旧键名读)。
 0.16.1 起其中 15 条是 `source: spec`:spec_sources 对照公开原文(Hot Chips 2023 UCIe 教程、UCIe 1.0 白皮书)核实,带原句与页码;剩下 `standard.lane_repair` 一条仍是 `source: survey`(降到 x8 两份原文都没写)。引擎只按 key 取,结果行打印 `source: xxx`。
 UCIe 规范本身的下载许可禁止把规范交给 AI 系统,本库不收规范原文(见 `cairn/spec-sources.md`)。
+**眼罩的口径比规范严**:原文的眼罩判的是信道自己的眼(无噪、无抖的行为级 TX/RX),本库拿含时钟路径残余抖动、收端噪声与串扰的眼去比;0.17.0 起报表 Targets 节写明这一点(issue #2 第 1 点,用户选保留)。
 **0.14.0 起眼宽目标分档:4–16 GT/s 0.75 UI、24–32 GT/s 0.65 UI**(0.14.5 起是一条区间 `@24-32`,28 GT/s 也取 0.65;表外且不在区间里的速率退回 0.75 并告警)(0.14.0 时出自二手转述;0.16.1 起核实:教程 slide 61 'Channel Specification')。按它 bundled 配置里 x1、x16 模块、x16 repair、x64 spare 都过,只有 x5 耦合不过。敏感性(0.14.2,示例 13):x1 +0.091、x64 spare +0.093 什么都不翻;x16 模块 +0.066 只在目标 0.70 UI 时翻(−0.010);**x16 repair +0.028 被目标 0.70 UI(−0.045)与发端 PLL 剖面 +3 dB(−0.034)翻**;x5 −0.121 什么都不翻。目标按 封装 × 速率档 分档查表(0.13.5):原文的分档数字一来,加 `standard.rx_eye_width_ui@32` 这样的条目即可,报表写明用的是哪一档。
 
 ```bash

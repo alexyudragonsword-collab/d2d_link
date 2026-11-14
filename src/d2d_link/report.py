@@ -13,6 +13,15 @@ from __future__ import annotations
 
 import math
 
+# Issue #2 point 1 (0.16.2): the UCIe eye mask is a channel-compliance
+# criterion -- the channel's eye with noiseless, jitter-free behavioural Tx
+# and Rx. This library compares the eye *with* the clock path's residual
+# jitter, Rx noise and crosstalk against it: stricter than the spec's test.
+# Kept on purpose (the user's choice, 2026-11-14); the report says so.
+MASK_CRITERION = ("Eye-mask comparison is stricter than the spec's criterion: the UCIe mask is for the channel's own "
+                  "eye with noiseless, jitter-free behavioural Tx/Rx; here the eye includes the clock path's residual "
+                  "jitter, Rx noise and crosstalk.")
+
 
 def budget_rows(cfg, clock) -> list[tuple[str, float]]:
     b = clock.budget()
@@ -73,6 +82,7 @@ def report(cfg, res, clock) -> dict:
                          + [{"term": "total (power sum)", "fs": 1e15 * total, "ui": total / ui}],
         "targets": {k: {"value": v, "source": src, "key": keys[k],
                         **({"off_table": off_table_rate(cfg)} if k == "eye_width_ui" else {})} for k, (v, src) in t.items()},
+        "mask_criterion": MASK_CRITERION,
         "crosstalk": ({"mode": cfg.channel.xtalk, **describe(cfg)} if cfg.channel.xtalk == "coupled"
                       else {"mode": cfg.channel.xtalk, **_xtalk_level(cfg, res)}),
         "channel_model": ({"rlgc_source": "model", **{k: v for k, v in cfg.rlgc().items()}}
@@ -111,6 +121,8 @@ def to_markdown(rep: dict) -> str:
     for k, v in rep["targets"].items():
         note = " (rate in no tier: fallback, unstated for this rate)" if v.get("off_table") else ""
         lines.append(f"| {k} | {v['value']:g} | {v['source']} | {v.get('key', '')}{note} |")
+    if rep.get("mask_criterion"):
+        lines += ["", rep["mask_criterion"]]
     x = rep["crosstalk"]
     lines += ["", "## Crosstalk", ""]
     if x["mode"] == "coupled":
@@ -433,6 +445,6 @@ def attribution_markdown(att: dict) -> str:
     return "\n".join(lines)
 
 
-__all__ = ["budget_rows", "report", "to_markdown", "build", "sensitivity_knobs", "sensitivity",
+__all__ = ["budget_rows", "report", "to_markdown", "build", "MASK_CRITERION", "sensitivity_knobs", "sensitivity",
            "attribution", "attribution_causes", "attribution_markdown", "switched_off", "shapley",
            "sensitivity_markdown"]

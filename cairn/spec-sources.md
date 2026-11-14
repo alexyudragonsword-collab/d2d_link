@@ -41,6 +41,9 @@ authoring_mode: ai_generated
 
 ## 决策记录
 
+- **2026-11-14(0.17.0,issue #2 第 1 点)眼罩口径:保留含抖动的比法,标明比规范严**。原文的眼罩是信道合规判据(无噪、无抖的行为级 TX/RX 看信道自己的眼);
+  本库的眼含时钟路径残余抖动、收端噪声与串扰。用户选保留(设计裕度口径),不另算信道眼;`report.MASK_CRITERION` 进报表 JSON(`mask_criterion`)、Markdown 的 Targets 节与 GUI 判定卡。
+  后果:本库的「不过」不等于不合规 —— x5 耦合 0.572 UI 是含抖动的眼。
 - **2026-11-14(0.16.1,issue #2)重新 pin 到 spec_sources@bbc0ccb**:15 条 survey → spec,值与单位一条没动,指纹 3597 个值逐位不变,
   报表与示例的出处标签从 survey 变 spec;GUI 的来源 chip 改取表条目自己的标签(此前写死 survey)。issue 的四个判定点(眼罩口径、32 GT/s 原始 BER、
   发送摆幅、quarter-rate 时钟)另起提交,见 ROADMAP P1 #1。另:旧 cite 说"白皮书写 BER < 1e-27",是错的(白皮书没写这个数),spec_sources 已改。

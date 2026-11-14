@@ -83,7 +83,8 @@ def verdict(result: dict) -> html.Section:
     aside = ("targets resolve to the UCIe table: none set in the YAML" if all(v["source"] in ("spec", "survey") for v in t.values())
              else "targets: " + ", ".join(f"{k} {v['source']}" for k, v in t.items()))
     return section("verdict", "1", "Verdict", aside, tiles, html.Div(bars, className="bars"),
-                   html.P(sentence, className="note"))
+                   html.P(sentence, className="note"),
+                   html.P(result["report"].get("mask_criterion", ""), className="fine"))
 
 
 __all__ = ["verdict"]
