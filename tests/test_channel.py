@@ -473,3 +473,56 @@ def test_per_lane_file_with_behavioural_fext_keeps_the_cos_factor(tmp_path):
     assert per_lane.stat[0].main_cursor_v == pytest.approx(group.stat[0].main_cursor_v, rel=1e-9)
     plain = run_link(dataclasses.replace(cfg, channel=dataclasses.replace(ch, xtalk="none"), lanes=LaneConfig(count=3)))
     assert per_lane.stat[0].main_cursor_v < plain.stat[0].main_cursor_v          # the cos factor is there
+
+
+def _four_lane_16_port(tmp_path):
+    """A 16-port differential file (PyBERT order +A, +B, -A, -B per lane,
+    each lane its own delay and loss, weak coupling between lanes) and each
+    lane written as its own single-ended 4-port file (+A, -A, +B, -B) from
+    the same numbers."""
+    skrf = pytest.importorskip("skrf")
+    f = np.linspace(0.0, 50e9, 201)
+    f[0] = 1e6
+    s = np.zeros((f.size, 16, 16), complex)
+    blocks = []
+    for lane in range(4):
+        t = np.exp(-(0.08 + 0.02 * lane) / 1e9 * f - 2j * np.pi * f * (80 + 10 * lane) * 1e-12)
+        r, c, x = 0.02 * t ** 2, 0.01 * np.ones_like(t), 0.03 * t
+        se = np.array([[r, c, t, x], [c, r, x, t], [t, x, r, c], [x, t, c, r]]).transpose(2, 0, 1)
+        idx = [4 * lane, 4 * lane + 2, 4 * lane + 1, 4 * lane + 3]
+        s[:, np.ix_(idx, idx)[0], np.ix_(idx, idx)[1]] = se
+        blocks.append(se)
+    for a in range(16):                                    # lane-to-lane coupling the per-lane read leaves out
+        for b in range(16):
+            if a // 4 != b // 4:
+                s[:, a, b] = 1e-3 * np.exp(-2j * np.pi * f * 50e-12)
+    skrf.Network(f=f, s=s, z0=50.0, f_unit="Hz").write_touchstone(str(tmp_path / "four_lanes"), form="ri")
+    for lane, se in enumerate(blocks):
+        skrf.Network(f=f, s=se, z0=50.0, f_unit="Hz").write_touchstone(str(tmp_path / f"lane{lane}"), form="ri")
+    return tmp_path / "four_lanes.s16p"
+
+
+def test_sixteen_port_differential_file_is_read_lane_by_lane(tmp_path):
+    """Halo_Serdes@6516f1c (vendored 0.17.3): ``import_diff_network`` takes
+    any multiple of 4 ports from 8, one differential lane per 4 (PyBERT
+    convention). At c13da1e a 16-port file raised "unsupported port count 16
+    (need 1/2/4/8/12)" and had to be split first. Lanes 0 and 3 read from
+    the 16-port file equal the same lanes split into 4-port files, bit for
+    bit, through the reader and through the library's channel model."""
+    pytest.importorskip("skrf")
+    from d2d_link.vendor.halo.touchstone import import_diff_network
+
+    path = _four_lane_16_port(tmp_path)
+    f = np.linspace(0.0, 40e9, 129)
+    for lane in (0, 3):
+        whole = import_diff_network(str(path), lane=lane)
+        split = import_diff_network(str(tmp_path / f"lane{lane}.s4p"))
+        assert np.array_equal(whole.f, split.f) and np.array_equal(whole.s, split.s), lane
+        a = ChannelModel.from_touchstone(str(path), f, 50.0, 50.0, lane=lane)
+        b = ChannelModel.from_touchstone(str(tmp_path / f"lane{lane}.s4p"), f, 50.0, 50.0)
+        assert np.array_equal(a.H, b.H), lane
+    h0 = ChannelModel.from_touchstone(str(path), f, 50.0, 50.0, lane=0).H
+    h3 = ChannelModel.from_touchstone(str(path), f, 50.0, 50.0, lane=3).H
+    assert not np.allclose(h0, h3)                         # the lanes really differ
+    with pytest.raises(ValueError, match="out of range"):
+        import_diff_network(str(path), lane=4)

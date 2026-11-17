@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Adapted from Halo_Serdes@c13da1e60584538b1cc3324c18266ba5beb76d37: tools/vendor_check.py (itself from polar_tx@bfa460c;
+# Adapted from Halo_Serdes@6516f1cce0f7da6461b599c7f818b381657b8a64: tools/vendor_check.py (itself from polar_tx@bfa460c;
 # package path, env-var prefix and adaptation marker re-homed; no logic change).
 """Vendor drift check for ``src/d2d_link/vendor``.
 

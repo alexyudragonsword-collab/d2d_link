@@ -101,7 +101,7 @@ class ChannelConfig:
     kind: Literal["analytic", "touchstone"] = "analytic"
     length_mm: float = 10.0            # analytic line length
     file: Optional[str] = None         # Touchstone path (s2p/s4p/...), kind == touchstone
-    lane: int = 0                      # lane index inside an 8/12-port file
+    lane: int = 0                      # lane index inside an 8/12/16/...-port file (4 ports per lane; 16+ since 0.17.3)
     renumber: bool = True              # auto-detect 1<->3 port ordering (PyBERT)
     zs_ohm: float = 50.0               # source termination
     zl_ohm: float = 50.0               # receiver termination
@@ -139,7 +139,7 @@ class ChannelConfig:
     next_db: Optional[float] = None
     routing: Literal["microstrip", "stripline"] = "microstrip"   # stripline: homogeneous dielectric, eps_eff = eps_r,
                                                                  # no first-order FEXT (odd and even modes travel together)
-    touchstone_mode: Literal["differential", "single_ended"] = "differential"   # 4/8/12-port differential (Halo reader)
+    touchstone_mode: Literal["differential", "single_ended"] = "differential"   # 4-port, or 4N-port with N lanes (Halo reader)
                                                                                 # or a single-ended 2N-port: ports 1..N the
                                                                                 # near ends of lanes 0..N-1, N+1..2N the far ends
     touchstone_lanes: Optional[int] = None      # N for a single-ended file; None -> ports / 2

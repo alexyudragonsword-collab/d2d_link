@@ -1,4 +1,4 @@
-# Vendored from Halo_Serdes@c13da1e60584538b1cc3324c18266ba5beb76d37: src/halo_serdes/channel/analytic.py
+# Vendored from Halo_Serdes@6516f1cce0f7da6461b599c7f818b381657b8a64: src/halo_serdes/channel/analytic.py
 # Adapted-copy policy: see src/d2d_link/vendor/__init__.py
 """Analytic (RLGC / ABCD cascade) channel modeling.
 

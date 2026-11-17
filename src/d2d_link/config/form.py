@@ -36,7 +36,7 @@ SECTIONS: list[tuple[str, str, list[dict]]] = [
         _f("channel.kind", "Kind", "enum", options=["analytic", "touchstone"]),
         _f("channel.length_mm", "Length [mm] (analytic)", "float"),
         _f("channel.file", "Touchstone file", "opt_str"),
-        _f("channel.lane", "Lane (8/12-port file)", "int"),
+        _f("channel.lane", "Lane (multi-lane file, 4 ports each)", "int"),
         _f("channel.renumber", "Auto port renumber", "bool"),
         _f("channel.zs_ohm", "Source term [ohm]", "float"),
         _f("channel.zl_ohm", "Receiver term [ohm]", "float"),
