@@ -1,4 +1,4 @@
-# Vendored from Halo_Serdes@c13da1e60584538b1cc3324c18266ba5beb76d37: src/halo_serdes/channel/touchstone.py
+# Vendored from Halo_Serdes@6516f1cce0f7da6461b599c7f818b381657b8a64: src/halo_serdes/channel/touchstone.py
 # Adapted-copy policy: see src/d2d_link/vendor/__init__.py
 """Touchstone import and differential transfer-function extraction.
 
@@ -15,7 +15,7 @@ Ports two battle-tested approaches and cross-validates them in tests:
    (``terminate_gamma``). Kept as an independent implementation for tests.
 
 Multi-port conventions follow PyBERT ``import_freq``: 4-port files are
-single-ended (+A, -A, +B, -B after optional renumber detection); 8/12-port
+single-ended (+A, -A, +B, -B after optional renumber detection); 8/12/16/...-port
 files hold N/4 lanes ordered (+A, +B, -A, -B) per lane.
 """
 
@@ -94,16 +94,18 @@ def sdd_2port(ntwk: rf.Network, renumber: bool = False) -> rf.Network:
 
 
 def import_diff_network(path: str, renumber: bool = True, lane: int = 0) -> rf.Network:
-    """Read a 1/2/4/8/12-port Touchstone file, return a differential 2-port.
+    """Read a 1/2/4-port or 4N-port Touchstone file, return a differential 2-port.
 
-    4-port files are assumed single-ended; 8/12-port files hold N/4 lanes with
-    ports (+A, +B, -A, -B) per lane (PyBERT convention).
+    4-port files are assumed single-ended; 8/12/16/...-port files hold N/4
+    lanes with ports (+A, +B, -A, -B) per lane (PyBERT convention; until
+    2026-11-03 only 8 and 12 ports were taken, so a 16-port file of four
+    differential lanes had to be split first).
     """
     ntwk = rf.Network(path, f_unit="Hz")
     (_, rows, cols) = ntwk.s.shape
     if rows != cols:
         raise ValueError("non-square Touchstone S-matrix")
-    if rows in (8, 12):
+    if rows >= 8 and rows % 4 == 0:
         n_lanes = rows // 4
         if not 0 <= lane < n_lanes:
             raise ValueError(f"lane={lane} out of range for {rows}-port file")
@@ -117,7 +119,7 @@ def import_diff_network(path: str, renumber: bool = True, lane: int = 0) -> rf.N
         from skrf.network import one_port_2_two_port
 
         return one_port_2_two_port(ntwk)
-    raise ValueError(f"unsupported port count {rows} (need 1/2/4/8/12)")
+    raise ValueError(f"unsupported port count {rows} (need 1, 2, 4 or a multiple of 4 from 8)")
 
 
 def _cap_mag(z: np.ndarray, max_mag: float = 1.0) -> np.ndarray:

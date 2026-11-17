@@ -3,6 +3,16 @@
 本文件按倒序记录实质性进展 —— 最新条目在本行正下方。每条保持简短(数字原值、被推翻的判断、下一步),
 结论沉淀进 `cairn/<topic>.md`。
 
+## 2026-11-17 · 重新 pin Halo_Serdes@6516f1c(feat/halo-repin-6516f1c,0.17.3,不动数)
+
+- 四个文件换到 6516f1c(上游只改了 touchstone.py 与 response.py);指纹 3597 / 3597 逐位相同,示例期望输出不变,vendor_check strict 绿。
+- 旧 pin:16 端口差分文件 `import_diff_network(..., lane=3)` → `ValueError: unsupported port count 16 (need 1/2/4/8/12)`;新 pin 下 lane 0 / 3 与拆成 4 端口逐位相等(新测试)。
+- 查了本库有没有截断冲激响应(Halo 截断丢慢尾、Whisper 上读数只有 serdespy 的 0.70–0.82×):**没有按能量 / 斜率的截断**,`trim_impulse` 不调,
+  只用 `freq2impulse` 的整窗(512 UI);唯一的截断是统计引擎读游标的 `stat_cursor_reach` = 256 UI 与两端 1e-6 峰值的门限。
+  实测丢掉的游标 RMS:x1 / x5 54.3 µV(主游标 164.6 mV 的 3.3e-4)、x16 模块 43.9 µV(2.6e-4)、x64 spare 32.2 µV(1.75e-4)——
+  低于 Halo 新的 isi_tol 1e-3,比 Halo 当年(0.004 V / 0.19 V ≈ 2e-2)小 60–120 倍。UCIe 短通道无关。
+- 分支规则:AGENTS.md 与 CONTRIBUTING 都没写只往 ccr-a2094794-9qa40v 推,无需改;本轮在 feat/* 上开 PR 合 main。
+
 ## 2026-11-14 · 表外速率 BER:原文未覆盖(ccr-a2094794-9qa40v,0.17.2)
 
 - spec_sources#22 答复「原文没说,不加」:slide 53 只列 6 个离散速率,UCIe 1.1 / 2.0 / 4.0 白皮书也没有区间 BER;28 GT/s 不是 UCIe 速率。

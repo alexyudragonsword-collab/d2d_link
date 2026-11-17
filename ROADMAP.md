@@ -54,7 +54,7 @@
    要做:用户给接收机前端带宽与噪声口径(或一个参考设计),写进 bundled 配置,重跑示例 00 / 05 / 07 / 12。
    复现:`examples/09_receiver_front_end.py` 第一张表(x1);模块用 `dataclasses.replace(cfg, rx=dataclasses.replace(cfg.rx, bw_hz=…))` 后 `run_link`。
 
-3. **Touchstone 路径只测过合成文件**(`tests/test_channel.py`:无损 4 端口、有损 + 直流补齐、单端 6 端口、有损 50 GHz 截断 + 直通与耦合项的带外延拓);没有真实封装 S 参数文件。接口留着,数据没有。
+3. **Touchstone 路径只测过合成文件**(`tests/test_channel.py`:无损 4 端口、有损 + 直流补齐、单端 6 端口、差分 16 端口 4 lane(0.17.3,Halo@6516f1c 起不用先拆)、有损 50 GHz 截断 + 直通与耦合项的带外延拓);没有真实封装 S 参数文件。接口留着,数据没有。
    延拓是外推(直通按最后十倍频的斜率,耦合沿直通的衰减):合成文件上剩 0.005 UI 的直通延拓误差;真实文件的带外行为未知,文件带宽低于 4 × Nyquist 时把这一项列进该链路的不确定度。
 
 ## P3 — 能力扩展

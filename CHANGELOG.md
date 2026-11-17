@@ -4,6 +4,20 @@
 
 ---
 
+## [0.17.3] — 2026-11-17 — 重新 pin Halo_Serdes:c13da1e → 6516f1c(不动数)
+
+- vendored 的四个 Halo 文件(`channel/analytic.py`、`response.py`、`touchstone.py`,`core/waveform.py`)换到 Halo_Serdes@`6516f1cce0f7da6461b599c7f818b381657b8a64`
+  (main;中间 376 个提交,这四个文件只改了两个):
+  - `touchstone.py`(bd927f9):`import_diff_network` 收 1 / 2 / 4 端口或 8 以上 4 的倍数(每 4 个端口一条差分 lane,PyBERT 约定);8 / 12 端口读法不变。
+    旧 pin 上 16 端口文件报 `ValueError: unsupported port count 16 (need 1/2/4/8/12)`。
+  - `response.py`(8509967):`trim_impulse` 加可选 `osr` / `isi_tol`(按 ISI 尾巴延后截断点,Halo P1 #42);本库只用 `freq2impulse`,不调它。
+  - `analytic.py`、`waveform.py` 只改文件头的 SHA;`response.py` 仍是 adapted(一行 import)。`tools/vendor_check.py` 的出处头同步(上游这段没改它),CI vendor-drift 的检出 pin 同步。
+- 新测试 `test_sixteen_port_differential_file_is_read_lane_by_lane`:合成 16 端口 4 lane 文件,lane 0 / 3 经 `import_diff_network` 与经 `ChannelModel.from_touchstone`
+  都与拆成 4 端口后分别读的结果逐位相等。schema / 表单里「8/12-port file」的说法改为任意 4N 端口。
+- 验收:指纹 3597 / 3597 逐位相同;16 个示例期望输出不变;`vendor_check --strict --fail-on-skip` 9 个文件 8 verbatim + 1 adapted、无漂移。
+
+---
+
 ## [0.17.2] — 2026-11-14 — 表外速率的 BER:原文未覆盖,维持告警
 
 - spec_sources#22 关闭「不加」:公开材料的 BER 表只列 4 / 8 / 12 / 16 / 24 / 32 GT/s,没有区间,28 GT/s 也不是 UCIe 1.x 的速率。

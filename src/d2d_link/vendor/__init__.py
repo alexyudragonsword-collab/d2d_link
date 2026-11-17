@@ -22,7 +22,11 @@ What is here and why:
   voltage transfer, with the serdespy cross-check), the RLGC lossy
   transmission-line model and the H(f) -> impulse conversions. The channel
   reading is the only part of Halo this library shares; its equalisers,
-  CDRs and FEC are the long-reach problem and stay there.
+  CDRs and FEC are the long-reach problem and stay there. Pinned at
+  6516f1c since 0.17.3 (c13da1e before): upstream changed two of the four
+  -- ``import_diff_network`` takes any 4N-port file from 8 ports (16+ was
+  refused), and ``trim_impulse`` gained an optional ISI-tail criterion this
+  library does not call (it uses ``freq2impulse`` only).
 - ``pllsim/colored.py`` (``synth_from_psd``) and ``pllsim/jitter.py``
   (``integrate_pn``, ``sphi_from_ldbc``): the two primitives that turn a
   clock phase-noise profile file (pll_simulator's ``export/clock_profile.py``)
