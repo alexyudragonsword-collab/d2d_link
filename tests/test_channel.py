@@ -480,8 +480,7 @@ def _four_lane_16_port(tmp_path):
     each lane its own delay and loss, weak coupling between lanes) and each
     lane written as its own single-ended 4-port file (+A, -A, +B, -B) from
     the same numbers."""
-    import skrf
-
+    skrf = pytest.importorskip("skrf")
     f = np.linspace(0.0, 50e9, 201)
     f[0] = 1e6
     s = np.zeros((f.size, 16, 16), complex)
@@ -510,6 +509,7 @@ def test_sixteen_port_differential_file_is_read_lane_by_lane(tmp_path):
     (need 1/2/4/8/12)" and had to be split first. Lanes 0 and 3 read from
     the 16-port file equal the same lanes split into 4-port files, bit for
     bit, through the reader and through the library's channel model."""
+    pytest.importorskip("skrf")
     from d2d_link.vendor.halo.touchstone import import_diff_network
 
     path = _four_lane_16_port(tmp_path)
